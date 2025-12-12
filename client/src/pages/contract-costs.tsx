@@ -123,6 +123,32 @@ export default function ContractCosts() {
     },
   });
 
+  const handleContractSelect = (contractId: string) => {
+    form.setValue("contractId", contractId);
+    const selectedContract = contracts?.find(c => c.id === contractId);
+    if (selectedContract) {
+      if (selectedContract.startDate) {
+        const startDateStr = format(new Date(selectedContract.startDate), "yyyy-MM-dd");
+        form.setValue("incurredDate", startDateStr);
+        form.setValue("amortizationStartDate", startDateStr);
+      } else {
+        form.setValue("incurredDate", "");
+        form.setValue("amortizationStartDate", "");
+      }
+      if (selectedContract.endDate) {
+        const endDateStr = format(new Date(selectedContract.endDate), "yyyy-MM-dd");
+        form.setValue("amortizationEndDate", endDateStr);
+      } else {
+        form.setValue("amortizationEndDate", "");
+      }
+      if (selectedContract.currency) {
+        form.setValue("currency", selectedContract.currency);
+      } else {
+        form.setValue("currency", "BRL");
+      }
+    }
+  };
+
   const filteredCosts = contractCosts?.filter((cost) => {
     const matchesSearch =
       cost.contractNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -302,7 +328,7 @@ export default function ContractCosts() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Contract</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={handleContractSelect} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-contract">
                               <SelectValue placeholder="Select contract" />
