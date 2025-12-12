@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useI18n } from "@/lib/i18n";
 import { Plus, Search, FileText, Calendar } from "lucide-react";
 import type { ContractWithDetails } from "@/lib/types";
 import type { Customer } from "@shared/schema";
@@ -32,6 +33,7 @@ import type { Customer } from "@shared/schema";
 export default function Contracts() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);

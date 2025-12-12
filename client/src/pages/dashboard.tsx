@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useI18n } from "@/lib/i18n";
 import {
   FileText,
   DollarSign,
@@ -25,6 +26,8 @@ import {
 import type { DashboardStats, RevenueByPeriod, ContractWithDetails, LicenseWithSession } from "@/lib/types";
 
 export default function Dashboard() {
+  const { t } = useI18n();
+  
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
@@ -121,7 +124,7 @@ export default function Dashboard() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <h1 className="text-2xl font-semibold">{t("dashboard.title")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
             IFRS 15 Revenue Recognition Overview
           </p>
@@ -130,30 +133,30 @@ export default function Dashboard() {
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          title="Total Contracts"
+          title={t("dashboard.totalContracts")}
           value={stats?.totalContracts ?? 0}
-          subtitle={`${stats?.activeContracts ?? 0} active`}
+          subtitle={`${stats?.activeContracts ?? 0} ${t("status.active").toLowerCase()}`}
           icon={<FileText className="h-5 w-5 text-muted-foreground" />}
           isLoading={statsLoading}
         />
         <MetricCard
-          title="Total Revenue"
+          title={t("common.total") + " Revenue"}
           value={`$${Number(stats?.totalRevenue ?? 0).toLocaleString()}`}
           trend={{ value: 12.5, direction: "up" }}
           icon={<DollarSign className="h-5 w-5 text-muted-foreground" />}
           isLoading={statsLoading}
         />
         <MetricCard
-          title="Recognized Revenue"
+          title={t("dashboard.recognizedRevenue")}
           value={`$${Number(stats?.recognizedRevenue ?? 0).toLocaleString()}`}
           subtitle="YTD"
           icon={<TrendingUp className="h-5 w-5 text-muted-foreground" />}
           isLoading={statsLoading}
         />
         <MetricCard
-          title="Deferred Revenue"
+          title={t("dashboard.deferredRevenue")}
           value={`$${Number(stats?.deferredRevenue ?? 0).toLocaleString()}`}
-          subtitle="Remaining obligations"
+          subtitle={t("reports.remainingObligations")}
           icon={<Clock className="h-5 w-5 text-muted-foreground" />}
           isLoading={statsLoading}
         />
@@ -162,7 +165,7 @@ export default function Dashboard() {
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
-            <CardTitle className="text-base font-medium">Revenue Recognition Trend</CardTitle>
+            <CardTitle className="text-base font-medium">{t("dashboard.revenueTrend")}</CardTitle>
           </CardHeader>
           <CardContent>
             {revenueLoading ? (
@@ -292,14 +295,14 @@ export default function Dashboard() {
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
-            <CardTitle className="text-base font-medium">Recent Contracts</CardTitle>
+            <CardTitle className="text-base font-medium">{t("dashboard.recentContracts")}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <DataTable
               columns={contractColumns}
               data={recentContracts ?? []}
               isLoading={contractsLoading}
-              emptyMessage="No contracts yet"
+              emptyMessage={t("dashboard.noContracts")}
               testIdPrefix="contract-row"
               className="border-0"
             />
@@ -308,14 +311,14 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
-            <CardTitle className="text-base font-medium">Active License Sessions</CardTitle>
+            <CardTitle className="text-base font-medium">{t("dashboard.activeLicenses")}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <DataTable
               columns={licenseColumns}
               data={activeLicenses ?? []}
               isLoading={licensesLoading}
-              emptyMessage="No active sessions"
+              emptyMessage={t("dashboard.noLicenses")}
               testIdPrefix="license-row"
               className="border-0"
             />

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useI18n, Language, languageNames } from "@/lib/i18n";
 import {
   Building2,
   CreditCard,
@@ -25,6 +26,7 @@ import {
   Shield,
   Bell,
   Palette,
+  Globe,
   ExternalLink,
   Check,
 } from "lucide-react";
@@ -32,6 +34,7 @@ import type { Tenant, User } from "@shared/schema";
 
 export default function Settings() {
   const { toast } = useToast();
+  const { t, language, setLanguage } = useI18n();
 
   const { data: tenant, isLoading: tenantLoading } = useQuery<Tenant>({
     queryKey: ["/api/tenant"],
@@ -86,9 +89,9 @@ export default function Settings() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Settings</h1>
+        <h1 className="text-2xl font-semibold">{t("settings.title")}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Manage organization settings and preferences
+          {t("settings.subtitle")}
         </p>
       </div>
 
@@ -96,11 +99,15 @@ export default function Settings() {
         <TabsList>
           <TabsTrigger value="organization" data-testid="tab-organization">
             <Building2 className="h-4 w-4 mr-2" />
-            Organization
+            {t("settings.organization")}
           </TabsTrigger>
           <TabsTrigger value="billing" data-testid="tab-billing">
             <CreditCard className="h-4 w-4 mr-2" />
-            Billing
+            {t("settings.billing")}
+          </TabsTrigger>
+          <TabsTrigger value="language" data-testid="tab-language">
+            <Globe className="h-4 w-4 mr-2" />
+            {t("settings.language")}
           </TabsTrigger>
           <TabsTrigger value="users" data-testid="tab-users">
             <Users className="h-4 w-4 mr-2" />
@@ -256,6 +263,52 @@ export default function Settings() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="language" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-medium">{t("settings.language")}</CardTitle>
+              <CardDescription>
+                {t("settings.selectLanguage")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>{t("settings.selectLanguage")}</Label>
+                <Select
+                  value={language}
+                  onValueChange={(value) => setLanguage(value as Language)}
+                >
+                  <SelectTrigger data-testid="select-language">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en" data-testid="option-lang-en">
+                      <div className="flex items-center gap-2">
+                        <span>English</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="pt-BR" data-testid="option-lang-pt">
+                      <div className="flex items-center gap-2">
+                        <span>Português (Brasil)</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="es" data-testid="option-lang-es">
+                      <div className="flex items-center gap-2">
+                        <span>Español</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  {language === "en" && "The interface will be displayed in English."}
+                  {language === "pt-BR" && "A interface será exibida em Português."}
+                  {language === "es" && "La interfaz se mostrará en Español."}
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

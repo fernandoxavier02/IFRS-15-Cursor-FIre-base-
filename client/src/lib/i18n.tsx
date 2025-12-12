@@ -1,0 +1,576 @@
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+
+export type Language = "en" | "pt-BR" | "es";
+
+export const translations = {
+  "en": {
+    // Navigation
+    "nav.dashboard": "Dashboard",
+    "nav.contracts": "Contracts",
+    "nav.customers": "Customers",
+    "nav.licenses": "Licenses",
+    "nav.reports": "Reports",
+    "nav.ifrs15": "IFRS 15 Engine",
+    "nav.audit": "Audit Trail",
+    "nav.settings": "Settings",
+    
+    // Dashboard
+    "dashboard.title": "Dashboard",
+    "dashboard.totalContracts": "Total Contracts",
+    "dashboard.activeContracts": "Active Contracts",
+    "dashboard.recognizedRevenue": "Recognized Revenue",
+    "dashboard.deferredRevenue": "Deferred Revenue",
+    "dashboard.revenueTrend": "Revenue Trend",
+    "dashboard.recentContracts": "Recent Contracts",
+    "dashboard.activeLicenses": "Active Licenses",
+    "dashboard.noContracts": "No contracts yet",
+    "dashboard.noLicenses": "No active licenses",
+    "dashboard.fromLastMonth": "from last month",
+    
+    // Contracts
+    "contracts.title": "Contracts",
+    "contracts.subtitle": "Manage customer contracts and revenue recognition",
+    "contracts.new": "New Contract",
+    "contracts.search": "Search contracts...",
+    "contracts.noResults": "No contracts found",
+    "contracts.create": "Create Contract",
+    "contracts.customer": "Customer",
+    "contracts.selectCustomer": "Select a customer",
+    "contracts.contractNumber": "Contract Number",
+    "contracts.value": "Contract Value",
+    "contracts.startDate": "Start Date",
+    "contracts.endDate": "End Date",
+    "contracts.status": "Status",
+    "contracts.description": "Description",
+    "contracts.cancel": "Cancel",
+    
+    // Customers
+    "customers.title": "Customers",
+    "customers.subtitle": "Manage customer accounts and relationships",
+    "customers.new": "New Customer",
+    "customers.search": "Search customers...",
+    "customers.noResults": "No customers found",
+    "customers.create": "Create Customer",
+    "customers.name": "Customer Name",
+    "customers.email": "Email Address",
+    "customers.phone": "Phone Number",
+    "customers.address": "Address",
+    "customers.industry": "Industry",
+    "customers.contracts": "Contracts",
+    "customers.totalValue": "Total Value",
+    "customers.cancel": "Cancel",
+    
+    // Licenses
+    "licenses.title": "Licenses",
+    "licenses.subtitle": "Manage software licenses and IP-based access control",
+    "licenses.new": "New License",
+    "licenses.search": "Search licenses...",
+    "licenses.noResults": "No licenses found",
+    "licenses.active": "Active",
+    "licenses.suspended": "Suspended",
+    "licenses.expired": "Expired",
+    "licenses.revoked": "Revoked",
+    "licenses.forceRelease": "Force Release",
+    "licenses.suspend": "Suspend",
+    "licenses.revoke": "Revoke",
+    "licenses.inUse": "In Use",
+    "licenses.lastHeartbeat": "Last Heartbeat",
+    "licenses.currentIp": "Current IP",
+    "licenses.expiresAt": "Expires At",
+    
+    // Reports
+    "reports.title": "IFRS 15 Reports",
+    "reports.subtitle": "Generate compliance reports for revenue recognition",
+    "reports.disaggregated": "Disaggregated Revenue",
+    "reports.contractBalances": "Contract Balances",
+    "reports.remainingObligations": "Remaining Performance Obligations",
+    "reports.generate": "Generate Report",
+    "reports.export": "Export",
+    "reports.period": "Period",
+    "reports.category": "Category",
+    "reports.amount": "Amount",
+    "reports.assets": "Contract Assets",
+    "reports.liabilities": "Contract Liabilities",
+    "reports.receivables": "Trade Receivables",
+    
+    // IFRS 15 Engine
+    "ifrs15.title": "IFRS 15 Revenue Recognition Engine",
+    "ifrs15.subtitle": "Apply the five-step model to recognize revenue from customer contracts",
+    "ifrs15.step1": "Step 1: Identify the Contract",
+    "ifrs15.step1Desc": "Identify contracts with customers that meet IFRS 15 criteria",
+    "ifrs15.step2": "Step 2: Identify Performance Obligations",
+    "ifrs15.step2Desc": "Identify distinct goods or services promised in the contract",
+    "ifrs15.step3": "Step 3: Determine Transaction Price",
+    "ifrs15.step3Desc": "Determine the amount of consideration expected",
+    "ifrs15.step4": "Step 4: Allocate Transaction Price",
+    "ifrs15.step4Desc": "Allocate the transaction price to each performance obligation",
+    "ifrs15.step5": "Step 5: Recognize Revenue",
+    "ifrs15.step5Desc": "Recognize revenue when performance obligations are satisfied",
+    "ifrs15.selectContract": "Select a Contract",
+    "ifrs15.processContract": "Process Contract",
+    "ifrs15.noContract": "Select a contract to begin processing",
+    
+    // Audit Trail
+    "audit.title": "Audit Trail",
+    "audit.subtitle": "Track all system changes and user activities",
+    "audit.search": "Search audit logs...",
+    "audit.filterEntity": "Filter by Entity",
+    "audit.filterAction": "Filter by Action",
+    "audit.all": "All",
+    "audit.user": "User",
+    "audit.action": "Action",
+    "audit.entity": "Entity",
+    "audit.timestamp": "Timestamp",
+    "audit.details": "Details",
+    "audit.noResults": "No audit logs found",
+    
+    // Settings
+    "settings.title": "Settings",
+    "settings.subtitle": "Manage your organization and account preferences",
+    "settings.organization": "Organization",
+    "settings.orgName": "Organization Name",
+    "settings.orgEmail": "Organization Email",
+    "settings.billing": "Billing",
+    "settings.currentPlan": "Current Plan",
+    "settings.manageBilling": "Manage Billing",
+    "settings.users": "Users & Roles",
+    "settings.manageUsers": "Manage Users",
+    "settings.notifications": "Notifications",
+    "settings.emailNotifications": "Email Notifications",
+    "settings.language": "Language",
+    "settings.selectLanguage": "Select Language",
+    "settings.theme": "Theme",
+    "settings.save": "Save Changes",
+    
+    // Common
+    "common.loading": "Loading...",
+    "common.error": "Error",
+    "common.success": "Success",
+    "common.save": "Save",
+    "common.cancel": "Cancel",
+    "common.delete": "Delete",
+    "common.edit": "Edit",
+    "common.view": "View",
+    "common.create": "Create",
+    "common.search": "Search",
+    "common.filter": "Filter",
+    "common.export": "Export",
+    "common.import": "Import",
+    "common.refresh": "Refresh",
+    "common.actions": "Actions",
+    "common.status": "Status",
+    "common.date": "Date",
+    "common.amount": "Amount",
+    "common.total": "Total",
+    "common.noData": "No data available",
+    
+    // Status
+    "status.active": "Active",
+    "status.inactive": "Inactive",
+    "status.pending": "Pending",
+    "status.draft": "Draft",
+    "status.approved": "Approved",
+    "status.rejected": "Rejected",
+    "status.expired": "Expired",
+    "status.cancelled": "Cancelled",
+  },
+  
+  "pt-BR": {
+    // Navegação
+    "nav.dashboard": "Painel",
+    "nav.contracts": "Contratos",
+    "nav.customers": "Clientes",
+    "nav.licenses": "Licenças",
+    "nav.reports": "Relatórios",
+    "nav.ifrs15": "Motor IFRS 15",
+    "nav.audit": "Trilha de Auditoria",
+    "nav.settings": "Configurações",
+    
+    // Painel
+    "dashboard.title": "Painel",
+    "dashboard.totalContracts": "Total de Contratos",
+    "dashboard.activeContracts": "Contratos Ativos",
+    "dashboard.recognizedRevenue": "Receita Reconhecida",
+    "dashboard.deferredRevenue": "Receita Diferida",
+    "dashboard.revenueTrend": "Tendência de Receita",
+    "dashboard.recentContracts": "Contratos Recentes",
+    "dashboard.activeLicenses": "Licenças Ativas",
+    "dashboard.noContracts": "Nenhum contrato ainda",
+    "dashboard.noLicenses": "Nenhuma licença ativa",
+    "dashboard.fromLastMonth": "do mês passado",
+    
+    // Contratos
+    "contracts.title": "Contratos",
+    "contracts.subtitle": "Gerencie contratos de clientes e reconhecimento de receita",
+    "contracts.new": "Novo Contrato",
+    "contracts.search": "Pesquisar contratos...",
+    "contracts.noResults": "Nenhum contrato encontrado",
+    "contracts.create": "Criar Contrato",
+    "contracts.customer": "Cliente",
+    "contracts.selectCustomer": "Selecione um cliente",
+    "contracts.contractNumber": "Número do Contrato",
+    "contracts.value": "Valor do Contrato",
+    "contracts.startDate": "Data de Início",
+    "contracts.endDate": "Data de Término",
+    "contracts.status": "Status",
+    "contracts.description": "Descrição",
+    "contracts.cancel": "Cancelar",
+    
+    // Clientes
+    "customers.title": "Clientes",
+    "customers.subtitle": "Gerencie contas e relacionamentos com clientes",
+    "customers.new": "Novo Cliente",
+    "customers.search": "Pesquisar clientes...",
+    "customers.noResults": "Nenhum cliente encontrado",
+    "customers.create": "Criar Cliente",
+    "customers.name": "Nome do Cliente",
+    "customers.email": "Endereço de Email",
+    "customers.phone": "Número de Telefone",
+    "customers.address": "Endereço",
+    "customers.industry": "Setor",
+    "customers.contracts": "Contratos",
+    "customers.totalValue": "Valor Total",
+    "customers.cancel": "Cancelar",
+    
+    // Licenças
+    "licenses.title": "Licenças",
+    "licenses.subtitle": "Gerencie licenças de software e controle de acesso por IP",
+    "licenses.new": "Nova Licença",
+    "licenses.search": "Pesquisar licenças...",
+    "licenses.noResults": "Nenhuma licença encontrada",
+    "licenses.active": "Ativa",
+    "licenses.suspended": "Suspensa",
+    "licenses.expired": "Expirada",
+    "licenses.revoked": "Revogada",
+    "licenses.forceRelease": "Liberar Forçado",
+    "licenses.suspend": "Suspender",
+    "licenses.revoke": "Revogar",
+    "licenses.inUse": "Em Uso",
+    "licenses.lastHeartbeat": "Último Heartbeat",
+    "licenses.currentIp": "IP Atual",
+    "licenses.expiresAt": "Expira Em",
+    
+    // Relatórios
+    "reports.title": "Relatórios IFRS 15",
+    "reports.subtitle": "Gere relatórios de conformidade para reconhecimento de receita",
+    "reports.disaggregated": "Receita Desagregada",
+    "reports.contractBalances": "Saldos de Contratos",
+    "reports.remainingObligations": "Obrigações de Desempenho Remanescentes",
+    "reports.generate": "Gerar Relatório",
+    "reports.export": "Exportar",
+    "reports.period": "Período",
+    "reports.category": "Categoria",
+    "reports.amount": "Valor",
+    "reports.assets": "Ativos de Contrato",
+    "reports.liabilities": "Passivos de Contrato",
+    "reports.receivables": "Contas a Receber",
+    
+    // Motor IFRS 15
+    "ifrs15.title": "Motor de Reconhecimento de Receita IFRS 15",
+    "ifrs15.subtitle": "Aplique o modelo de cinco etapas para reconhecer receita de contratos com clientes",
+    "ifrs15.step1": "Etapa 1: Identificar o Contrato",
+    "ifrs15.step1Desc": "Identifique contratos com clientes que atendam aos critérios do IFRS 15",
+    "ifrs15.step2": "Etapa 2: Identificar Obrigações de Desempenho",
+    "ifrs15.step2Desc": "Identifique bens ou serviços distintos prometidos no contrato",
+    "ifrs15.step3": "Etapa 3: Determinar Preço da Transação",
+    "ifrs15.step3Desc": "Determine o valor da contraprestação esperada",
+    "ifrs15.step4": "Etapa 4: Alocar Preço da Transação",
+    "ifrs15.step4Desc": "Aloque o preço da transação para cada obrigação de desempenho",
+    "ifrs15.step5": "Etapa 5: Reconhecer Receita",
+    "ifrs15.step5Desc": "Reconheça a receita quando as obrigações de desempenho forem satisfeitas",
+    "ifrs15.selectContract": "Selecione um Contrato",
+    "ifrs15.processContract": "Processar Contrato",
+    "ifrs15.noContract": "Selecione um contrato para iniciar o processamento",
+    
+    // Trilha de Auditoria
+    "audit.title": "Trilha de Auditoria",
+    "audit.subtitle": "Acompanhe todas as alterações do sistema e atividades dos usuários",
+    "audit.search": "Pesquisar logs de auditoria...",
+    "audit.filterEntity": "Filtrar por Entidade",
+    "audit.filterAction": "Filtrar por Ação",
+    "audit.all": "Todos",
+    "audit.user": "Usuário",
+    "audit.action": "Ação",
+    "audit.entity": "Entidade",
+    "audit.timestamp": "Data/Hora",
+    "audit.details": "Detalhes",
+    "audit.noResults": "Nenhum log de auditoria encontrado",
+    
+    // Configurações
+    "settings.title": "Configurações",
+    "settings.subtitle": "Gerencie sua organização e preferências de conta",
+    "settings.organization": "Organização",
+    "settings.orgName": "Nome da Organização",
+    "settings.orgEmail": "Email da Organização",
+    "settings.billing": "Faturamento",
+    "settings.currentPlan": "Plano Atual",
+    "settings.manageBilling": "Gerenciar Faturamento",
+    "settings.users": "Usuários e Funções",
+    "settings.manageUsers": "Gerenciar Usuários",
+    "settings.notifications": "Notificações",
+    "settings.emailNotifications": "Notificações por Email",
+    "settings.language": "Idioma",
+    "settings.selectLanguage": "Selecionar Idioma",
+    "settings.theme": "Tema",
+    "settings.save": "Salvar Alterações",
+    
+    // Comum
+    "common.loading": "Carregando...",
+    "common.error": "Erro",
+    "common.success": "Sucesso",
+    "common.save": "Salvar",
+    "common.cancel": "Cancelar",
+    "common.delete": "Excluir",
+    "common.edit": "Editar",
+    "common.view": "Visualizar",
+    "common.create": "Criar",
+    "common.search": "Pesquisar",
+    "common.filter": "Filtrar",
+    "common.export": "Exportar",
+    "common.import": "Importar",
+    "common.refresh": "Atualizar",
+    "common.actions": "Ações",
+    "common.status": "Status",
+    "common.date": "Data",
+    "common.amount": "Valor",
+    "common.total": "Total",
+    "common.noData": "Nenhum dado disponível",
+    
+    // Status
+    "status.active": "Ativo",
+    "status.inactive": "Inativo",
+    "status.pending": "Pendente",
+    "status.draft": "Rascunho",
+    "status.approved": "Aprovado",
+    "status.rejected": "Rejeitado",
+    "status.expired": "Expirado",
+    "status.cancelled": "Cancelado",
+  },
+  
+  "es": {
+    // Navegación
+    "nav.dashboard": "Panel",
+    "nav.contracts": "Contratos",
+    "nav.customers": "Clientes",
+    "nav.licenses": "Licencias",
+    "nav.reports": "Informes",
+    "nav.ifrs15": "Motor NIIF 15",
+    "nav.audit": "Pista de Auditoría",
+    "nav.settings": "Configuración",
+    
+    // Panel
+    "dashboard.title": "Panel",
+    "dashboard.totalContracts": "Total de Contratos",
+    "dashboard.activeContracts": "Contratos Activos",
+    "dashboard.recognizedRevenue": "Ingresos Reconocidos",
+    "dashboard.deferredRevenue": "Ingresos Diferidos",
+    "dashboard.revenueTrend": "Tendencia de Ingresos",
+    "dashboard.recentContracts": "Contratos Recientes",
+    "dashboard.activeLicenses": "Licencias Activas",
+    "dashboard.noContracts": "Sin contratos aún",
+    "dashboard.noLicenses": "Sin licencias activas",
+    "dashboard.fromLastMonth": "del mes pasado",
+    
+    // Contratos
+    "contracts.title": "Contratos",
+    "contracts.subtitle": "Gestione contratos de clientes y reconocimiento de ingresos",
+    "contracts.new": "Nuevo Contrato",
+    "contracts.search": "Buscar contratos...",
+    "contracts.noResults": "No se encontraron contratos",
+    "contracts.create": "Crear Contrato",
+    "contracts.customer": "Cliente",
+    "contracts.selectCustomer": "Seleccione un cliente",
+    "contracts.contractNumber": "Número de Contrato",
+    "contracts.value": "Valor del Contrato",
+    "contracts.startDate": "Fecha de Inicio",
+    "contracts.endDate": "Fecha de Fin",
+    "contracts.status": "Estado",
+    "contracts.description": "Descripción",
+    "contracts.cancel": "Cancelar",
+    
+    // Clientes
+    "customers.title": "Clientes",
+    "customers.subtitle": "Gestione cuentas y relaciones con clientes",
+    "customers.new": "Nuevo Cliente",
+    "customers.search": "Buscar clientes...",
+    "customers.noResults": "No se encontraron clientes",
+    "customers.create": "Crear Cliente",
+    "customers.name": "Nombre del Cliente",
+    "customers.email": "Correo Electrónico",
+    "customers.phone": "Número de Teléfono",
+    "customers.address": "Dirección",
+    "customers.industry": "Industria",
+    "customers.contracts": "Contratos",
+    "customers.totalValue": "Valor Total",
+    "customers.cancel": "Cancelar",
+    
+    // Licencias
+    "licenses.title": "Licencias",
+    "licenses.subtitle": "Gestione licencias de software y control de acceso por IP",
+    "licenses.new": "Nueva Licencia",
+    "licenses.search": "Buscar licencias...",
+    "licenses.noResults": "No se encontraron licencias",
+    "licenses.active": "Activa",
+    "licenses.suspended": "Suspendida",
+    "licenses.expired": "Expirada",
+    "licenses.revoked": "Revocada",
+    "licenses.forceRelease": "Liberar Forzado",
+    "licenses.suspend": "Suspender",
+    "licenses.revoke": "Revocar",
+    "licenses.inUse": "En Uso",
+    "licenses.lastHeartbeat": "Último Heartbeat",
+    "licenses.currentIp": "IP Actual",
+    "licenses.expiresAt": "Expira En",
+    
+    // Informes
+    "reports.title": "Informes NIIF 15",
+    "reports.subtitle": "Genere informes de cumplimiento para reconocimiento de ingresos",
+    "reports.disaggregated": "Ingresos Desagregados",
+    "reports.contractBalances": "Saldos de Contratos",
+    "reports.remainingObligations": "Obligaciones de Desempeño Restantes",
+    "reports.generate": "Generar Informe",
+    "reports.export": "Exportar",
+    "reports.period": "Período",
+    "reports.category": "Categoría",
+    "reports.amount": "Monto",
+    "reports.assets": "Activos de Contrato",
+    "reports.liabilities": "Pasivos de Contrato",
+    "reports.receivables": "Cuentas por Cobrar",
+    
+    // Motor NIIF 15
+    "ifrs15.title": "Motor de Reconocimiento de Ingresos NIIF 15",
+    "ifrs15.subtitle": "Aplique el modelo de cinco pasos para reconocer ingresos de contratos con clientes",
+    "ifrs15.step1": "Paso 1: Identificar el Contrato",
+    "ifrs15.step1Desc": "Identifique contratos con clientes que cumplan los criterios de NIIF 15",
+    "ifrs15.step2": "Paso 2: Identificar Obligaciones de Desempeño",
+    "ifrs15.step2Desc": "Identifique bienes o servicios distintos prometidos en el contrato",
+    "ifrs15.step3": "Paso 3: Determinar Precio de la Transacción",
+    "ifrs15.step3Desc": "Determine el monto de la contraprestación esperada",
+    "ifrs15.step4": "Paso 4: Asignar Precio de la Transacción",
+    "ifrs15.step4Desc": "Asigne el precio de la transacción a cada obligación de desempeño",
+    "ifrs15.step5": "Paso 5: Reconocer Ingresos",
+    "ifrs15.step5Desc": "Reconozca los ingresos cuando se satisfagan las obligaciones de desempeño",
+    "ifrs15.selectContract": "Seleccione un Contrato",
+    "ifrs15.processContract": "Procesar Contrato",
+    "ifrs15.noContract": "Seleccione un contrato para iniciar el procesamiento",
+    
+    // Pista de Auditoría
+    "audit.title": "Pista de Auditoría",
+    "audit.subtitle": "Rastree todos los cambios del sistema y actividades de usuarios",
+    "audit.search": "Buscar registros de auditoría...",
+    "audit.filterEntity": "Filtrar por Entidad",
+    "audit.filterAction": "Filtrar por Acción",
+    "audit.all": "Todos",
+    "audit.user": "Usuario",
+    "audit.action": "Acción",
+    "audit.entity": "Entidad",
+    "audit.timestamp": "Fecha/Hora",
+    "audit.details": "Detalles",
+    "audit.noResults": "No se encontraron registros de auditoría",
+    
+    // Configuración
+    "settings.title": "Configuración",
+    "settings.subtitle": "Gestione su organización y preferencias de cuenta",
+    "settings.organization": "Organización",
+    "settings.orgName": "Nombre de la Organización",
+    "settings.orgEmail": "Correo de la Organización",
+    "settings.billing": "Facturación",
+    "settings.currentPlan": "Plan Actual",
+    "settings.manageBilling": "Gestionar Facturación",
+    "settings.users": "Usuarios y Roles",
+    "settings.manageUsers": "Gestionar Usuarios",
+    "settings.notifications": "Notificaciones",
+    "settings.emailNotifications": "Notificaciones por Correo",
+    "settings.language": "Idioma",
+    "settings.selectLanguage": "Seleccionar Idioma",
+    "settings.theme": "Tema",
+    "settings.save": "Guardar Cambios",
+    
+    // Común
+    "common.loading": "Cargando...",
+    "common.error": "Error",
+    "common.success": "Éxito",
+    "common.save": "Guardar",
+    "common.cancel": "Cancelar",
+    "common.delete": "Eliminar",
+    "common.edit": "Editar",
+    "common.view": "Ver",
+    "common.create": "Crear",
+    "common.search": "Buscar",
+    "common.filter": "Filtrar",
+    "common.export": "Exportar",
+    "common.import": "Importar",
+    "common.refresh": "Actualizar",
+    "common.actions": "Acciones",
+    "common.status": "Estado",
+    "common.date": "Fecha",
+    "common.amount": "Monto",
+    "common.total": "Total",
+    "common.noData": "Sin datos disponibles",
+    
+    // Estado
+    "status.active": "Activo",
+    "status.inactive": "Inactivo",
+    "status.pending": "Pendiente",
+    "status.draft": "Borrador",
+    "status.approved": "Aprobado",
+    "status.rejected": "Rechazado",
+    "status.expired": "Expirado",
+    "status.cancelled": "Cancelado",
+  },
+} as const;
+
+type TranslationKey = keyof typeof translations["en"];
+
+interface I18nContextType {
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  t: (key: TranslationKey) => string;
+}
+
+const I18nContext = createContext<I18nContextType | undefined>(undefined);
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const [language, setLanguageState] = useState<Language>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("language") as Language;
+      if (saved && (saved === "en" || saved === "pt-BR" || saved === "es")) {
+        return saved;
+      }
+    }
+    return "en";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("language", language);
+    document.documentElement.lang = language;
+  }, [language]);
+
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+  };
+
+  const t = (key: TranslationKey): string => {
+    return translations[language][key] || translations["en"][key] || key;
+  };
+
+  return (
+    <I18nContext.Provider value={{ language, setLanguage, t }}>
+      {children}
+    </I18nContext.Provider>
+  );
+}
+
+export function useI18n() {
+  const context = useContext(I18nContext);
+  if (context === undefined) {
+    throw new Error("useI18n must be used within an I18nProvider");
+  }
+  return context;
+}
+
+export const languageNames: Record<Language, string> = {
+  "en": "English",
+  "pt-BR": "Português (Brasil)",
+  "es": "Español",
+};

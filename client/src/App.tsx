@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageSelector } from "@/components/language-selector";
+import { I18nProvider } from "@/lib/i18n";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import NotFound from "@/pages/not-found";
@@ -42,25 +44,30 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="ifrs15-theme">
-        <TooltipProvider>
-          <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-            <div className="flex h-screen w-full">
-              <AppSidebar />
-              <div className="flex flex-col flex-1 overflow-hidden">
-                <header className="flex items-center justify-between gap-4 px-4 h-14 border-b bg-background shrink-0">
-                  <div className="flex items-center gap-2">
-                    <SidebarTrigger data-testid="button-sidebar-toggle" />
-                  </div>
-                  <ThemeToggle />
-                </header>
-                <main className="flex-1 overflow-auto bg-muted/30">
-                  <Router />
-                </main>
+        <I18nProvider>
+          <TooltipProvider>
+            <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+              <div className="flex h-screen w-full">
+                <AppSidebar />
+                <div className="flex flex-col flex-1 overflow-hidden">
+                  <header className="flex items-center justify-between gap-4 px-4 h-14 border-b bg-background shrink-0">
+                    <div className="flex items-center gap-2">
+                      <SidebarTrigger data-testid="button-sidebar-toggle" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <LanguageSelector />
+                      <ThemeToggle />
+                    </div>
+                  </header>
+                  <main className="flex-1 overflow-auto bg-muted/30">
+                    <Router />
+                  </main>
+                </div>
               </div>
-            </div>
-          </SidebarProvider>
-          <Toaster />
-        </TooltipProvider>
+            </SidebarProvider>
+            <Toaster />
+          </TooltipProvider>
+        </I18nProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

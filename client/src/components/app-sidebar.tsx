@@ -22,58 +22,60 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
-
-const mainNavItems = [
-  {
-    title: "Dashboard",
-    url: "/",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Contracts",
-    url: "/contracts",
-    icon: FileText,
-  },
-  {
-    title: "Customers",
-    url: "/customers",
-    icon: Users,
-  },
-];
-
-const ifrs15Items = [
-  {
-    title: "IFRS 15 Engine",
-    url: "/ifrs15",
-    icon: Calculator,
-  },
-  {
-    title: "Reports",
-    url: "/reports",
-    icon: BarChart3,
-  },
-];
-
-const adminItems = [
-  {
-    title: "Licenses",
-    url: "/licenses",
-    icon: KeyRound,
-  },
-  {
-    title: "Audit Trail",
-    url: "/audit",
-    icon: Shield,
-  },
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-  },
-];
+import { useI18n } from "@/lib/i18n";
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { t } = useI18n();
+
+  const mainNavItems = [
+    {
+      titleKey: "nav.dashboard" as const,
+      url: "/",
+      icon: LayoutDashboard,
+    },
+    {
+      titleKey: "nav.contracts" as const,
+      url: "/contracts",
+      icon: FileText,
+    },
+    {
+      titleKey: "nav.customers" as const,
+      url: "/customers",
+      icon: Users,
+    },
+  ];
+
+  const ifrs15Items = [
+    {
+      titleKey: "nav.ifrs15" as const,
+      url: "/ifrs15",
+      icon: Calculator,
+    },
+    {
+      titleKey: "nav.reports" as const,
+      url: "/reports",
+      icon: BarChart3,
+    },
+  ];
+
+  const adminItems = [
+    {
+      titleKey: "nav.licenses" as const,
+      url: "/licenses",
+      icon: KeyRound,
+    },
+    {
+      titleKey: "nav.audit" as const,
+      url: "/audit",
+      icon: Shield,
+    },
+    {
+      titleKey: "nav.settings" as const,
+      url: "/settings",
+      icon: Settings,
+    },
+  ];
 
   return (
     <Sidebar>
@@ -97,15 +99,15 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {mainNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.titleKey}>
                   <SidebarMenuButton
                     asChild
                     isActive={location === item.url}
                     className="w-full"
                   >
-                    <Link href={item.url} data-testid={`nav-${item.title.toLowerCase()}`}>
+                    <Link href={item.url} data-testid={`nav-${item.titleKey.split(".")[1]}`}>
                       <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <span>{t(item.titleKey)}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -116,20 +118,20 @@ export function AppSidebar() {
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs font-medium uppercase tracking-wide text-muted-foreground px-2">
-            Revenue Recognition
+            IFRS 15
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {ifrs15Items.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.titleKey}>
                   <SidebarMenuButton
                     asChild
                     isActive={location === item.url || location.startsWith(item.url + "/")}
                     className="w-full"
                   >
-                    <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                    <Link href={item.url} data-testid={`nav-${item.titleKey.split(".")[1]}`}>
                       <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <span>{t(item.titleKey)}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -140,20 +142,20 @@ export function AppSidebar() {
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs font-medium uppercase tracking-wide text-muted-foreground px-2">
-            Administration
+            Admin
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {adminItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.titleKey}>
                   <SidebarMenuButton
                     asChild
                     isActive={location === item.url}
                     className="w-full"
                   >
-                    <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                    <Link href={item.url} data-testid={`nav-${item.titleKey.split(".")[1]}`}>
                       <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <span>{t(item.titleKey)}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
