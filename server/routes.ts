@@ -2883,6 +2883,186 @@ export async function registerRoutes(
     }
   });
 
+  // ============ IFRS 15 Accounting Control ============
+  // GET /api/ifrs15-accounting-control/:year/:month
+  // Returns contract assets (unbilled revenue) and contract liabilities (deferred revenue)
+  // with opening balance, debits, credits, movement, and closing balance per contract
+  app.get("/api/ifrs15-accounting-control/:year/:month", async (req: Request, res: Response) => {
+    try {
+      const { year, month } = req.params;
+      const yearNum = parseInt(year);
+      const monthNum = parseInt(month);
+      
+      if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+        return res.status(400).json({ message: "Invalid year or month" });
+      }
+      
+      // Period boundaries
+      const periodStart = new Date(yearNum, monthNum - 1, 1);
+      const periodEnd = new Date(yearNum, monthNum, 0); // Last day of month
+      const previousPeriodEnd = new Date(yearNum, monthNum - 1, 0); // Last day of previous month
+      
+      const contracts = await storage.getContracts(DEFAULT_TENANT_ID);
+      const customers = await storage.getCustomers(DEFAULT_TENANT_ID);
+      const ledgerEntries = await storage.getRevenueLedgerEntries(DEFAULT_TENANT_ID);
+      const billingSchedules = await storage.getBillingSchedules(DEFAULT_TENANT_ID);
+      
+      interface ContractAccountingRow {
+        id: string;
+        contractId: string;
+        contractNumber: string;
+        customerName: string;
+        currency: string;
+        openingBalance: number;
+        debits: number;
+        credits: number;
+        movement: number;
+        closingBalance: number;
+        type: "asset" | "liability";
+      }
+      
+      const contractAssets: ContractAccountingRow[] = [];
+      const contractLiabilities: ContractAccountingRow[] = [];
+      
+      let totalAssetOpening = 0;
+      let totalAssetDebits = 0;
+      let totalAssetCredits = 0;
+      let totalAssetMovement = 0;
+      let totalAssetClosing = 0;
+      
+      let totalLiabilityOpening = 0;
+      let totalLiabilityDebits = 0;
+      let totalLiabilityCredits = 0;
+      let totalLiabilityMovement = 0;
+      let totalLiabilityClosing = 0;
+      
+      for (const contract of contracts) {
+        const customer = customers.find(c => c.id === contract.customerId);
+        const contractLedger = ledgerEntries.filter(e => e.contractId === contract.id);
+        const contractBilling = billingSchedules.filter(b => b.contractId === contract.id);
+        
+        // Calculate revenue recognized up to previous period end
+        let revenueRecognizedPrevious = 0;
+        let amountsInvoicedPrevious = 0;
+        
+        // Calculate revenue recognized in current period
+        let revenueRecognizedPeriod = 0;
+        let amountsInvoicedPeriod = 0;
+        
+        for (const entry of contractLedger) {
+          if (entry.entryType === "revenue" && entry.isPosted) {
+            const entryDate = entry.entryDate ? new Date(entry.entryDate) : null;
+            const amount = parseFloat(entry.amount || "0");
+            
+            if (entryDate && entryDate <= previousPeriodEnd) {
+              revenueRecognizedPrevious += amount;
+            } else if (entryDate && entryDate >= periodStart && entryDate <= periodEnd) {
+              revenueRecognizedPeriod += amount;
+            }
+          }
+        }
+        
+        for (const billing of contractBilling) {
+          if (billing.status === "invoiced" || billing.status === "paid") {
+            const billingDate = billing.invoiceDate ? new Date(billing.invoiceDate) : 
+                               (billing.scheduledDate ? new Date(billing.scheduledDate) : null);
+            const amount = parseFloat(billing.amount || "0");
+            
+            if (billingDate && billingDate <= previousPeriodEnd) {
+              amountsInvoicedPrevious += amount;
+            } else if (billingDate && billingDate >= periodStart && billingDate <= periodEnd) {
+              amountsInvoicedPeriod += amount;
+            }
+          }
+        }
+        
+        // Net Balance = Revenue Recognized - Amounts Invoiced
+        // Positive = Contract Asset (unbilled revenue)
+        // Negative = Contract Liability (deferred revenue)
+        const openingNetBalance = revenueRecognizedPrevious - amountsInvoicedPrevious;
+        const closingNetBalance = (revenueRecognizedPrevious + revenueRecognizedPeriod) - (amountsInvoicedPrevious + amountsInvoicedPeriod);
+        
+        // Skip contracts with no balance and no activity
+        if (openingNetBalance === 0 && closingNetBalance === 0 && revenueRecognizedPeriod === 0 && amountsInvoicedPeriod === 0) continue;
+        
+        const contractNumber = contract.contractNumber || `C-${contract.id.slice(0, 8)}`;
+        const customerName = customer?.name || "Unknown";
+        const currency = contract.currency || "BRL";
+        
+        // Classify based on closing balance sign
+        if (closingNetBalance >= 0) {
+          // Contract Asset (Unbilled Revenue)
+          // Debit = Revenue recognized (increases unbilled revenue)
+          // Credit = Billing (decreases unbilled revenue as we invoice)
+          const row: ContractAccountingRow = {
+            id: contract.id,
+            contractId: contract.id,
+            contractNumber,
+            customerName,
+            currency,
+            openingBalance: Math.max(0, openingNetBalance),
+            debits: revenueRecognizedPeriod,
+            credits: amountsInvoicedPeriod,
+            movement: revenueRecognizedPeriod - amountsInvoicedPeriod,
+            closingBalance: closingNetBalance,
+            type: "asset",
+          };
+          
+          contractAssets.push(row);
+          totalAssetOpening += row.openingBalance;
+          totalAssetDebits += row.debits;
+          totalAssetCredits += row.credits;
+          totalAssetMovement += row.movement;
+          totalAssetClosing += row.closingBalance;
+        } else {
+          // Contract Liability (Deferred Revenue)
+          // For liability accounts, we show positive balances
+          // Debit = Revenue recognized (decreases deferred revenue)
+          // Credit = Billing (increases deferred revenue)
+          const row: ContractAccountingRow = {
+            id: contract.id,
+            contractId: contract.id,
+            contractNumber,
+            customerName,
+            currency,
+            openingBalance: Math.abs(openingNetBalance),
+            debits: revenueRecognizedPeriod,
+            credits: amountsInvoicedPeriod,
+            movement: amountsInvoicedPeriod - revenueRecognizedPeriod, // Credit increases liability
+            closingBalance: Math.abs(closingNetBalance),
+            type: "liability",
+          };
+          
+          contractLiabilities.push(row);
+          totalLiabilityOpening += row.openingBalance;
+          totalLiabilityDebits += row.debits;
+          totalLiabilityCredits += row.credits;
+          totalLiabilityMovement += row.movement;
+          totalLiabilityClosing += row.closingBalance;
+        }
+      }
+      
+      res.json({
+        period: `${year}-${month.padStart(2, "0")}`,
+        contractAssets,
+        contractLiabilities,
+        totalAssetOpening,
+        totalAssetDebits,
+        totalAssetCredits,
+        totalAssetMovement,
+        totalAssetClosing,
+        totalLiabilityOpening,
+        totalLiabilityDebits,
+        totalLiabilityCredits,
+        totalLiabilityMovement,
+        totalLiabilityClosing,
+      });
+    } catch (error) {
+      console.error("Error fetching IFRS 15 accounting control data:", error);
+      res.status(500).json({ message: "Failed to fetch accounting control data" });
+    }
+  });
+
   // Generate consolidated balance snapshot (compute from current data)
   app.post("/api/consolidated-balances/generate", async (req: Request, res: Response) => {
     try {

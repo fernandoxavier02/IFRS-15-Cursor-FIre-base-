@@ -21,6 +21,7 @@ export const translations = {
     "nav.consolidatedBalances": "Consolidated Balances",
     "nav.revenueWaterfall": "Revenue Waterfall",
     "nav.contractCosts": "Contract Costs",
+    "nav.ifrs15AccountingControl": "Accounting Control",
     
     // Dashboard
     "dashboard.title": "Dashboard",
@@ -288,6 +289,7 @@ export const translations = {
     "nav.consolidatedBalances": "Saldos Consolidados",
     "nav.revenueWaterfall": "Cascata de Receita",
     "nav.contractCosts": "Custos de Contrato",
+    "nav.ifrs15AccountingControl": "Controle Contábil",
     
     // Painel
     "dashboard.title": "Painel",
@@ -555,6 +557,7 @@ export const translations = {
     "nav.consolidatedBalances": "Saldos Consolidados",
     "nav.revenueWaterfall": "Cascada de Ingresos",
     "nav.contractCosts": "Costos de Contrato",
+    "nav.ifrs15AccountingControl": "Control Contable",
     
     // Panel
     "dashboard.title": "Panel",

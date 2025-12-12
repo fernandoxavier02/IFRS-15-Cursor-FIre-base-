@@ -38,6 +38,7 @@ import ExchangeRates from "@/pages/exchange-rates";
 import FinancingComponents from "@/pages/financing-components";
 import ExecutiveDashboard from "@/pages/executive-dashboard";
 import ContractDetails from "@/pages/contract-details";
+import IFRS15AccountingControl from "@/pages/ifrs15-accounting-control";
 
 function LoadingSpinner() {
   return (
@@ -120,6 +121,7 @@ function MainRouter() {
         <Route path="/exchange-rates" component={ExchangeRates} />
         <Route path="/financing-components" component={FinancingComponents} />
         <Route path="/executive-dashboard" component={ExecutiveDashboard} />
+        <Route path="/ifrs15-accounting-control" component={IFRS15AccountingControl} />
         <Route path="/audit" component={AuditTrail} />
         <Route path="/settings" component={Settings} />
         <Route path="/ai-settings" component={AiSettings} />

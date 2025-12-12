@@ -136,6 +136,12 @@ export function AppSidebar() {
       gradient: "from-violet-500 to-purple-600",
     },
     {
+      titleKey: "nav.ifrs15AccountingControl",
+      url: "/ifrs15-accounting-control",
+      icon: Scales,
+      gradient: "from-slate-500 to-gray-600",
+    },
+    {
       titleKey: "nav.reports",
       url: "/reports",
       icon: ChartBar,
