@@ -2,16 +2,15 @@
 
 ## Design Approach
 
-**Selected System:** Custom Innovative Color Palette  
-**Justification:** Enterprise financial compliance application with a modern, vibrant aesthetic that stands out while maintaining professionalism. The color palette uses white as a clean background with vibrant green, blue, and purple accents for an innovative yet trustworthy appearance.
+**Selected System:** Premium Enterprise Design Language  
+**Justification:** High-end financial compliance application requiring sophisticated visual treatment that signals credibility and innovation. Combines modern glassmorphism aesthetics with enterprise-grade data presentation.
 
 **Key Principles:**
-- Clean white backgrounds for clarity and readability
-- Vibrant green (#10b981) as primary action color - represents growth and financial success
-- Blue (#3b82f6) for data visualization and information hierarchy
-- Purple (#8b5cf6) as accent color for highlights and special features
-- No emoji icons - using Lucide React icon library exclusively
-- Full light/dark mode support
+- Premium depth through layered backgrounds, gradients, and subtle shadows
+- Glassmorphism for elevated UI surfaces with backdrop blur effects
+- Vibrant accent system using emerald, blue, and purple strategically
+- Financial credibility through refined typography and tabular numerals
+- Rich micro-interactions without sacrificing performance
 
 ---
 
@@ -20,144 +19,167 @@
 ### A. Color Palette
 
 **Light Mode:**
-- Background: Pure white (#ffffff)
-- Foreground: Deep purple-gray for text
-- Primary: Vibrant green (HSL 152 76% 40%) - buttons, links, active states
-- Accent: Purple (HSL 262 80% 55%) - highlights, badges, special features
-- Charts: Blue, Green, Purple variations for data visualization
+- Primary Background: Soft gray (#f8f9fa)
+- Elevated Surfaces: White with subtle shadow and 50% backdrop blur
+- Deep Accents: Charcoal (#1a1a1a) for contrast elements
+- Primary Action: Emerald (#10b981) with gradient to lighter shade
+- Data Viz: Blue (#3b82f6), Purple (#8b5cf6), Emerald variations
+- Gradients: Emerald-to-blue for primary elements, purple-to-blue for accents
 
 **Dark Mode:**
-- Background: Deep purple-gray (#141318)
-- Foreground: Near white (#fafafa)
-- Primary: Bright green (HSL 152 76% 45%) - enhanced for dark backgrounds
-- Accent: Bright purple (HSL 262 80% 60%) - enhanced visibility
-- Charts: Lighter versions of blue, green, purple for dark backgrounds
+- Primary Background: Deep charcoal (#0f0f0f)
+- Elevated Surfaces: Slate gray (#1a1a1f) with glass effect and enhanced glow
+- Card Backgrounds: Dark gray (#18181b) with subtle border glow
+- Primary Action: Bright emerald (#34d399) with enhanced luminosity
+- Glassmorphism: 40% opacity backgrounds with heavy backdrop blur
+- Gradient Overlays: Brighter, more saturated versions for dark backgrounds
 
 ### B. Typography
 
-**Font Stack:** Open Sans, system sans-serif fallback
+**Font Stack:** Inter Variable, system-ui fallback
 
 **Hierarchy:**
-- Page Headers: 32px, Semibold (font-semibold)
-- Section Headers: 24px, Semibold
-- Subsection/Card Headers: 18px, Medium (font-medium)
-- Body Text: 14px, Regular
-- Data Tables: 14px, Regular
-- Labels/Metadata: 12px, Regular
-- Fine Print/Timestamps: 11px, Regular
+- Display Headers: 36px, Bold (font-bold), tight tracking
+- Page Headers: 28px, Semibold, gradient text on key metrics
+- Section Headers: 20px, Semibold
+- Card Headers: 16px, Medium
+- Body/Data: 14px, Regular, tabular-nums for financial figures
+- Labels: 13px, Medium, uppercase tracking
+- Metadata: 12px, Regular, tabular-nums
 
-**Usage Patterns:**
-- Contract amounts and financial figures: Tabular numbers, Medium weight
-- Status indicators: 12px, Medium, uppercase
-- Form labels: 12px, Medium
-- Error messages: 14px, Regular
+**Financial Data Treatment:**
+- All currency amounts: Tabular numerals, Medium weight, 16px minimum
+- Percentage changes: Bold weight with colored backgrounds
+- Large metrics: 32px, Bold, with gradient fill on significant values
 
 ### C. Layout System
 
-**Spacing Primitives:** Tailwind units of **2, 4, 6, 8, 12, 16**
+**Spacing Primitives:** Tailwind units of **3, 4, 6, 8, 12, 16, 24**
 
-**Common Patterns:**
-- Component padding: `p-6` or `p-8`
-- Section margins: `mb-8` or `mb-12`
-- Card spacing: `space-y-6`
-- Form field gaps: `gap-4`
-- Table cell padding: `px-4 py-2`
-- Page container: `max-w-7xl mx-auto px-6`
-
-**Grid Structure:**
-- Dashboard: 12-column grid (`grid-cols-12`)
-- Data tables: Full-width with horizontal scroll when needed
-- Forms: 2-column layout for efficiency (`grid-cols-2 gap-6`)
-- Reports: Single column, `max-w-5xl` for readability
+**Patterns:**
+- Card padding: `p-6` to `p-8`
+- Glass surfaces: Additional `border border-white/10` with `backdrop-blur-xl`
+- Section gaps: `gap-6` to `gap-8`
+- Dashboard grid: Asymmetric 12-column with varied card spans
+- Container: `max-w-[1600px] mx-auto px-8`
 
 ---
 
 ## D. Component Library
 
 ### Icons
-
-**IMPORTANT: No emoji icons allowed**
-- Use Lucide React icons exclusively for all UI icons
-- Use react-icons/si for company/brand logos only
-- Icons should be sized appropriately: 16px for inline, 20px for buttons, 24px for headers
+- **Primary:** Phosphor Icons (Duotone variant) via CDN
+- **Size Standards:** 20px inline, 24px buttons, 32px feature cards
+- **Treatment:** Duotone with gradient fills on active/hover states
 
 ### Navigation
 
-**Sidebar Navigation:**
-- Left sidebar using Shadcn sidebar primitives
-- Width: `20rem`, collapsible to icon-only
-- Module icons with labels (Lucide icons only)
-- Active state: Green accent background
+**Sidebar:**
+- Width: `280px`, collapsible to `80px`
+- Background: Gradient from charcoal to deep slate with glass overlay
+- Logo area: 64px height with gradient brand treatment
+- Active state: Emerald gradient background with enhanced glow
+- Section dividers: Subtle gradient lines
 
 **Header:**
-- Fixed header with sidebar trigger and theme toggle
-- Height: `h-14`
+- Height: `64px`
+- Glass effect with backdrop blur
+- Contains: breadcrumbs, global search, notifications, user menu, theme toggle
 
-### Core UI Elements
+### Premium UI Elements
 
-**Cards:**
-- Container: White background (light) / dark purple-gray (dark)
-- Subtle border with rounded corners
-- Header with action buttons in opposite corner
+**Glass Cards:**
+- Background: White/10 (dark) or white with 50% blur (light)
+- Border: Subtle gradient border (1px)
+- Shadow: Layered shadows for depth (sm + lg combined)
+- Hover: Lift effect with enhanced shadow and subtle scale (1.01)
+
+**Dashboard Cards (Asymmetric):**
+- Financial summary: 2x height span with large metrics and sparkline
+- Quick actions: 1x1 compact cards with gradient backgrounds
+- Charts: 2x1 landscape cards with premium chart styling
+- Status indicators: 1x1 with radial progress and glass effect
 
 **Data Tables:**
-- Alternating row backgrounds for scannability
-- Sticky headers for long scrolls
-- Sortable columns with clear indicators
-- Row actions in rightmost column
+- Header: Glass effect with gradient underline
+- Rows: Subtle hover with glass background
+- Alt rows: Very subtle background tint
+- Sticky columns: Enhanced shadow separation
+- Cell padding: `px-6 py-4`
 
-**Badges/Status Indicators:**
-- Pill-shaped with small radius
-- Color-coded by status:
-  - Active/Success: Green variant
-  - Warning/Pending: Purple accent variant
-  - Error/Cancelled: Destructive red
-  - Neutral/Draft: Secondary gray
+**Badges:**
+- Rounded-full pills with gradient backgrounds
+- Status colors with 20% opacity fill + solid border
+- Icon + text combination with duotone icons
 
 ### Forms
 
-**Input Fields:**
-- Standard height: `h-10`
-- Label above input: `text-sm font-medium mb-1`
-- Focus ring: Green primary color
-- Error state: Red border + error message
+**Premium Inputs:**
+- Height: `h-11`
+- Background: Glass effect in dark mode, white in light
+- Focus: Emerald ring with glow effect
+- Floating labels for premium feel
+- Icons positioned inside inputs (duotone treatment)
 
-### Data Displays
+### Data Visualization
 
-**Financial Data Cards:**
-- Large metric display: 28px, Semibold
-- Label above: 12px, Medium, uppercase
-- Trend indicator with Lucide icon (TrendingUp, TrendingDown)
-- Green for positive trends, red for negative
+**Charts (Recharts):**
+- Gradient fills beneath line charts
+- Glass effect tooltips with backdrop blur
+- Animated entry (smooth 800ms ease)
+- Grid lines: Subtle with 10% opacity
+- Premium axis styling with tabular numerals
 
-**Charts:**
-- Primary chart color: Blue (#3b82f6)
-- Secondary: Green (#10b981)
-- Tertiary: Purple (#8b5cf6)
-- Use Recharts library
-
----
-
-## E. Animations
-
-**Minimal Motion:**
-- Hover: Subtle background elevation
-- Modal entry: Fade + slight scale
-- Loading: Skeleton placeholders
-- No decorative animations
+**Sparklines:**
+- Embedded in metric cards
+- Emerald gradient with glow on positive trends
+- Red gradient on negative trends
+- 40px height, minimal styling
 
 ---
 
-## F. Theme Toggle
+## E. Animations & Interactions
 
-**Implementation:**
-- Sun/Moon icon button in header
-- Smooth transition between modes
-- Persists preference in localStorage
-- System preference detection
+**Micro-interactions:**
+- Button hover: Subtle scale (1.02) + enhanced shadow + gradient shift
+- Card hover: Lift with shadow spread
+- Modal entry: Fade + slide from bottom (300ms ease-out)
+- Page transitions: Crossfade between views
+- Loading: Skeleton with shimmer gradient animation
+- Number counters: Animated count-up on metric changes
+
+**Performance:**
+- Use `transform` and `opacity` for animations only
+- Hardware acceleration with `will-change` on interactive elements
+- Reduced motion support via `prefers-reduced-motion`
+
+---
+
+## F. Glass Effects Implementation
+
+**Glass Surfaces:**
+- Backdrop blur: `backdrop-blur-xl` (24px)
+- Background opacity: 40-60% of base color
+- Border: 1px solid white/10 (dark) or black/5 (light)
+- Inner shadow for depth perception
+
+**Gradient Treatments:**
+- Primary buttons: Linear emerald-to-lighter-emerald
+- Accent cards: Radial purple-to-blue from top-left
+- Sidebar: Vertical charcoal-to-slate gradient
+- Status indicators: Matching color gradient fills
+
+---
+
+## G. Theme Toggle
+
+- Smooth 200ms transition for all color properties
+- System preference detection with override capability
+- Gradient icon button with glass background
+- Persisted in localStorage
 
 ---
 
 ## Images
 
-No hero images - this is a data-focused enterprise application. All visual emphasis on clear data presentation with the vibrant color palette providing visual interest.
+**No hero images** - Enterprise data application. Visual interest created through premium glassmorphism, gradients, and sophisticated data visualization. Brand logo in sidebar with gradient treatment.
