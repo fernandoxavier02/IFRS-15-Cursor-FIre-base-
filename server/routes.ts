@@ -1356,32 +1356,42 @@ export async function registerRoutes(
         ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
         : "https://app.ifrs15.com";
 
-      // Send email with credentials using Resend
-      const emailResult = await sendEmail({
-        to: email,
-        subject: "Your IFRS 15 Revenue Manager Access Credentials",
-        html: generateCredentialsEmailHtml({
-          email,
-          password: tempPassword,
-          licenseKey,
-          appUrl,
-        }),
-        text: generateCredentialsEmailText({
-          email,
-          password: tempPassword,
-          licenseKey,
-          appUrl,
-        }),
-      });
+      // Try to send email - but don't fail license creation if email fails
+      let emailResult = { success: false, error: "Email service not configured" };
+      try {
+        emailResult = await sendEmail({
+          to: email,
+          subject: "Your IFRS 15 Revenue Manager Access Credentials",
+          html: generateCredentialsEmailHtml({
+            email,
+            password: tempPassword,
+            licenseKey,
+            appUrl,
+          }),
+          text: generateCredentialsEmailText({
+            email,
+            password: tempPassword,
+            licenseKey,
+            appUrl,
+          }),
+        });
+      } catch (emailError: any) {
+        console.error("Email sending error:", emailError);
+        emailResult = { success: false, error: emailError.message || "Unknown email error" };
+      }
 
       // Log email status in queue for audit purposes
-      await storage.createEmailQueueItem({
-        toEmail: email,
-        subject: "Your IFRS 15 Revenue Manager Access Credentials",
-        body: `Credentials sent to ${email}`,
-        templateType: "credentials",
-        status: emailResult.success ? "sent" : "failed",
-      });
+      try {
+        await storage.createEmailQueueItem({
+          toEmail: email,
+          subject: "Your IFRS 15 Revenue Manager Access Credentials",
+          body: `Credentials for ${email}. Password: ${tempPassword}, License: ${licenseKey}`,
+          templateType: "credentials",
+          status: emailResult.success ? "sent" : "pending",
+        });
+      } catch (queueError) {
+        console.error("Email queue error:", queueError);
+      }
 
       await storage.createAuditLog({
         tenantId: tenant.id,
@@ -1392,13 +1402,19 @@ export async function registerRoutes(
         justification: "Admin created license",
       });
 
+      // Always return success with license info and credentials
       res.status(201).json({
         license,
         user: { email: user.email },
         emailSent: emailResult.success,
+        credentials: {
+          email,
+          password: tempPassword,
+          licenseKey,
+        },
         message: emailResult.success 
           ? "License created and credentials sent via email" 
-          : `License created but email failed: ${emailResult.error}`,
+          : `License created. Email not sent (${emailResult.error}). Credentials shown below.`,
       });
     } catch (error) {
       console.error("Error creating license:", error);
