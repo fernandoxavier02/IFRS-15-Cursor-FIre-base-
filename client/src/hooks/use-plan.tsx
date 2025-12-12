@@ -50,8 +50,23 @@ const planFeatureMatrix = {
   },
 };
 
+const ADMIN_FULL_ACCESS: PlanFeatures = {
+  canCreateContract: true,
+  canCreateLicense: true,
+  hasAdvancedReports: true,
+  hasVariableConsideration: true,
+  hasContractModifications: true,
+  hasAuditTrail: true,
+  hasCustomIntegrations: true,
+  hasDedicatedSupport: true,
+  contractsRemaining: -1,
+  licensesRemaining: -1,
+  isUnlimited: true,
+};
+
 export function usePlan() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const { data: planInfo, isLoading } = useQuery<PlanInfo>({
     queryKey: ["/api/plan"],
@@ -59,6 +74,10 @@ export function usePlan() {
   });
 
   const getPlanFeatures = (): PlanFeatures => {
+    if (isAdmin) {
+      return ADMIN_FULL_ACCESS;
+    }
+
     if (!planInfo) {
       return {
         canCreateContract: false,
