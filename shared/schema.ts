@@ -13,6 +13,9 @@ export const licenseStatusEnum = pgEnum("license_status", ["active", "suspended"
 export const subscriptionStatusEnum = pgEnum("subscription_status", ["active", "past_due", "canceled", "unpaid", "trialing"]);
 export const planTypeEnum = pgEnum("plan_type", ["starter", "professional", "enterprise"]);
 export const auditActionEnum = pgEnum("audit_action", ["create", "update", "delete", "approve", "reject", "recognize", "defer"]);
+export const aiProviderEnum = pgEnum("ai_provider", ["openai", "anthropic", "openrouter", "google"]);
+export const ingestionStatusEnum = pgEnum("ingestion_status", ["pending", "processing", "awaiting_review", "approved", "rejected", "failed"]);
+export const reviewStatusEnum = pgEnum("review_status", ["pending", "approved", "rejected", "needs_correction"]);
 
 // Users table with RBAC
 export const users = pgTable("users", {
@@ -276,6 +279,66 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// AI Provider Configurations (BYOK - Bring Your Own Key)
+export const aiProviderConfigs = pgTable("ai_provider_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  provider: aiProviderEnum("provider").notNull(),
+  name: text("name").notNull(), // User-friendly name
+  apiKey: text("api_key").notNull(), // Encrypted API key
+  model: text("model").notNull(), // e.g., gpt-4, claude-3-opus, etc.
+  baseUrl: text("base_url"), // For OpenRouter or custom endpoints
+  isDefault: boolean("is_default").default(false),
+  isActive: boolean("is_active").default(true),
+  lastUsedAt: timestamp("last_used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// AI Ingestion Jobs
+export const aiIngestionJobs = pgTable("ai_ingestion_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  providerId: varchar("provider_id").references(() => aiProviderConfigs.id).notNull(),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size").notNull(),
+  filePath: text("file_path").notNull(), // Base64 or file reference
+  status: ingestionStatusEnum("status").notNull().default("pending"),
+  progress: integer("progress").default(0), // 0-100
+  errorMessage: text("error_message"),
+  processingStartedAt: timestamp("processing_started_at"),
+  processingCompletedAt: timestamp("processing_completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// AI Extraction Results (normalized contract data)
+export const aiExtractionResults = pgTable("ai_extraction_results", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").references(() => aiIngestionJobs.id).notNull(),
+  extractedData: jsonb("extracted_data").notNull(), // Normalized contract structure
+  confidenceScores: jsonb("confidence_scores"), // Per-field confidence
+  rawResponse: jsonb("raw_response"), // Original AI response
+  tokensUsed: integer("tokens_used"),
+  processingTimeMs: integer("processing_time_ms"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// AI Review Tasks (Human in the Loop)
+export const aiReviewTasks = pgTable("ai_review_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").references(() => aiIngestionJobs.id).notNull(),
+  extractionResultId: varchar("extraction_result_id").references(() => aiExtractionResults.id).notNull(),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  status: reviewStatusEnum("status").notNull().default("pending"),
+  reviewedData: jsonb("reviewed_data"), // Human-corrected data
+  reviewNotes: text("review_notes"),
+  contractId: varchar("contract_id").references(() => contracts.id), // Created contract after approval
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relations
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   users: many(users),
@@ -388,6 +451,10 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: tru
 export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true, createdAt: true });
 export const insertCheckoutSessionSchema = createInsertSchema(checkoutSessions).omit({ id: true, createdAt: true });
 export const insertEmailQueueSchema = createInsertSchema(emailQueue).omit({ id: true, createdAt: true });
+export const insertAiProviderConfigSchema = createInsertSchema(aiProviderConfigs).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAiIngestionJobSchema = createInsertSchema(aiIngestionJobs).omit({ id: true, createdAt: true });
+export const insertAiExtractionResultSchema = createInsertSchema(aiExtractionResults).omit({ id: true, createdAt: true });
+export const insertAiReviewTaskSchema = createInsertSchema(aiReviewTasks).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -423,3 +490,67 @@ export type CheckoutSession = typeof checkoutSessions.$inferSelect;
 export type InsertCheckoutSession = z.infer<typeof insertCheckoutSessionSchema>;
 export type EmailQueueItem = typeof emailQueue.$inferSelect;
 export type InsertEmailQueueItem = z.infer<typeof insertEmailQueueSchema>;
+export type AiProviderConfig = typeof aiProviderConfigs.$inferSelect;
+export type InsertAiProviderConfig = z.infer<typeof insertAiProviderConfigSchema>;
+export type AiIngestionJob = typeof aiIngestionJobs.$inferSelect;
+export type InsertAiIngestionJob = z.infer<typeof insertAiIngestionJobSchema>;
+export type AiExtractionResult = typeof aiExtractionResults.$inferSelect;
+export type InsertAiExtractionResult = z.infer<typeof insertAiExtractionResultSchema>;
+export type AiReviewTask = typeof aiReviewTasks.$inferSelect;
+export type InsertAiReviewTask = z.infer<typeof insertAiReviewTaskSchema>;
+
+// AI Models available per provider
+export const aiModels = {
+  openai: [
+    { id: "gpt-4o", name: "GPT-4o (Recomendado)" },
+    { id: "gpt-4-turbo", name: "GPT-4 Turbo" },
+    { id: "gpt-4", name: "GPT-4" },
+    { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
+  ],
+  anthropic: [
+    { id: "claude-3-opus-20240229", name: "Claude 3 Opus (Mais Poderoso)" },
+    { id: "claude-3-sonnet-20240229", name: "Claude 3 Sonnet (Equilibrado)" },
+    { id: "claude-3-haiku-20240307", name: "Claude 3 Haiku (Mais Rápido)" },
+  ],
+  openrouter: [
+    { id: "anthropic/claude-3-opus", name: "Claude 3 Opus via OpenRouter" },
+    { id: "openai/gpt-4o", name: "GPT-4o via OpenRouter" },
+    { id: "google/gemini-pro-1.5", name: "Gemini Pro 1.5 via OpenRouter" },
+    { id: "meta-llama/llama-3-70b-instruct", name: "Llama 3 70B via OpenRouter" },
+    { id: "mistralai/mixtral-8x22b-instruct", name: "Mixtral 8x22B via OpenRouter" },
+  ],
+  google: [
+    { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro (Recomendado)" },
+    { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash (Mais Rápido)" },
+    { id: "gemini-pro", name: "Gemini Pro" },
+  ],
+} as const;
+
+// Contract extraction schema for AI parsing
+export const contractExtractionSchema = z.object({
+  contractNumber: z.string().optional(),
+  title: z.string(),
+  customerName: z.string(),
+  startDate: z.string(),
+  endDate: z.string().optional(),
+  totalValue: z.number(),
+  currency: z.string().default("BRL"),
+  paymentTerms: z.string().optional(),
+  lineItems: z.array(z.object({
+    description: z.string(),
+    quantity: z.number().default(1),
+    unitPrice: z.number(),
+    totalPrice: z.number(),
+    recognitionMethod: z.enum(["over_time", "point_in_time"]).optional(),
+    deliveryStartDate: z.string().optional(),
+    deliveryEndDate: z.string().optional(),
+  })),
+  performanceObligations: z.array(z.object({
+    description: z.string(),
+    allocatedPrice: z.number(),
+    recognitionMethod: z.enum(["over_time", "point_in_time"]),
+    justification: z.string().optional(),
+  })).optional(),
+});
+
+export type ContractExtraction = z.infer<typeof contractExtractionSchema>;
