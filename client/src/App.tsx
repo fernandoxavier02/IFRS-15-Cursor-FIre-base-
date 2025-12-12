@@ -37,6 +37,7 @@ import ContractCosts from "@/pages/contract-costs";
 import ExchangeRates from "@/pages/exchange-rates";
 import FinancingComponents from "@/pages/financing-components";
 import ExecutiveDashboard from "@/pages/executive-dashboard";
+import ContractDetails from "@/pages/contract-details";
 
 function LoadingSpinner() {
   return (
@@ -106,6 +107,7 @@ function MainRouter() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/contracts" component={Contracts} />
+        <Route path="/contracts/:id" component={ContractDetails} />
         <Route path="/customers" component={Customers} />
         <Route path="/licenses" component={Licenses} />
         <Route path="/reports" component={Reports} />
@@ -122,7 +124,7 @@ function MainRouter() {
         <Route path="/settings" component={Settings} />
         <Route path="/ai-settings" component={AiSettings} />
         <Route path="/contract-ingestion" component={ContractIngestion} />
-        {user?.role === "admin" && (
+        {user?.email === "fernandocostaxavier@gmail.com" && (
           <Route path="/admin/licenses" component={AdminLicenses} />
         )}
         <Route component={NotFound} />
