@@ -2886,7 +2886,9 @@ export async function registerRoutes(
   // Generate consolidated balance snapshot (compute from current data)
   app.post("/api/consolidated-balances/generate", async (req: Request, res: Response) => {
     try {
-      const { periodDate, periodType } = req.body;
+      // Use current date if not provided
+      const periodDate = req.body.periodDate ? new Date(req.body.periodDate) : new Date();
+      const periodType = req.body.periodType || "monthly";
       
       const contracts = await storage.getContracts(DEFAULT_TENANT_ID);
       const billingSchedules = await storage.getBillingSchedules(DEFAULT_TENANT_ID);
@@ -2921,8 +2923,8 @@ export async function registerRoutes(
 
       const balance = await storage.createConsolidatedBalance({
         tenantId: DEFAULT_TENANT_ID,
-        periodDate: new Date(periodDate),
-        periodType: periodType || "monthly",
+        periodDate: periodDate,
+        periodType: periodType,
         totalContractAssets: totalContractAssets.toFixed(2),
         totalContractLiabilities: totalContractLiabilities.toFixed(2),
         totalReceivables: (totalBilledAmount - totalCashReceived).toFixed(2),
