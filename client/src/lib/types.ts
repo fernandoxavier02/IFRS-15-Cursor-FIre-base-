@@ -145,3 +145,25 @@ export interface ConsolidatedBalanceData {
   currency: string;
   createdAt: string;
 }
+
+export interface ContractCostWithDetails {
+  id: string;
+  tenantId: string;
+  contractId: string;
+  costType: "incremental" | "fulfillment";
+  description: string;
+  amount: string;
+  currency: string;
+  incurredDate: string;
+  amortizationStartDate: string;
+  amortizationEndDate: string;
+  amortizationMethod: string;
+  totalAmortized: string;
+  remainingBalance: string;
+  isFullyAmortized: boolean;
+  impairmentLoss: string;
+  createdAt: string;
+  contractNumber: string;
+  contractTitle: string;
+  customerName: string;
+}

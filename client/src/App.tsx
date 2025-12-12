@@ -33,6 +33,7 @@ import BillingSchedules from "@/pages/billing-schedules";
 import RevenueLedger from "@/pages/revenue-ledger";
 import ConsolidatedBalances from "@/pages/consolidated-balances";
 import RevenueWaterfall from "@/pages/revenue-waterfall";
+import ContractCosts from "@/pages/contract-costs";
 
 function LoadingSpinner() {
   return (
@@ -110,6 +111,7 @@ function MainRouter() {
         <Route path="/revenue-ledger" component={RevenueLedger} />
         <Route path="/consolidated-balances" component={ConsolidatedBalances} />
         <Route path="/revenue-waterfall" component={RevenueWaterfall} />
+        <Route path="/contract-costs" component={ContractCosts} />
         <Route path="/audit" component={AuditTrail} />
         <Route path="/settings" component={Settings} />
         <Route path="/ai-settings" component={AiSettings} />

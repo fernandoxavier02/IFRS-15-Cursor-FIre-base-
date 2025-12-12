@@ -18,6 +18,7 @@ import {
   BookOpen,
   Scales,
   Funnel,
+  Receipt,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -104,6 +105,12 @@ export function AppSidebar() {
       url: "/revenue-waterfall",
       icon: Funnel,
       gradient: "from-cyan-500 to-blue-500",
+    },
+    {
+      titleKey: "nav.contractCosts",
+      url: "/contract-costs",
+      icon: Receipt,
+      gradient: "from-rose-500 to-pink-500",
     },
     {
       titleKey: "nav.reports",

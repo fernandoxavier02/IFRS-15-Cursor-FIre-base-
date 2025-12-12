@@ -19,7 +19,10 @@ type StatusType =
   | "overdue"
   | "cancelled"
   | "posted"
-  | "unposted";
+  | "unposted"
+  | "incremental"
+  | "fulfillment"
+  | "fully_amortized";
 
 interface StatusBadgeProps {
   status: StatusType;
@@ -45,6 +48,9 @@ const statusConfig: Record<StatusType, { label: string; variant: "default" | "se
   cancelled: { label: "Cancelled", variant: "secondary" },
   posted: { label: "Posted", variant: "default" },
   unposted: { label: "Unposted", variant: "outline" },
+  incremental: { label: "Incremental", variant: "default" },
+  fulfillment: { label: "Fulfillment", variant: "secondary" },
+  fully_amortized: { label: "Fully Amortized", variant: "outline" },
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
