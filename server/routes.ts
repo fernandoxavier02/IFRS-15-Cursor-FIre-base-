@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { extractContractData, generateConfidenceScores } from "./ai-service";
+import { sendEmail, generateCredentialsEmailHtml, generateCredentialsEmailText } from "./email";
 import { aiModels, insertAiProviderConfigSchema, insertPerformanceObligationSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -1350,25 +1351,36 @@ export async function registerRoutes(
         seatCount: seatCount || 1,
       });
 
-      // Queue email with credentials (plaintext password for user, hashed in DB)
+      // Get app URL
+      const appUrl = process.env.REPLIT_DOMAINS?.split(",")[0] 
+        ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+        : "https://app.ifrs15.com";
+
+      // Send email with credentials using Resend
+      const emailResult = await sendEmail({
+        to: email,
+        subject: "Your IFRS 15 Revenue Manager Access Credentials",
+        html: generateCredentialsEmailHtml({
+          email,
+          password: tempPassword,
+          licenseKey,
+          appUrl,
+        }),
+        text: generateCredentialsEmailText({
+          email,
+          password: tempPassword,
+          licenseKey,
+          appUrl,
+        }),
+      });
+
+      // Log email status in queue for audit purposes
       await storage.createEmailQueueItem({
         toEmail: email,
         subject: "Your IFRS 15 Revenue Manager Access Credentials",
-        body: `
-          Welcome to IFRS 15 Revenue Manager!
-
-          Your login credentials:
-          Email: ${email}
-          Password: ${tempPassword}
-          License Key: ${licenseKey}
-
-          Please login at: ${process.env.REPLIT_DOMAINS?.split(",")[0] || "https://app.ifrs15.com"}
-
-          Important: For security, please change your password after first login.
-          Note: Your license is locked to one IP address at a time.
-        `,
+        body: `Credentials sent to ${email}`,
         templateType: "credentials",
-        status: "pending",
+        status: emailResult.success ? "sent" : "failed",
       });
 
       await storage.createAuditLog({
@@ -1376,14 +1388,17 @@ export async function registerRoutes(
         entityType: "license",
         entityId: license.id,
         action: "create",
-        newValue: { licenseKey, email, seatCount },
+        newValue: { licenseKey, email, seatCount, emailSent: emailResult.success },
         justification: "Admin created license",
       });
 
       res.status(201).json({
         license,
         user: { email: user.email },
-        message: "License created and credentials queued for email",
+        emailSent: emailResult.success,
+        message: emailResult.success 
+          ? "License created and credentials sent via email" 
+          : `License created but email failed: ${emailResult.error}`,
       });
     } catch (error) {
       console.error("Error creating license:", error);
