@@ -1702,5 +1702,718 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== ACCOUNTING API ROUTES (IFRS 15) ====================
+
+  // Billing Schedules
+  app.get("/api/billing-schedules", async (req: Request, res: Response) => {
+    try {
+      const schedules = await storage.getBillingSchedules(DEFAULT_TENANT_ID);
+      const contracts = await storage.getContracts(DEFAULT_TENANT_ID);
+      const customers = await storage.getCustomers(DEFAULT_TENANT_ID);
+      
+      const result = schedules.map((s) => {
+        const contract = contracts.find((c) => c.id === s.contractId);
+        const customer = contract ? customers.find((cu) => cu.id === contract.customerId) : null;
+        return {
+          ...s,
+          billingDate: s.billingDate?.toISOString(),
+          dueDate: s.dueDate?.toISOString(),
+          invoicedAt: s.invoicedAt?.toISOString() || null,
+          paidAt: s.paidAt?.toISOString() || null,
+          createdAt: s.createdAt?.toISOString(),
+          contractNumber: contract?.contractNumber || null,
+          contractTitle: contract?.title || null,
+          customerName: customer?.name || null,
+        };
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Error getting billing schedules:", error);
+      res.status(500).json({ message: "Failed to get billing schedules" });
+    }
+  });
+
+  app.get("/api/billing-schedules/upcoming", async (req: Request, res: Response) => {
+    try {
+      const days = parseInt(req.query.days as string) || 30;
+      const schedules = await storage.getUpcomingBillings(DEFAULT_TENANT_ID, days);
+      const contracts = await storage.getContracts(DEFAULT_TENANT_ID);
+      const customers = await storage.getCustomers(DEFAULT_TENANT_ID);
+      
+      const result = schedules.map((s) => {
+        const contract = contracts.find((c) => c.id === s.contractId);
+        const customer = contract ? customers.find((cu) => cu.id === contract.customerId) : null;
+        return {
+          ...s,
+          billingDate: s.billingDate?.toISOString(),
+          dueDate: s.dueDate?.toISOString(),
+          contractNumber: contract?.contractNumber || null,
+          contractTitle: contract?.title || null,
+          customerName: customer?.name || null,
+        };
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get upcoming billings" });
+    }
+  });
+
+  app.get("/api/billing-schedules/overdue", async (req: Request, res: Response) => {
+    try {
+      const schedules = await storage.getOverdueBillings(DEFAULT_TENANT_ID);
+      const contracts = await storage.getContracts(DEFAULT_TENANT_ID);
+      const customers = await storage.getCustomers(DEFAULT_TENANT_ID);
+      
+      const result = schedules.map((s) => {
+        const contract = contracts.find((c) => c.id === s.contractId);
+        const customer = contract ? customers.find((cu) => cu.id === contract.customerId) : null;
+        return {
+          ...s,
+          billingDate: s.billingDate?.toISOString(),
+          dueDate: s.dueDate?.toISOString(),
+          contractNumber: contract?.contractNumber || null,
+          contractTitle: contract?.title || null,
+          customerName: customer?.name || null,
+        };
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get overdue billings" });
+    }
+  });
+
+  app.get("/api/contracts/:contractId/billing-schedules", async (req: Request, res: Response) => {
+    try {
+      const { contractId } = req.params;
+      const schedules = await storage.getBillingSchedulesByContract(contractId);
+      const result = schedules.map((s) => ({
+        ...s,
+        billingDate: s.billingDate?.toISOString(),
+        dueDate: s.dueDate?.toISOString(),
+        invoicedAt: s.invoicedAt?.toISOString() || null,
+        paidAt: s.paidAt?.toISOString() || null,
+        createdAt: s.createdAt?.toISOString(),
+      }));
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get billing schedules for contract" });
+    }
+  });
+
+  app.post("/api/billing-schedules", async (req: Request, res: Response) => {
+    try {
+      const { contractId, performanceObligationId, billingDate, dueDate, amount, currency, frequency, notes } = req.body;
+      
+      const schedule = await storage.createBillingSchedule({
+        tenantId: DEFAULT_TENANT_ID,
+        contractId,
+        performanceObligationId: performanceObligationId || null,
+        billingDate: new Date(billingDate),
+        dueDate: new Date(dueDate),
+        amount,
+        currency: currency || "BRL",
+        frequency,
+        status: "scheduled",
+        notes,
+      });
+
+      await storage.createAuditLog({
+        tenantId: DEFAULT_TENANT_ID,
+        entityType: "billing_schedule",
+        entityId: schedule.id,
+        action: "create",
+        newValue: schedule,
+        justification: "Billing schedule created",
+      });
+
+      res.status(201).json(schedule);
+    } catch (error) {
+      console.error("Error creating billing schedule:", error);
+      res.status(500).json({ message: "Failed to create billing schedule" });
+    }
+  });
+
+  app.patch("/api/billing-schedules/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const updateData = { ...req.body };
+      
+      if (updateData.billingDate) {
+        updateData.billingDate = new Date(updateData.billingDate);
+      }
+      if (updateData.dueDate) {
+        updateData.dueDate = new Date(updateData.dueDate);
+      }
+      if (updateData.invoicedAt) {
+        updateData.invoicedAt = new Date(updateData.invoicedAt);
+      }
+      if (updateData.paidAt) {
+        updateData.paidAt = new Date(updateData.paidAt);
+      }
+
+      const schedule = await storage.updateBillingSchedule(id, updateData);
+      if (!schedule) {
+        return res.status(404).json({ message: "Billing schedule not found" });
+      }
+
+      await storage.createAuditLog({
+        tenantId: DEFAULT_TENANT_ID,
+        entityType: "billing_schedule",
+        entityId: id,
+        action: "update",
+        newValue: schedule,
+        justification: "Billing schedule updated",
+      });
+
+      res.json(schedule);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update billing schedule" });
+    }
+  });
+
+  // Revenue Ledger Entries
+  app.get("/api/ledger-entries", async (req: Request, res: Response) => {
+    try {
+      const entries = await storage.getRevenueLedgerEntries(DEFAULT_TENANT_ID);
+      const contracts = await storage.getContracts(DEFAULT_TENANT_ID);
+      const customers = await storage.getCustomers(DEFAULT_TENANT_ID);
+      
+      const result = entries.map((e) => {
+        const contract = contracts.find((c) => c.id === e.contractId);
+        const customer = contract ? customers.find((cu) => cu.id === contract.customerId) : null;
+        return {
+          ...e,
+          entryDate: e.entryDate?.toISOString(),
+          periodStart: e.periodStart?.toISOString(),
+          periodEnd: e.periodEnd?.toISOString(),
+          postedAt: e.postedAt?.toISOString() || null,
+          createdAt: e.createdAt?.toISOString(),
+          contractNumber: contract?.contractNumber || null,
+          contractTitle: contract?.title || null,
+          customerName: customer?.name || null,
+        };
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Error getting ledger entries:", error);
+      res.status(500).json({ message: "Failed to get ledger entries" });
+    }
+  });
+
+  app.get("/api/ledger-entries/unposted", async (req: Request, res: Response) => {
+    try {
+      const entries = await storage.getUnpostedLedgerEntries(DEFAULT_TENANT_ID);
+      const contracts = await storage.getContracts(DEFAULT_TENANT_ID);
+      
+      const result = entries.map((e) => {
+        const contract = contracts.find((c) => c.id === e.contractId);
+        return {
+          ...e,
+          entryDate: e.entryDate?.toISOString(),
+          periodStart: e.periodStart?.toISOString(),
+          periodEnd: e.periodEnd?.toISOString(),
+          contractNumber: contract?.contractNumber || null,
+          contractTitle: contract?.title || null,
+        };
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get unposted entries" });
+    }
+  });
+
+  app.get("/api/contracts/:contractId/ledger-entries", async (req: Request, res: Response) => {
+    try {
+      const { contractId } = req.params;
+      const entries = await storage.getRevenueLedgerEntriesByContract(contractId);
+      const result = entries.map((e) => ({
+        ...e,
+        entryDate: e.entryDate?.toISOString(),
+        periodStart: e.periodStart?.toISOString(),
+        periodEnd: e.periodEnd?.toISOString(),
+        postedAt: e.postedAt?.toISOString() || null,
+        createdAt: e.createdAt?.toISOString(),
+      }));
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get ledger entries for contract" });
+    }
+  });
+
+  app.post("/api/ledger-entries", async (req: Request, res: Response) => {
+    try {
+      const { 
+        contractId, performanceObligationId, billingScheduleId, entryDate, 
+        periodStart, periodEnd, entryType, debitAccount, creditAccount, 
+        amount, currency, exchangeRate, description, referenceNumber 
+      } = req.body;
+      
+      const entry = await storage.createRevenueLedgerEntry({
+        tenantId: DEFAULT_TENANT_ID,
+        contractId,
+        performanceObligationId: performanceObligationId || null,
+        billingScheduleId: billingScheduleId || null,
+        entryDate: new Date(entryDate),
+        periodStart: new Date(periodStart),
+        periodEnd: new Date(periodEnd),
+        entryType,
+        debitAccount,
+        creditAccount,
+        amount,
+        currency: currency || "BRL",
+        exchangeRate: exchangeRate || "1",
+        functionalAmount: amount,
+        description,
+        referenceNumber,
+        isPosted: false,
+      });
+
+      await storage.createAuditLog({
+        tenantId: DEFAULT_TENANT_ID,
+        entityType: "ledger_entry",
+        entityId: entry.id,
+        action: "create",
+        newValue: entry,
+        justification: "Ledger entry created",
+      });
+
+      res.status(201).json(entry);
+    } catch (error) {
+      console.error("Error creating ledger entry:", error);
+      res.status(500).json({ message: "Failed to create ledger entry" });
+    }
+  });
+
+  app.post("/api/ledger-entries/:id/post", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      const session = sessionToken ? sessions.get(sessionToken) : null;
+      const userId = session?.userId || null;
+
+      const { id } = req.params;
+      const entry = await storage.updateRevenueLedgerEntry(id, {
+        isPosted: true,
+        postedAt: new Date(),
+        postedBy: userId,
+      });
+
+      if (!entry) {
+        return res.status(404).json({ message: "Ledger entry not found" });
+      }
+
+      await storage.createAuditLog({
+        tenantId: DEFAULT_TENANT_ID,
+        entityType: "ledger_entry",
+        entityId: id,
+        action: "update",
+        newValue: { isPosted: true, postedAt: entry.postedAt },
+        justification: "Ledger entry posted to GL",
+      });
+
+      res.json(entry);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to post ledger entry" });
+    }
+  });
+
+  app.post("/api/ledger-entries/post-all", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      const session = sessionToken ? sessions.get(sessionToken) : null;
+      const userId = session?.userId || null;
+
+      const unposted = await storage.getUnpostedLedgerEntries(DEFAULT_TENANT_ID);
+      const posted: string[] = [];
+
+      for (const entry of unposted) {
+        await storage.updateRevenueLedgerEntry(entry.id, {
+          isPosted: true,
+          postedAt: new Date(),
+          postedBy: userId,
+        });
+        posted.push(entry.id);
+      }
+
+      await storage.createAuditLog({
+        tenantId: DEFAULT_TENANT_ID,
+        entityType: "ledger_entry",
+        entityId: "batch",
+        action: "update",
+        newValue: { postedCount: posted.length, postedIds: posted },
+        justification: "Batch posted ledger entries to GL",
+      });
+
+      res.json({ success: true, postedCount: posted.length });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to post ledger entries" });
+    }
+  });
+
+  // Contract Costs
+  app.get("/api/contract-costs", async (req: Request, res: Response) => {
+    try {
+      const costs = await storage.getContractCosts(DEFAULT_TENANT_ID);
+      const contracts = await storage.getContracts(DEFAULT_TENANT_ID);
+      const customers = await storage.getCustomers(DEFAULT_TENANT_ID);
+      
+      const result = costs.map((c) => {
+        const contract = contracts.find((ct) => ct.id === c.contractId);
+        const customer = contract ? customers.find((cu) => cu.id === contract.customerId) : null;
+        return {
+          ...c,
+          incurredDate: c.incurredDate?.toISOString(),
+          amortizationStartDate: c.amortizationStartDate?.toISOString(),
+          amortizationEndDate: c.amortizationEndDate?.toISOString(),
+          createdAt: c.createdAt?.toISOString(),
+          contractNumber: contract?.contractNumber || null,
+          contractTitle: contract?.title || null,
+          customerName: customer?.name || null,
+        };
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Error getting contract costs:", error);
+      res.status(500).json({ message: "Failed to get contract costs" });
+    }
+  });
+
+  app.get("/api/contracts/:contractId/costs", async (req: Request, res: Response) => {
+    try {
+      const { contractId } = req.params;
+      const costs = await storage.getContractCostsByContract(contractId);
+      const result = costs.map((c) => ({
+        ...c,
+        incurredDate: c.incurredDate?.toISOString(),
+        amortizationStartDate: c.amortizationStartDate?.toISOString(),
+        amortizationEndDate: c.amortizationEndDate?.toISOString(),
+        createdAt: c.createdAt?.toISOString(),
+      }));
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get costs for contract" });
+    }
+  });
+
+  app.post("/api/contract-costs", async (req: Request, res: Response) => {
+    try {
+      const { 
+        contractId, costType, description, amount, currency, 
+        incurredDate, amortizationStartDate, amortizationEndDate, amortizationMethod 
+      } = req.body;
+      
+      const cost = await storage.createContractCost({
+        tenantId: DEFAULT_TENANT_ID,
+        contractId,
+        costType,
+        description,
+        amount,
+        currency: currency || "BRL",
+        incurredDate: new Date(incurredDate),
+        amortizationStartDate: new Date(amortizationStartDate),
+        amortizationEndDate: new Date(amortizationEndDate),
+        amortizationMethod: amortizationMethod || "straight_line",
+        totalAmortized: "0",
+        remainingBalance: amount,
+        isFullyAmortized: false,
+      });
+
+      await storage.createAuditLog({
+        tenantId: DEFAULT_TENANT_ID,
+        entityType: "contract_cost",
+        entityId: cost.id,
+        action: "create",
+        newValue: cost,
+        justification: "Contract cost created",
+      });
+
+      res.status(201).json(cost);
+    } catch (error) {
+      console.error("Error creating contract cost:", error);
+      res.status(500).json({ message: "Failed to create contract cost" });
+    }
+  });
+
+  app.patch("/api/contract-costs/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const updateData = { ...req.body };
+      
+      if (updateData.incurredDate) {
+        updateData.incurredDate = new Date(updateData.incurredDate);
+      }
+      if (updateData.amortizationStartDate) {
+        updateData.amortizationStartDate = new Date(updateData.amortizationStartDate);
+      }
+      if (updateData.amortizationEndDate) {
+        updateData.amortizationEndDate = new Date(updateData.amortizationEndDate);
+      }
+
+      const cost = await storage.updateContractCost(id, updateData);
+      if (!cost) {
+        return res.status(404).json({ message: "Contract cost not found" });
+      }
+
+      await storage.createAuditLog({
+        tenantId: DEFAULT_TENANT_ID,
+        entityType: "contract_cost",
+        entityId: id,
+        action: "update",
+        newValue: cost,
+        justification: "Contract cost updated",
+      });
+
+      res.json(cost);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update contract cost" });
+    }
+  });
+
+  // Exchange Rates
+  app.get("/api/exchange-rates", async (req: Request, res: Response) => {
+    try {
+      const rates = await storage.getExchangeRates(DEFAULT_TENANT_ID);
+      const result = rates.map((r) => ({
+        ...r,
+        effectiveDate: r.effectiveDate?.toISOString(),
+        createdAt: r.createdAt?.toISOString(),
+      }));
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get exchange rates" });
+    }
+  });
+
+  app.post("/api/exchange-rates", async (req: Request, res: Response) => {
+    try {
+      const { fromCurrency, toCurrency, rate, effectiveDate, source } = req.body;
+      
+      const exchangeRate = await storage.createExchangeRate({
+        tenantId: DEFAULT_TENANT_ID,
+        fromCurrency,
+        toCurrency,
+        rate,
+        effectiveDate: new Date(effectiveDate),
+        source: source || "manual",
+      });
+
+      res.status(201).json(exchangeRate);
+    } catch (error) {
+      console.error("Error creating exchange rate:", error);
+      res.status(500).json({ message: "Failed to create exchange rate" });
+    }
+  });
+
+  // Financing Components
+  app.get("/api/financing-components", async (req: Request, res: Response) => {
+    try {
+      const components = await storage.getFinancingComponents(DEFAULT_TENANT_ID);
+      const contracts = await storage.getContracts(DEFAULT_TENANT_ID);
+      
+      const result = components.map((fc) => {
+        const contract = contracts.find((c) => c.id === fc.contractId);
+        return {
+          ...fc,
+          calculatedAt: fc.calculatedAt?.toISOString(),
+          createdAt: fc.createdAt?.toISOString(),
+          contractNumber: contract?.contractNumber || null,
+          contractTitle: contract?.title || null,
+        };
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get financing components" });
+    }
+  });
+
+  app.get("/api/contracts/:contractId/financing-components", async (req: Request, res: Response) => {
+    try {
+      const { contractId } = req.params;
+      const components = await storage.getFinancingComponentsByContract(contractId);
+      const result = components.map((fc) => ({
+        ...fc,
+        calculatedAt: fc.calculatedAt?.toISOString(),
+        createdAt: fc.createdAt?.toISOString(),
+      }));
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get financing components for contract" });
+    }
+  });
+
+  app.post("/api/financing-components", async (req: Request, res: Response) => {
+    try {
+      const { 
+        contractId, nominalAmount, presentValue, discountRate, 
+        financingPeriodMonths, totalInterest, currency 
+      } = req.body;
+      
+      const component = await storage.createFinancingComponent({
+        tenantId: DEFAULT_TENANT_ID,
+        contractId,
+        nominalAmount,
+        presentValue,
+        discountRate,
+        financingPeriodMonths,
+        totalInterest,
+        recognizedInterest: "0",
+        currency: currency || "BRL",
+      });
+
+      await storage.createAuditLog({
+        tenantId: DEFAULT_TENANT_ID,
+        entityType: "financing_component",
+        entityId: component.id,
+        action: "create",
+        newValue: component,
+        justification: "Significant financing component calculated",
+      });
+
+      res.status(201).json(component);
+    } catch (error) {
+      console.error("Error creating financing component:", error);
+      res.status(500).json({ message: "Failed to create financing component" });
+    }
+  });
+
+  // Consolidated Balances
+  app.get("/api/consolidated-balances", async (req: Request, res: Response) => {
+    try {
+      const balances = await storage.getConsolidatedBalances(DEFAULT_TENANT_ID);
+      const result = balances.map((b) => ({
+        ...b,
+        periodDate: b.periodDate?.toISOString(),
+        createdAt: b.createdAt?.toISOString(),
+      }));
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get consolidated balances" });
+    }
+  });
+
+  app.get("/api/consolidated-balances/latest", async (req: Request, res: Response) => {
+    try {
+      const balance = await storage.getLatestConsolidatedBalance(DEFAULT_TENANT_ID);
+      if (!balance) {
+        return res.json(null);
+      }
+      res.json({
+        ...balance,
+        periodDate: balance.periodDate?.toISOString(),
+        createdAt: balance.createdAt?.toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get latest consolidated balance" });
+    }
+  });
+
+  app.post("/api/consolidated-balances", async (req: Request, res: Response) => {
+    try {
+      const { 
+        periodDate, periodType, totalContractAssets, totalContractLiabilities,
+        totalReceivables, totalDeferredRevenue, totalRecognizedRevenue,
+        totalBilledAmount, totalCashReceived, totalRemainingObligations,
+        contractCount, currency 
+      } = req.body;
+      
+      const balance = await storage.createConsolidatedBalance({
+        tenantId: DEFAULT_TENANT_ID,
+        periodDate: new Date(periodDate),
+        periodType: periodType || "monthly",
+        totalContractAssets: totalContractAssets || "0",
+        totalContractLiabilities: totalContractLiabilities || "0",
+        totalReceivables: totalReceivables || "0",
+        totalDeferredRevenue: totalDeferredRevenue || "0",
+        totalRecognizedRevenue: totalRecognizedRevenue || "0",
+        totalBilledAmount: totalBilledAmount || "0",
+        totalCashReceived: totalCashReceived || "0",
+        totalRemainingObligations: totalRemainingObligations || "0",
+        contractCount: contractCount || 0,
+        currency: currency || "BRL",
+      });
+
+      await storage.createAuditLog({
+        tenantId: DEFAULT_TENANT_ID,
+        entityType: "consolidated_balance",
+        entityId: balance.id,
+        action: "create",
+        newValue: balance,
+        justification: "Period balance snapshot created",
+      });
+
+      res.status(201).json(balance);
+    } catch (error) {
+      console.error("Error creating consolidated balance:", error);
+      res.status(500).json({ message: "Failed to create consolidated balance" });
+    }
+  });
+
+  // Generate consolidated balance snapshot (compute from current data)
+  app.post("/api/consolidated-balances/generate", async (req: Request, res: Response) => {
+    try {
+      const { periodDate, periodType } = req.body;
+      
+      const contracts = await storage.getContracts(DEFAULT_TENANT_ID);
+      const billingSchedules = await storage.getBillingSchedules(DEFAULT_TENANT_ID);
+      const ledgerEntries = await storage.getRevenueLedgerEntries(DEFAULT_TENANT_ID);
+      
+      // Calculate totals from current data
+      let totalRecognizedRevenue = 0;
+      let totalDeferredRevenue = 0;
+      let totalBilledAmount = 0;
+      let totalCashReceived = 0;
+
+      for (const entry of ledgerEntries) {
+        if (entry.isPosted && entry.entryType === "revenue") {
+          totalRecognizedRevenue += parseFloat(entry.amount || "0");
+        }
+        if (entry.entryType === "deferred_revenue") {
+          totalDeferredRevenue += parseFloat(entry.amount || "0");
+        }
+      }
+
+      for (const schedule of billingSchedules) {
+        if (schedule.status === "invoiced" || schedule.status === "paid") {
+          totalBilledAmount += parseFloat(schedule.amount || "0");
+        }
+        if (schedule.status === "paid") {
+          totalCashReceived += parseFloat(schedule.paidAmount || schedule.amount || "0");
+        }
+      }
+
+      const totalContractAssets = Math.max(0, totalRecognizedRevenue - totalBilledAmount);
+      const totalContractLiabilities = Math.max(0, totalBilledAmount - totalRecognizedRevenue);
+
+      const balance = await storage.createConsolidatedBalance({
+        tenantId: DEFAULT_TENANT_ID,
+        periodDate: new Date(periodDate),
+        periodType: periodType || "monthly",
+        totalContractAssets: totalContractAssets.toFixed(2),
+        totalContractLiabilities: totalContractLiabilities.toFixed(2),
+        totalReceivables: (totalBilledAmount - totalCashReceived).toFixed(2),
+        totalDeferredRevenue: totalDeferredRevenue.toFixed(2),
+        totalRecognizedRevenue: totalRecognizedRevenue.toFixed(2),
+        totalBilledAmount: totalBilledAmount.toFixed(2),
+        totalCashReceived: totalCashReceived.toFixed(2),
+        totalRemainingObligations: "0",
+        contractCount: contracts.length,
+        currency: "BRL",
+      });
+
+      await storage.createAuditLog({
+        tenantId: DEFAULT_TENANT_ID,
+        entityType: "consolidated_balance",
+        entityId: balance.id,
+        action: "create",
+        newValue: balance,
+        justification: "Automated period balance snapshot generated",
+      });
+
+      res.status(201).json(balance);
+    } catch (error) {
+      console.error("Error generating consolidated balance:", error);
+      res.status(500).json({ message: "Failed to generate consolidated balance" });
+    }
+  });
+
   return httpServer;
 }
