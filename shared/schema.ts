@@ -11,6 +11,7 @@ export const recognitionMethodEnum = pgEnum("recognition_method", ["over_time", 
 export const measurementMethodEnum = pgEnum("measurement_method", ["input", "output"]);
 export const licenseStatusEnum = pgEnum("license_status", ["active", "suspended", "revoked", "expired"]);
 export const subscriptionStatusEnum = pgEnum("subscription_status", ["active", "past_due", "canceled", "unpaid", "trialing"]);
+export const planTypeEnum = pgEnum("plan_type", ["starter", "professional", "enterprise"]);
 export const auditActionEnum = pgEnum("audit_action", ["create", "update", "delete", "approve", "reject", "recognize", "defer"]);
 
 // Users table with RBAC
@@ -38,6 +39,9 @@ export const tenants = pgTable("tenants", {
   country: text("country").notNull(),
   currency: text("currency").notNull().default("USD"),
   taxId: text("tax_id"),
+  planType: planTypeEnum("plan_type").default("starter"),
+  maxContracts: integer("max_contracts").default(10),
+  maxLicenses: integer("max_licenses").default(1),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   stripePriceId: text("stripe_price_id"),
@@ -47,6 +51,15 @@ export const tenants = pgTable("tenants", {
   cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Plan limits configuration
+export const planLimits = {
+  starter: { contracts: 10, licenses: 1 },
+  professional: { contracts: 30, licenses: 3 },
+  enterprise: { contracts: -1, licenses: -1 }, // -1 = unlimited
+} as const;
+
+export type PlanType = "starter" | "professional" | "enterprise";
 
 // Customers
 export const customers = pgTable("customers", {
