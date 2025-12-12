@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { usePlan } from "@/hooks/use-plan";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -43,8 +44,10 @@ export function AppSidebar() {
   const [location] = useLocation();
   const { t } = useI18n();
   const { user, logout } = useAuth();
+  const { features } = usePlan();
 
   const isAdmin = user?.role === "admin";
+  const hasAiIngestion = features.hasCustomIntegrations;
 
   const mainNavItems: NavItem[] = [
     {
@@ -222,23 +225,25 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
 
-          <SidebarGroup className="space-y-1 mt-6">
-            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-white/40 px-3 mb-2 flex items-center gap-1.5">
-              AI Ingestion
-              <span className="px-1.5 py-0.5 text-[8px] rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold">
-                NEW
-              </span>
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {aiItems.map((item) => (
-                  <SidebarMenuItem key={item.titleKey}>
-                    <NavButton item={item} isActive={location === item.url} />
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          {hasAiIngestion && (
+            <SidebarGroup className="space-y-1 mt-6">
+              <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-white/40 px-3 mb-2 flex items-center gap-1.5">
+                AI Ingestion
+                <span className="px-1.5 py-0.5 text-[8px] rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold">
+                  NEW
+                </span>
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="space-y-1">
+                  {aiItems.map((item) => (
+                    <SidebarMenuItem key={item.titleKey}>
+                      <NavButton item={item} isActive={location === item.url} />
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
 
           <SidebarGroup className="space-y-1 mt-6">
             <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-white/40 px-3 mb-2">

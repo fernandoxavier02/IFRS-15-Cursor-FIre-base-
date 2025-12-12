@@ -1054,7 +1054,32 @@ export async function registerRoutes(
 
   // Get available AI models
   app.get("/api/ai/models", async (req: Request, res: Response) => {
-    res.json(aiModels);
+    try {
+      const sessionToken = req.cookies?.session;
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Invalid session" });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user || !user.tenantId) {
+        return res.status(401).json({ message: "Invalid user" });
+      }
+
+      // Check enterprise plan
+      const tenant = await storage.getTenant(user.tenantId);
+      if (!tenant || tenant.planType !== "enterprise") {
+        return res.status(403).json({ message: "AI features are only available for Enterprise plan" });
+      }
+
+      res.json(aiModels);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch AI models" });
+    }
   });
 
   // Get AI provider configs for tenant
@@ -1168,6 +1193,12 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid user" });
       }
 
+      // Check enterprise plan
+      const tenant = await storage.getTenant(user.tenantId);
+      if (!tenant || tenant.planType !== "enterprise") {
+        return res.status(403).json({ message: "AI features are only available for Enterprise plan" });
+      }
+
       const { id } = req.params;
       const { name, apiKey, model, baseUrl, isDefault, isActive } = req.body;
 
@@ -1219,6 +1250,12 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid user" });
       }
 
+      // Check enterprise plan
+      const tenant = await storage.getTenant(user.tenantId);
+      if (!tenant || tenant.planType !== "enterprise") {
+        return res.status(403).json({ message: "AI features are only available for Enterprise plan" });
+      }
+
       const { id } = req.params;
 
       const existing = await storage.getAiProviderConfig(id);
@@ -1262,6 +1299,12 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid user" });
       }
 
+      // Check enterprise plan
+      const tenant = await storage.getTenant(user.tenantId);
+      if (!tenant || tenant.planType !== "enterprise") {
+        return res.status(403).json({ message: "AI features are only available for Enterprise plan" });
+      }
+
       const jobs = await storage.getAiIngestionJobs(user.tenantId);
       res.json(jobs);
     } catch (error) {
@@ -1285,6 +1328,12 @@ export async function registerRoutes(
       const user = await storage.getUser(session.userId);
       if (!user || !user.tenantId) {
         return res.status(401).json({ message: "Invalid user" });
+      }
+
+      // Check enterprise plan
+      const tenant = await storage.getTenant(user.tenantId);
+      if (!tenant || tenant.planType !== "enterprise") {
+        return res.status(403).json({ message: "AI features are only available for Enterprise plan" });
       }
 
       const { id } = req.params;
@@ -1447,6 +1496,12 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid user" });
       }
 
+      // Check enterprise plan
+      const tenant = await storage.getTenant(user.tenantId);
+      if (!tenant || tenant.planType !== "enterprise") {
+        return res.status(403).json({ message: "AI features are only available for Enterprise plan" });
+      }
+
       const tasks = await storage.getPendingReviewTasks(user.tenantId);
       res.json(tasks);
     } catch (error) {
@@ -1470,6 +1525,12 @@ export async function registerRoutes(
       const user = await storage.getUser(session.userId);
       if (!user || !user.tenantId) {
         return res.status(401).json({ message: "Invalid user" });
+      }
+
+      // Check enterprise plan
+      const tenant = await storage.getTenant(user.tenantId);
+      if (!tenant || tenant.planType !== "enterprise") {
+        return res.status(403).json({ message: "AI features are only available for Enterprise plan" });
       }
 
       const { id } = req.params;
@@ -1608,6 +1669,12 @@ export async function registerRoutes(
       const user = await storage.getUser(session.userId);
       if (!user || !user.tenantId) {
         return res.status(401).json({ message: "Invalid user" });
+      }
+
+      // Check enterprise plan
+      const tenant = await storage.getTenant(user.tenantId);
+      if (!tenant || tenant.planType !== "enterprise") {
+        return res.status(403).json({ message: "AI features are only available for Enterprise plan" });
       }
 
       const { id } = req.params;
