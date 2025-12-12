@@ -13,6 +13,9 @@ import {
   licenseSessions,
   stripeEvents,
   auditLogs,
+  subscriptionPlans,
+  checkoutSessions,
+  emailQueue,
   type User,
   type InsertUser,
   type Tenant,
@@ -38,6 +41,12 @@ import {
   type StripeEvent,
   type ContractBalance,
   type InsertContractBalance,
+  type SubscriptionPlan,
+  type InsertSubscriptionPlan,
+  type CheckoutSession,
+  type InsertCheckoutSession,
+  type EmailQueueItem,
+  type InsertEmailQueueItem,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, isNotNull, lt, gte } from "drizzle-orm";
@@ -121,6 +130,25 @@ export interface IStorage {
     contractAssets: string;
     contractLiabilities: string;
   }>;
+
+  // Subscription Plans
+  getSubscriptionPlans(): Promise<SubscriptionPlan[]>;
+  getSubscriptionPlan(id: string): Promise<SubscriptionPlan | undefined>;
+  createSubscriptionPlan(plan: InsertSubscriptionPlan): Promise<SubscriptionPlan>;
+  updateSubscriptionPlan(id: string, data: Partial<InsertSubscriptionPlan>): Promise<SubscriptionPlan | undefined>;
+
+  // Checkout Sessions
+  getCheckoutSession(stripeSessionId: string): Promise<CheckoutSession | undefined>;
+  createCheckoutSession(session: InsertCheckoutSession): Promise<CheckoutSession>;
+  updateCheckoutSession(id: string, data: Partial<InsertCheckoutSession>): Promise<CheckoutSession | undefined>;
+
+  // Email Queue
+  createEmailQueueItem(item: InsertEmailQueueItem): Promise<EmailQueueItem>;
+  getPendingEmails(): Promise<EmailQueueItem[]>;
+  updateEmailQueueItem(id: string, data: Partial<InsertEmailQueueItem>): Promise<EmailQueueItem | undefined>;
+
+  // All Licenses (for admin)
+  getAllLicenses(): Promise<License[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -396,6 +424,61 @@ export class DatabaseStorage implements IStorage {
       contractAssets: (totalRevenue * 0.15).toFixed(2),
       contractLiabilities: (totalRevenue * 0.25).toFixed(2),
     };
+  }
+  // Subscription Plans
+  async getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+    return db.select().from(subscriptionPlans).where(eq(subscriptionPlans.isActive, true));
+  }
+
+  async getSubscriptionPlan(id: string): Promise<SubscriptionPlan | undefined> {
+    const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, id));
+    return plan || undefined;
+  }
+
+  async createSubscriptionPlan(plan: InsertSubscriptionPlan): Promise<SubscriptionPlan> {
+    const [created] = await db.insert(subscriptionPlans).values(plan).returning();
+    return created;
+  }
+
+  async updateSubscriptionPlan(id: string, data: Partial<InsertSubscriptionPlan>): Promise<SubscriptionPlan | undefined> {
+    const [updated] = await db.update(subscriptionPlans).set(data).where(eq(subscriptionPlans.id, id)).returning();
+    return updated || undefined;
+  }
+
+  // Checkout Sessions
+  async getCheckoutSession(stripeSessionId: string): Promise<CheckoutSession | undefined> {
+    const [session] = await db.select().from(checkoutSessions).where(eq(checkoutSessions.stripeSessionId, stripeSessionId));
+    return session || undefined;
+  }
+
+  async createCheckoutSession(session: InsertCheckoutSession): Promise<CheckoutSession> {
+    const [created] = await db.insert(checkoutSessions).values(session).returning();
+    return created;
+  }
+
+  async updateCheckoutSession(id: string, data: Partial<InsertCheckoutSession>): Promise<CheckoutSession | undefined> {
+    const [updated] = await db.update(checkoutSessions).set(data).where(eq(checkoutSessions.id, id)).returning();
+    return updated || undefined;
+  }
+
+  // Email Queue
+  async createEmailQueueItem(item: InsertEmailQueueItem): Promise<EmailQueueItem> {
+    const [created] = await db.insert(emailQueue).values(item).returning();
+    return created;
+  }
+
+  async getPendingEmails(): Promise<EmailQueueItem[]> {
+    return db.select().from(emailQueue).where(eq(emailQueue.status, "pending")).limit(10);
+  }
+
+  async updateEmailQueueItem(id: string, data: Partial<InsertEmailQueueItem>): Promise<EmailQueueItem | undefined> {
+    const [updated] = await db.update(emailQueue).set(data).where(eq(emailQueue.id, id)).returning();
+    return updated || undefined;
+  }
+
+  // All Licenses (for admin)
+  async getAllLicenses(): Promise<License[]> {
+    return db.select().from(licenses).orderBy(desc(licenses.createdAt));
   }
 }
 

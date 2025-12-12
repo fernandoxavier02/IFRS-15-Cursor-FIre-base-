@@ -198,6 +198,47 @@ export const stripeEvents = pgTable("stripe_events", {
   data: jsonb("data"),
 });
 
+// Subscription Plans
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  priceMonthly: decimal("price_monthly", { precision: 10, scale: 2 }).notNull(),
+  priceYearly: decimal("price_yearly", { precision: 10, scale: 2 }),
+  stripePriceIdMonthly: text("stripe_price_id_monthly"),
+  stripePriceIdYearly: text("stripe_price_id_yearly"),
+  features: text("features").array(),
+  maxUsers: integer("max_users").default(1),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Checkout Sessions tracking
+export const checkoutSessions = pgTable("checkout_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stripeSessionId: text("stripe_session_id").notNull().unique(),
+  email: text("email").notNull(),
+  planId: varchar("plan_id").references(() => subscriptionPlans.id),
+  status: text("status").notNull().default("pending"), // pending, completed, expired
+  tenantId: varchar("tenant_id").references(() => tenants.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
+// Email Credentials Queue
+export const emailQueue = pgTable("email_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  toEmail: text("to_email").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  templateType: text("template_type").notNull(), // welcome, credentials, subscription_active
+  status: text("status").notNull().default("pending"), // pending, sent, failed
+  attempts: integer("attempts").default(0),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  sentAt: timestamp("sent_at"),
+});
+
 // Audit Trail
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -322,6 +363,9 @@ export const insertContractBalanceSchema = createInsertSchema(contractBalances).
 export const insertLicenseSchema = createInsertSchema(licenses).omit({ id: true, createdAt: true });
 export const insertLicenseSessionSchema = createInsertSchema(licenseSessions).omit({ id: true, startedAt: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
+export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true, createdAt: true });
+export const insertCheckoutSessionSchema = createInsertSchema(checkoutSessions).omit({ id: true, createdAt: true });
+export const insertEmailQueueSchema = createInsertSchema(emailQueue).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -351,3 +395,9 @@ export type InsertLicenseSession = z.infer<typeof insertLicenseSessionSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type StripeEvent = typeof stripeEvents.$inferSelect;
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
+export type CheckoutSession = typeof checkoutSessions.$inferSelect;
+export type InsertCheckoutSession = z.infer<typeof insertCheckoutSessionSchema>;
+export type EmailQueueItem = typeof emailQueue.$inferSelect;
+export type InsertEmailQueueItem = z.infer<typeof insertEmailQueueSchema>;
