@@ -16,6 +16,9 @@ export const translations = {
     "nav.adminLicenses": "License Admin",
     "nav.contractIngestion": "Contract Ingestion",
     "nav.aiSettings": "AI Settings",
+    "nav.billingSchedules": "Billing Schedules",
+    "nav.revenueLedger": "Revenue Ledger",
+    "nav.consolidatedBalances": "Consolidated Balances",
     
     // Dashboard
     "dashboard.title": "Dashboard",
@@ -191,6 +194,9 @@ export const translations = {
     "nav.adminLicenses": "Admin Licenças",
     "nav.contractIngestion": "Ingestão de Contratos",
     "nav.aiSettings": "Configurações de IA",
+    "nav.billingSchedules": "Cronograma de Faturamento",
+    "nav.revenueLedger": "Livro de Receitas",
+    "nav.consolidatedBalances": "Saldos Consolidados",
     
     // Painel
     "dashboard.title": "Painel",
@@ -366,6 +372,9 @@ export const translations = {
     "nav.adminLicenses": "Admin Licencias",
     "nav.contractIngestion": "Ingestión de Contratos",
     "nav.aiSettings": "Configuración de IA",
+    "nav.billingSchedules": "Programación de Facturación",
+    "nav.revenueLedger": "Libro de Ingresos",
+    "nav.consolidatedBalances": "Saldos Consolidados",
     
     // Panel
     "dashboard.title": "Panel",

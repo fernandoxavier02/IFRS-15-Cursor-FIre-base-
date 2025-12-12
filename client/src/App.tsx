@@ -29,6 +29,9 @@ import ChangePassword from "@/pages/change-password";
 import ActivateLicense from "@/pages/activate-license";
 import AiSettings from "@/pages/ai-settings";
 import ContractIngestion from "@/pages/contract-ingestion";
+import BillingSchedules from "@/pages/billing-schedules";
+import RevenueLedger from "@/pages/revenue-ledger";
+import ConsolidatedBalances from "@/pages/consolidated-balances";
 
 function LoadingSpinner() {
   return (
@@ -102,6 +105,9 @@ function MainRouter() {
         <Route path="/licenses" component={Licenses} />
         <Route path="/reports" component={Reports} />
         <Route path="/ifrs15" component={IFRS15Engine} />
+        <Route path="/billing-schedules" component={BillingSchedules} />
+        <Route path="/revenue-ledger" component={RevenueLedger} />
+        <Route path="/consolidated-balances" component={ConsolidatedBalances} />
         <Route path="/audit" component={AuditTrail} />
         <Route path="/settings" component={Settings} />
         <Route path="/ai-settings" component={AiSettings} />

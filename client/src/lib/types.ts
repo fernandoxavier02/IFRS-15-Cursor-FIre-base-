@@ -76,3 +76,72 @@ export interface RemainingObligations {
   period: string;
   amount: number;
 }
+
+export interface BillingScheduleWithDetails {
+  id: string;
+  tenantId: string;
+  contractId: string;
+  performanceObligationId: string | null;
+  billingDate: string;
+  dueDate: string;
+  amount: string;
+  currency: string;
+  frequency: "one_time" | "monthly" | "quarterly" | "semi_annually" | "annually";
+  status: "scheduled" | "invoiced" | "paid" | "overdue" | "cancelled";
+  invoiceNumber: string | null;
+  invoicedAt: string | null;
+  paidAt: string | null;
+  paidAmount: string | null;
+  notes: string | null;
+  createdAt: string;
+  contractNumber: string;
+  contractTitle: string;
+  customerName: string;
+}
+
+export interface LedgerEntryWithDetails {
+  id: string;
+  tenantId: string;
+  contractId: string;
+  performanceObligationId: string | null;
+  billingScheduleId: string | null;
+  entryDate: string;
+  periodStart: string;
+  periodEnd: string;
+  entryType: "revenue_recognition" | "deferral" | "adjustment" | "reversal";
+  debitAccount: string;
+  creditAccount: string;
+  amount: string;
+  currency: string;
+  exchangeRate: string | null;
+  functionalAmount: string | null;
+  description: string | null;
+  referenceNumber: string | null;
+  isPosted: boolean;
+  postedAt: string | null;
+  postedBy: string | null;
+  isReversed: boolean;
+  reversedEntryId: string | null;
+  createdAt: string;
+  contractNumber: string;
+  contractTitle: string;
+  customerName: string;
+}
+
+export interface ConsolidatedBalanceData {
+  id: string;
+  tenantId: string;
+  periodDate: string;
+  periodType: string;
+  totalContractAssets: string;
+  totalContractLiabilities: string;
+  totalReceivables: string;
+  totalDeferredRevenue: string;
+  totalRecognizedRevenue: string;
+  totalBilledAmount: string;
+  totalCashReceived: string;
+  totalRemainingObligations: string;
+  contractCount: number;
+  currency: string;
+  createdAt: string;
+}

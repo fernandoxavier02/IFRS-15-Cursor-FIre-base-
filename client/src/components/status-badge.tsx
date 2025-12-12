@@ -12,7 +12,14 @@ type StatusType =
   | "past_due"
   | "canceled"
   | "unpaid"
-  | "trialing";
+  | "trialing"
+  | "scheduled"
+  | "invoiced"
+  | "paid"
+  | "overdue"
+  | "cancelled"
+  | "posted"
+  | "unposted";
 
 interface StatusBadgeProps {
   status: StatusType;
@@ -31,6 +38,13 @@ const statusConfig: Record<StatusType, { label: string; variant: "default" | "se
   canceled: { label: "Canceled", variant: "secondary" },
   unpaid: { label: "Unpaid", variant: "destructive" },
   trialing: { label: "Trialing", variant: "outline" },
+  scheduled: { label: "Scheduled", variant: "outline" },
+  invoiced: { label: "Invoiced", variant: "secondary" },
+  paid: { label: "Paid", variant: "default" },
+  overdue: { label: "Overdue", variant: "destructive" },
+  cancelled: { label: "Cancelled", variant: "secondary" },
+  posted: { label: "Posted", variant: "default" },
+  unposted: { label: "Unposted", variant: "outline" },
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {

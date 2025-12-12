@@ -14,6 +14,9 @@ import {
   ClockCounterClockwise,
   Brain,
   FileArrowUp,
+  CalendarCheck,
+  BookOpen,
+  Scales,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -76,6 +79,24 @@ export function AppSidebar() {
       url: "/ifrs15",
       icon: Calculator,
       gradient: "from-emerald-500 to-blue-500",
+    },
+    {
+      titleKey: "nav.billingSchedules",
+      url: "/billing-schedules",
+      icon: CalendarCheck,
+      gradient: "from-teal-500 to-cyan-500",
+    },
+    {
+      titleKey: "nav.revenueLedger",
+      url: "/revenue-ledger",
+      icon: BookOpen,
+      gradient: "from-indigo-500 to-violet-500",
+    },
+    {
+      titleKey: "nav.consolidatedBalances",
+      url: "/consolidated-balances",
+      icon: Scales,
+      gradient: "from-amber-500 to-orange-500",
     },
     {
       titleKey: "nav.reports",
