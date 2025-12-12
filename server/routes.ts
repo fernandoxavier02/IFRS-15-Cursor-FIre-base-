@@ -388,9 +388,72 @@ export async function registerRoutes(
     }
   });
 
+  // Helper function to generate monthly revenue recognition entries (linear)
+  async function generateLinearRevenueEntries(
+    tenantId: string,
+    contractId: string,
+    totalValue: string,
+    currency: string,
+    startDate: Date,
+    endDate: Date | null
+  ) {
+    const start = new Date(startDate);
+    const end = endDate ? new Date(endDate) : new Date(start.getFullYear() + 1, start.getMonth(), start.getDate());
+    
+    // Calculate months between start and end using year/month counters to avoid date overflow issues
+    const startYear = start.getFullYear();
+    const startMonth = start.getMonth();
+    const endYear = end.getFullYear();
+    const endMonth = end.getMonth();
+    
+    const monthsDiff = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
+    const totalAmount = parseFloat(totalValue);
+    const monthlyAmount = totalAmount / Math.max(1, monthsDiff);
+    
+    const entries = [];
+    
+    // Use year/month counters to guarantee contiguous months
+    let currentYear = startYear;
+    let currentMonth = startMonth;
+    
+    for (let i = 0; i < monthsDiff; i++) {
+      // First day of the current month
+      const periodStart = new Date(currentYear, currentMonth, 1);
+      // Last day of the current month
+      const periodEnd = new Date(currentYear, currentMonth + 1, 0);
+      
+      // Create revenue recognition entry: Debit Deferred Revenue, Credit Revenue
+      const entry = await storage.createRevenueLedgerEntry({
+        tenantId,
+        contractId,
+        entryDate: periodStart,
+        periodStart,
+        periodEnd,
+        entryType: "revenue",
+        debitAccount: "Deferred Revenue",
+        creditAccount: "Revenue",
+        amount: monthlyAmount.toFixed(2),
+        currency,
+        description: `Linear revenue recognition - Month ${i + 1}`,
+        isPosted: false,
+      });
+      
+      entries.push(entry);
+      
+      // Advance to next month using counters
+      currentMonth++;
+      if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+      }
+    }
+    
+    return entries;
+  }
+
   app.post("/api/contracts", async (req: Request, res: Response) => {
     try {
-      const { customerId, contractNumber, title, startDate, endDate, totalValue, currency, paymentTerms } = req.body;
+      const { customerId, contractNumber, title, startDate, endDate, totalValue, currency, paymentTerms, generateJournalEntries } = req.body;
       
       const contract = await storage.createContract({
         tenantId: DEFAULT_TENANT_ID,
@@ -413,6 +476,18 @@ export async function registerRoutes(
         description: "Initial contract version",
         totalValue,
       });
+
+      // Generate linear revenue recognition entries if requested or by default
+      if (generateJournalEntries !== false && endDate) {
+        await generateLinearRevenueEntries(
+          DEFAULT_TENANT_ID,
+          contract.id,
+          totalValue,
+          currency || "USD",
+          new Date(startDate),
+          new Date(endDate)
+        );
+      }
 
       // Create audit log
       await storage.createAuditLog({
@@ -2413,6 +2488,100 @@ export async function registerRoutes(
       res.json({ success: true, postedCount: posted.length });
     } catch (error) {
       res.status(500).json({ message: "Failed to post ledger entries" });
+    }
+  });
+
+  // Update ledger entry (manual editing)
+  app.patch("/api/ledger-entries/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { 
+        entryDate, periodStart, periodEnd, entryType, 
+        debitAccount, creditAccount, amount, currency,
+        exchangeRate, description, referenceNumber 
+      } = req.body;
+
+      // Get current entry to check if posted
+      const entries = await storage.getRevenueLedgerEntries(DEFAULT_TENANT_ID);
+      const currentEntry = entries.find(e => e.id === id);
+      
+      if (!currentEntry) {
+        return res.status(404).json({ message: "Ledger entry not found" });
+      }
+
+      if (currentEntry.isPosted) {
+        return res.status(400).json({ message: "Cannot edit a posted ledger entry" });
+      }
+
+      const updateData: any = {};
+      if (entryDate) updateData.entryDate = new Date(entryDate);
+      if (periodStart) updateData.periodStart = new Date(periodStart);
+      if (periodEnd) updateData.periodEnd = new Date(periodEnd);
+      if (entryType) updateData.entryType = entryType;
+      if (debitAccount) updateData.debitAccount = debitAccount;
+      if (creditAccount) updateData.creditAccount = creditAccount;
+      if (amount) {
+        updateData.amount = amount;
+        updateData.functionalAmount = amount;
+      }
+      if (currency) updateData.currency = currency;
+      if (exchangeRate) updateData.exchangeRate = exchangeRate;
+      if (description !== undefined) updateData.description = description;
+      if (referenceNumber !== undefined) updateData.referenceNumber = referenceNumber;
+
+      const entry = await storage.updateRevenueLedgerEntry(id, updateData);
+
+      if (!entry) {
+        return res.status(404).json({ message: "Ledger entry not found" });
+      }
+
+      await storage.createAuditLog({
+        tenantId: DEFAULT_TENANT_ID,
+        entityType: "ledger_entry",
+        entityId: id,
+        action: "update",
+        newValue: updateData,
+        justification: "Ledger entry manually updated",
+      });
+
+      res.json(entry);
+    } catch (error) {
+      console.error("Error updating ledger entry:", error);
+      res.status(500).json({ message: "Failed to update ledger entry" });
+    }
+  });
+
+  // Delete ledger entry
+  app.delete("/api/ledger-entries/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // Get current entry to check if posted
+      const entries = await storage.getRevenueLedgerEntries(DEFAULT_TENANT_ID);
+      const currentEntry = entries.find(e => e.id === id);
+      
+      if (!currentEntry) {
+        return res.status(404).json({ message: "Ledger entry not found" });
+      }
+
+      if (currentEntry.isPosted) {
+        return res.status(400).json({ message: "Cannot delete a posted ledger entry" });
+      }
+
+      await storage.deleteRevenueLedgerEntry(id);
+
+      await storage.createAuditLog({
+        tenantId: DEFAULT_TENANT_ID,
+        entityType: "ledger_entry",
+        entityId: id,
+        action: "delete",
+        justification: "Ledger entry deleted",
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting ledger entry:", error);
+      res.status(500).json({ message: "Failed to delete ledger entry" });
     }
   });
 

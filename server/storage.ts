@@ -229,6 +229,7 @@ export interface IStorage {
   getRevenueLedgerEntry(id: string): Promise<RevenueLedgerEntry | undefined>;
   createRevenueLedgerEntry(entry: InsertRevenueLedgerEntry): Promise<RevenueLedgerEntry>;
   updateRevenueLedgerEntry(id: string, data: Partial<InsertRevenueLedgerEntry>): Promise<RevenueLedgerEntry | undefined>;
+  deleteRevenueLedgerEntry(id: string): Promise<void>;
   getUnpostedLedgerEntries(tenantId: string): Promise<RevenueLedgerEntry[]>;
 
   // Contract Costs
@@ -850,6 +851,10 @@ export class DatabaseStorage implements IStorage {
   async updateRevenueLedgerEntry(id: string, data: Partial<InsertRevenueLedgerEntry>): Promise<RevenueLedgerEntry | undefined> {
     const [updated] = await db.update(revenueLedgerEntries).set(data).where(eq(revenueLedgerEntries.id, id)).returning();
     return updated || undefined;
+  }
+
+  async deleteRevenueLedgerEntry(id: string): Promise<void> {
+    await db.delete(revenueLedgerEntries).where(eq(revenueLedgerEntries.id, id));
   }
 
   async getUnpostedLedgerEntries(tenantId: string): Promise<RevenueLedgerEntry[]> {
