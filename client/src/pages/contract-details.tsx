@@ -1,5 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +12,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table";
 import { useI18n } from "@/lib/i18n";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   ArrowLeft,
   FileText,
@@ -18,6 +34,7 @@ import {
   Receipt,
   Target,
   ChartLineUp,
+  Plus,
 } from "@phosphor-icons/react";
 import { format } from "date-fns";
 import type { ContractWithDetails, PerformanceObligationSummary, BillingScheduleWithDetails, LedgerEntryWithDetails } from "@/lib/types";
@@ -53,6 +70,66 @@ export default function ContractDetails() {
     queryKey: [`/api/contracts/${id}/ledger-entries`],
     enabled: !!id,
   });
+
+  const { toast } = useToast();
+  const [poDialogOpen, setPoDialogOpen] = useState(false);
+
+  const poFormSchema = z.object({
+    description: z.string().min(1, "Description is required"),
+    allocatedPrice: z.string().min(1, "Allocated price is required").refine(v => !isNaN(parseFloat(v)) && parseFloat(v) > 0, "Must be a positive number"),
+    recognitionMethod: z.enum(["over_time", "point_in_time"]),
+    measurementMethod: z.enum(["input", "output", ""]).optional(),
+    percentComplete: z.string().optional().default("0"),
+  });
+
+  type POFormValues = z.infer<typeof poFormSchema>;
+
+  const poForm = useForm<POFormValues>({
+    resolver: zodResolver(poFormSchema),
+    defaultValues: {
+      description: "",
+      allocatedPrice: "",
+      recognitionMethod: "over_time",
+      measurementMethod: "",
+      percentComplete: "0",
+    },
+  });
+
+  const createPOMutation = useMutation({
+    mutationFn: async (data: POFormValues) => {
+      const percentValue = data.percentComplete?.trim() || "0";
+      const parsedPercent = parseFloat(percentValue);
+      
+      return apiRequest("POST", `/api/contracts/${id}/performance-obligations`, {
+        description: data.description,
+        allocatedPrice: data.allocatedPrice,
+        recognitionMethod: data.recognitionMethod,
+        measurementMethod: data.measurementMethod || null,
+        percentComplete: isNaN(parsedPercent) ? "0" : percentValue,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contracts/${id}/performance-obligations`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/contracts/${id}`] });
+      setPoDialogOpen(false);
+      poForm.reset();
+      toast({
+        title: "Success",
+        description: "Performance obligation created successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create performance obligation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreatePO = (data: POFormValues) => {
+    createPOMutation.mutate(data);
+  };
 
   const formatCurrency = (amount: string | number, currency: string = "USD") => {
     return new Intl.NumberFormat("en-US", {
@@ -373,9 +450,135 @@ export default function ContractDetails() {
                 </div>
                 <CardTitle className="text-base font-semibold">Performance Obligations</CardTitle>
               </div>
-              <Badge variant="outline" className="text-xs">
-                {performanceObligations?.length ?? 0} obligations
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs">
+                  {performanceObligations?.length ?? 0} obligations
+                </Badge>
+                <Dialog open={poDialogOpen} onOpenChange={setPoDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" data-testid="button-add-po">
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                      <DialogTitle data-testid="text-dialog-title">Add Performance Obligation</DialogTitle>
+                    </DialogHeader>
+                    <Form {...poForm}>
+                      <form onSubmit={poForm.handleSubmit(handleCreatePO)} className="grid gap-4 py-4">
+                        <FormField
+                          control={poForm.control}
+                          name="description"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Description</FormLabel>
+                              <FormControl>
+                                <Input
+                                  data-testid="input-po-description"
+                                  placeholder="e.g., Software License, Implementation Services"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={poForm.control}
+                          name="allocatedPrice"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Allocated Price</FormLabel>
+                              <FormControl>
+                                <Input
+                                  data-testid="input-po-price"
+                                  type="number"
+                                  placeholder="0.00"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={poForm.control}
+                          name="recognitionMethod"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Recognition Method</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-recognition-method">
+                                    <SelectValue placeholder="Select method" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="over_time">Over Time</SelectItem>
+                                  <SelectItem value="point_in_time">Point in Time</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        {poForm.watch("recognitionMethod") === "over_time" && (
+                          <FormField
+                            control={poForm.control}
+                            name="measurementMethod"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Measurement Method</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-measurement-method">
+                                      <SelectValue placeholder="Select measurement" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="input">Input Method</SelectItem>
+                                    <SelectItem value="output">Output Method</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+                        <FormField
+                          control={poForm.control}
+                          name="percentComplete"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Percent Complete (%)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  data-testid="input-po-percent"
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  placeholder="0"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button type="button" variant="outline" onClick={() => setPoDialogOpen(false)} data-testid="button-cancel-po">
+                            Cancel
+                          </Button>
+                          <Button type="submit" disabled={createPOMutation.isPending} data-testid="button-save-po">
+                            {createPOMutation.isPending ? "Saving..." : "Save"}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </CardHeader>
             <CardContent className="pt-4">
               {poLoading ? (

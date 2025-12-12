@@ -5,7 +5,8 @@ import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { extractContractData, generateConfidenceScores } from "./ai-service";
-import { aiModels, insertAiProviderConfigSchema } from "@shared/schema";
+import { aiModels, insertAiProviderConfigSchema, insertPerformanceObligationSchema } from "@shared/schema";
+import { z } from "zod";
 
 let DEFAULT_TENANT_ID = "default-tenant";
 const ADMIN_EMAIL = "fernandocostaxavier@gmail.com";
@@ -504,6 +505,72 @@ export async function registerRoutes(
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to get performance obligations" });
+    }
+  });
+
+  // Create performance obligation for a contract
+  const createPOSchema = insertPerformanceObligationSchema.omit({ contractVersionId: true }).extend({
+    description: z.string().min(1, "Description is required"),
+    allocatedPrice: z.union([z.string(), z.number()])
+      .transform(v => String(v))
+      .refine(v => !isNaN(parseFloat(v)) && parseFloat(v) > 0, "Allocated price must be a positive number"),
+    recognitionMethod: z.enum(["over_time", "point_in_time"]),
+    measurementMethod: z.enum(["input", "output"]).optional().nullable(),
+    percentComplete: z.union([z.string(), z.number()]).optional()
+      .transform(v => {
+        const str = v ? String(v) : "0";
+        const num = parseFloat(str);
+        return isNaN(num) ? "0" : str;
+      }),
+  });
+
+  app.post("/api/contracts/:id/performance-obligations", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const contract = await storage.getContract(id);
+      if (!contract) {
+        return res.status(404).json({ message: "Contract not found" });
+      }
+
+      const versions = await storage.getContractVersions(id);
+      if (versions.length === 0) {
+        return res.status(400).json({ message: "Contract has no versions" });
+      }
+
+      const latestVersion = versions[0];
+      
+      const parsed = createPOSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0]?.message || "Validation failed" });
+      }
+
+      const { description, allocatedPrice, recognitionMethod, measurementMethod, percentComplete } = parsed.data;
+
+      const po = await storage.createPerformanceObligation({
+        contractVersionId: latestVersion.id,
+        description,
+        allocatedPrice,
+        recognitionMethod,
+        measurementMethod: measurementMethod || null,
+        percentComplete: percentComplete || "0",
+        recognizedAmount: "0",
+        deferredAmount: allocatedPrice,
+        isSatisfied: false,
+      });
+
+      await storage.createAuditLog({
+        tenantId: DEFAULT_TENANT_ID,
+        entityType: "performance_obligation",
+        entityId: po.id,
+        action: "create",
+        newValue: po,
+        justification: "Performance obligation created",
+      });
+
+      res.status(201).json(po);
+    } catch (error) {
+      console.error("Error creating performance obligation:", error);
+      res.status(500).json({ message: "Failed to create performance obligation" });
     }
   });
 
