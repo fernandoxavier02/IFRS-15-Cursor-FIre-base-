@@ -188,3 +188,46 @@ export interface DisclosureReportData {
   totalContractAssets: number;
   totalContractLiabilities: number;
 }
+
+export interface ExchangeRate {
+  id: string;
+  tenantId: string;
+  fromCurrency: string;
+  toCurrency: string;
+  rate: string;
+  effectiveDate: string;
+  source: string | null;
+  createdAt: string;
+}
+
+export interface FinancingComponent {
+  id: string;
+  tenantId: string;
+  contractId: string;
+  nominalAmount: string;
+  presentValue: string;
+  discountRate: string;
+  financingPeriodMonths: number;
+  totalInterest: string;
+  recognizedInterest: string | null;
+  currency: string;
+  calculatedAt: string;
+  createdAt: string;
+}
+
+export interface Contract {
+  id: string;
+  tenantId: string;
+  customerId: string;
+  contractNumber: string;
+  title: string;
+  status: "draft" | "active" | "modified" | "terminated" | "expired";
+  startDate: string;
+  endDate: string | null;
+  totalValue: string;
+  currency: string;
+  paymentTerms: string | null;
+  currentVersionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
