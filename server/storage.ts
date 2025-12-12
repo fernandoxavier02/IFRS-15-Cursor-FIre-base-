@@ -20,6 +20,12 @@ import {
   aiIngestionJobs,
   aiExtractionResults,
   aiReviewTasks,
+  billingSchedules,
+  revenueLedgerEntries,
+  contractCosts,
+  exchangeRates,
+  financingComponents,
+  consolidatedBalances,
   type User,
   type InsertUser,
   type Tenant,
@@ -59,6 +65,18 @@ import {
   type InsertAiExtractionResult,
   type AiReviewTask,
   type InsertAiReviewTask,
+  type BillingSchedule,
+  type InsertBillingSchedule,
+  type RevenueLedgerEntry,
+  type InsertRevenueLedgerEntry,
+  type ContractCost,
+  type InsertContractCost,
+  type ExchangeRate,
+  type InsertExchangeRate,
+  type FinancingComponent,
+  type InsertFinancingComponent,
+  type ConsolidatedBalance,
+  type InsertConsolidatedBalance,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, isNotNull, lt, gte } from "drizzle-orm";
@@ -192,6 +210,51 @@ export interface IStorage {
   getPendingReviewTasks(tenantId: string): Promise<AiReviewTask[]>;
   createAiReviewTask(task: InsertAiReviewTask): Promise<AiReviewTask>;
   updateAiReviewTask(id: string, data: Partial<InsertAiReviewTask>): Promise<AiReviewTask | undefined>;
+
+  // ==================== ACCOUNTING METHODS (IFRS 15) ====================
+
+  // Billing Schedules
+  getBillingSchedules(tenantId: string): Promise<BillingSchedule[]>;
+  getBillingSchedulesByContract(contractId: string): Promise<BillingSchedule[]>;
+  getBillingSchedule(id: string): Promise<BillingSchedule | undefined>;
+  createBillingSchedule(schedule: InsertBillingSchedule): Promise<BillingSchedule>;
+  updateBillingSchedule(id: string, data: Partial<InsertBillingSchedule>): Promise<BillingSchedule | undefined>;
+  getUpcomingBillings(tenantId: string, days: number): Promise<BillingSchedule[]>;
+  getOverdueBillings(tenantId: string): Promise<BillingSchedule[]>;
+
+  // Revenue Ledger Entries
+  getRevenueLedgerEntries(tenantId: string): Promise<RevenueLedgerEntry[]>;
+  getRevenueLedgerEntriesByContract(contractId: string): Promise<RevenueLedgerEntry[]>;
+  getRevenueLedgerEntry(id: string): Promise<RevenueLedgerEntry | undefined>;
+  createRevenueLedgerEntry(entry: InsertRevenueLedgerEntry): Promise<RevenueLedgerEntry>;
+  updateRevenueLedgerEntry(id: string, data: Partial<InsertRevenueLedgerEntry>): Promise<RevenueLedgerEntry | undefined>;
+  getUnpostedLedgerEntries(tenantId: string): Promise<RevenueLedgerEntry[]>;
+
+  // Contract Costs
+  getContractCosts(tenantId: string): Promise<ContractCost[]>;
+  getContractCostsByContract(contractId: string): Promise<ContractCost[]>;
+  getContractCost(id: string): Promise<ContractCost | undefined>;
+  createContractCost(cost: InsertContractCost): Promise<ContractCost>;
+  updateContractCost(id: string, data: Partial<InsertContractCost>): Promise<ContractCost | undefined>;
+
+  // Exchange Rates
+  getExchangeRates(tenantId: string): Promise<ExchangeRate[]>;
+  getExchangeRate(tenantId: string, fromCurrency: string, toCurrency: string): Promise<ExchangeRate | undefined>;
+  createExchangeRate(rate: InsertExchangeRate): Promise<ExchangeRate>;
+  updateExchangeRate(id: string, data: Partial<InsertExchangeRate>): Promise<ExchangeRate | undefined>;
+
+  // Financing Components
+  getFinancingComponents(tenantId: string): Promise<FinancingComponent[]>;
+  getFinancingComponentsByContract(contractId: string): Promise<FinancingComponent[]>;
+  getFinancingComponent(id: string): Promise<FinancingComponent | undefined>;
+  createFinancingComponent(component: InsertFinancingComponent): Promise<FinancingComponent>;
+  updateFinancingComponent(id: string, data: Partial<InsertFinancingComponent>): Promise<FinancingComponent | undefined>;
+
+  // Consolidated Balances
+  getConsolidatedBalances(tenantId: string): Promise<ConsolidatedBalance[]>;
+  getConsolidatedBalance(id: string): Promise<ConsolidatedBalance | undefined>;
+  createConsolidatedBalance(balance: InsertConsolidatedBalance): Promise<ConsolidatedBalance>;
+  getLatestConsolidatedBalance(tenantId: string): Promise<ConsolidatedBalance | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -681,6 +744,187 @@ export class DatabaseStorage implements IStorage {
   async updateAiReviewTask(id: string, data: Partial<InsertAiReviewTask>): Promise<AiReviewTask | undefined> {
     const [updated] = await db.update(aiReviewTasks).set(data).where(eq(aiReviewTasks.id, id)).returning();
     return updated || undefined;
+  }
+
+  // ==================== ACCOUNTING METHODS (IFRS 15) ====================
+
+  // Billing Schedules
+  async getBillingSchedules(tenantId: string): Promise<BillingSchedule[]> {
+    return db.select().from(billingSchedules).where(eq(billingSchedules.tenantId, tenantId)).orderBy(desc(billingSchedules.billingDate));
+  }
+
+  async getBillingSchedulesByContract(contractId: string): Promise<BillingSchedule[]> {
+    return db.select().from(billingSchedules).where(eq(billingSchedules.contractId, contractId)).orderBy(billingSchedules.billingDate);
+  }
+
+  async getBillingSchedule(id: string): Promise<BillingSchedule | undefined> {
+    const [schedule] = await db.select().from(billingSchedules).where(eq(billingSchedules.id, id));
+    return schedule || undefined;
+  }
+
+  async createBillingSchedule(schedule: InsertBillingSchedule): Promise<BillingSchedule> {
+    const [created] = await db.insert(billingSchedules).values(schedule).returning();
+    return created;
+  }
+
+  async updateBillingSchedule(id: string, data: Partial<InsertBillingSchedule>): Promise<BillingSchedule | undefined> {
+    const [updated] = await db.update(billingSchedules).set(data).where(eq(billingSchedules.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async getUpcomingBillings(tenantId: string, days: number): Promise<BillingSchedule[]> {
+    const now = new Date();
+    const future = new Date();
+    future.setDate(future.getDate() + days);
+    return db.select().from(billingSchedules)
+      .where(and(
+        eq(billingSchedules.tenantId, tenantId),
+        eq(billingSchedules.status, "scheduled"),
+        gte(billingSchedules.billingDate, now),
+        lt(billingSchedules.billingDate, future)
+      ))
+      .orderBy(billingSchedules.billingDate);
+  }
+
+  async getOverdueBillings(tenantId: string): Promise<BillingSchedule[]> {
+    const now = new Date();
+    return db.select().from(billingSchedules)
+      .where(and(
+        eq(billingSchedules.tenantId, tenantId),
+        eq(billingSchedules.status, "overdue")
+      ))
+      .orderBy(billingSchedules.dueDate);
+  }
+
+  // Revenue Ledger Entries
+  async getRevenueLedgerEntries(tenantId: string): Promise<RevenueLedgerEntry[]> {
+    return db.select().from(revenueLedgerEntries).where(eq(revenueLedgerEntries.tenantId, tenantId)).orderBy(desc(revenueLedgerEntries.entryDate));
+  }
+
+  async getRevenueLedgerEntriesByContract(contractId: string): Promise<RevenueLedgerEntry[]> {
+    return db.select().from(revenueLedgerEntries).where(eq(revenueLedgerEntries.contractId, contractId)).orderBy(desc(revenueLedgerEntries.entryDate));
+  }
+
+  async getRevenueLedgerEntry(id: string): Promise<RevenueLedgerEntry | undefined> {
+    const [entry] = await db.select().from(revenueLedgerEntries).where(eq(revenueLedgerEntries.id, id));
+    return entry || undefined;
+  }
+
+  async createRevenueLedgerEntry(entry: InsertRevenueLedgerEntry): Promise<RevenueLedgerEntry> {
+    const [created] = await db.insert(revenueLedgerEntries).values(entry).returning();
+    return created;
+  }
+
+  async updateRevenueLedgerEntry(id: string, data: Partial<InsertRevenueLedgerEntry>): Promise<RevenueLedgerEntry | undefined> {
+    const [updated] = await db.update(revenueLedgerEntries).set(data).where(eq(revenueLedgerEntries.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async getUnpostedLedgerEntries(tenantId: string): Promise<RevenueLedgerEntry[]> {
+    return db.select().from(revenueLedgerEntries)
+      .where(and(
+        eq(revenueLedgerEntries.tenantId, tenantId),
+        eq(revenueLedgerEntries.isPosted, false)
+      ))
+      .orderBy(revenueLedgerEntries.entryDate);
+  }
+
+  // Contract Costs
+  async getContractCosts(tenantId: string): Promise<ContractCost[]> {
+    return db.select().from(contractCosts).where(eq(contractCosts.tenantId, tenantId)).orderBy(desc(contractCosts.incurredDate));
+  }
+
+  async getContractCostsByContract(contractId: string): Promise<ContractCost[]> {
+    return db.select().from(contractCosts).where(eq(contractCosts.contractId, contractId)).orderBy(contractCosts.incurredDate);
+  }
+
+  async getContractCost(id: string): Promise<ContractCost | undefined> {
+    const [cost] = await db.select().from(contractCosts).where(eq(contractCosts.id, id));
+    return cost || undefined;
+  }
+
+  async createContractCost(cost: InsertContractCost): Promise<ContractCost> {
+    const [created] = await db.insert(contractCosts).values(cost).returning();
+    return created;
+  }
+
+  async updateContractCost(id: string, data: Partial<InsertContractCost>): Promise<ContractCost | undefined> {
+    const [updated] = await db.update(contractCosts).set(data).where(eq(contractCosts.id, id)).returning();
+    return updated || undefined;
+  }
+
+  // Exchange Rates
+  async getExchangeRates(tenantId: string): Promise<ExchangeRate[]> {
+    return db.select().from(exchangeRates).where(eq(exchangeRates.tenantId, tenantId)).orderBy(desc(exchangeRates.effectiveDate));
+  }
+
+  async getExchangeRate(tenantId: string, fromCurrency: string, toCurrency: string): Promise<ExchangeRate | undefined> {
+    const [rate] = await db.select().from(exchangeRates)
+      .where(and(
+        eq(exchangeRates.tenantId, tenantId),
+        eq(exchangeRates.fromCurrency, fromCurrency),
+        eq(exchangeRates.toCurrency, toCurrency)
+      ))
+      .orderBy(desc(exchangeRates.effectiveDate))
+      .limit(1);
+    return rate || undefined;
+  }
+
+  async createExchangeRate(rate: InsertExchangeRate): Promise<ExchangeRate> {
+    const [created] = await db.insert(exchangeRates).values(rate).returning();
+    return created;
+  }
+
+  async updateExchangeRate(id: string, data: Partial<InsertExchangeRate>): Promise<ExchangeRate | undefined> {
+    const [updated] = await db.update(exchangeRates).set(data).where(eq(exchangeRates.id, id)).returning();
+    return updated || undefined;
+  }
+
+  // Financing Components
+  async getFinancingComponents(tenantId: string): Promise<FinancingComponent[]> {
+    return db.select().from(financingComponents).where(eq(financingComponents.tenantId, tenantId)).orderBy(desc(financingComponents.createdAt));
+  }
+
+  async getFinancingComponentsByContract(contractId: string): Promise<FinancingComponent[]> {
+    return db.select().from(financingComponents).where(eq(financingComponents.contractId, contractId));
+  }
+
+  async getFinancingComponent(id: string): Promise<FinancingComponent | undefined> {
+    const [component] = await db.select().from(financingComponents).where(eq(financingComponents.id, id));
+    return component || undefined;
+  }
+
+  async createFinancingComponent(component: InsertFinancingComponent): Promise<FinancingComponent> {
+    const [created] = await db.insert(financingComponents).values(component).returning();
+    return created;
+  }
+
+  async updateFinancingComponent(id: string, data: Partial<InsertFinancingComponent>): Promise<FinancingComponent | undefined> {
+    const [updated] = await db.update(financingComponents).set(data).where(eq(financingComponents.id, id)).returning();
+    return updated || undefined;
+  }
+
+  // Consolidated Balances
+  async getConsolidatedBalances(tenantId: string): Promise<ConsolidatedBalance[]> {
+    return db.select().from(consolidatedBalances).where(eq(consolidatedBalances.tenantId, tenantId)).orderBy(desc(consolidatedBalances.periodDate));
+  }
+
+  async getConsolidatedBalance(id: string): Promise<ConsolidatedBalance | undefined> {
+    const [balance] = await db.select().from(consolidatedBalances).where(eq(consolidatedBalances.id, id));
+    return balance || undefined;
+  }
+
+  async createConsolidatedBalance(balance: InsertConsolidatedBalance): Promise<ConsolidatedBalance> {
+    const [created] = await db.insert(consolidatedBalances).values(balance).returning();
+    return created;
+  }
+
+  async getLatestConsolidatedBalance(tenantId: string): Promise<ConsolidatedBalance | undefined> {
+    const [balance] = await db.select().from(consolidatedBalances)
+      .where(eq(consolidatedBalances.tenantId, tenantId))
+      .orderBy(desc(consolidatedBalances.periodDate))
+      .limit(1);
+    return balance || undefined;
   }
 }
 

@@ -17,6 +17,12 @@ export const aiProviderEnum = pgEnum("ai_provider", ["openai", "anthropic", "ope
 export const ingestionStatusEnum = pgEnum("ingestion_status", ["pending", "processing", "awaiting_review", "approved", "rejected", "failed"]);
 export const reviewStatusEnum = pgEnum("review_status", ["pending", "approved", "rejected", "needs_correction"]);
 
+// Accounting Enums for IFRS 15
+export const billingFrequencyEnum = pgEnum("billing_frequency", ["monthly", "quarterly", "semi_annual", "annual", "milestone", "one_time"]);
+export const billingStatusEnum = pgEnum("billing_status", ["scheduled", "invoiced", "paid", "overdue", "cancelled"]);
+export const ledgerEntryTypeEnum = pgEnum("ledger_entry_type", ["revenue", "deferred_revenue", "contract_asset", "contract_liability", "receivable", "cash", "financing_income", "commission_expense"]);
+export const costTypeEnum = pgEnum("cost_type", ["incremental", "fulfillment"]);
+
 // Users table with RBAC
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -339,6 +345,122 @@ export const aiReviewTasks = pgTable("ai_review_tasks", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ==================== ACCOUNTING TABLES (IFRS 15) ====================
+
+// Billing Schedules - tracks when invoices are due/sent
+export const billingSchedules = pgTable("billing_schedules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  contractId: varchar("contract_id").references(() => contracts.id).notNull(),
+  performanceObligationId: varchar("performance_obligation_id").references(() => performanceObligations.id),
+  billingDate: timestamp("billing_date").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  amount: decimal("amount", { precision: 18, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("BRL"),
+  frequency: billingFrequencyEnum("frequency").notNull(),
+  status: billingStatusEnum("status").notNull().default("scheduled"),
+  invoiceNumber: text("invoice_number"),
+  invoicedAt: timestamp("invoiced_at"),
+  paidAt: timestamp("paid_at"),
+  paidAmount: decimal("paid_amount", { precision: 18, scale: 2 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Revenue Ledger Entries (Journal Entries for double-entry accounting)
+export const revenueLedgerEntries = pgTable("revenue_ledger_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  contractId: varchar("contract_id").references(() => contracts.id).notNull(),
+  performanceObligationId: varchar("performance_obligation_id").references(() => performanceObligations.id),
+  billingScheduleId: varchar("billing_schedule_id").references(() => billingSchedules.id),
+  entryDate: timestamp("entry_date").notNull(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  entryType: ledgerEntryTypeEnum("entry_type").notNull(),
+  debitAccount: text("debit_account").notNull(),
+  creditAccount: text("credit_account").notNull(),
+  amount: decimal("amount", { precision: 18, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("BRL"),
+  exchangeRate: decimal("exchange_rate", { precision: 18, scale: 6 }).default("1"),
+  functionalAmount: decimal("functional_amount", { precision: 18, scale: 2 }),
+  description: text("description"),
+  referenceNumber: text("reference_number"),
+  isPosted: boolean("is_posted").default(false),
+  postedAt: timestamp("posted_at"),
+  postedBy: varchar("posted_by").references(() => users.id),
+  isReversed: boolean("is_reversed").default(false),
+  reversedEntryId: varchar("reversed_entry_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Contract Costs (ASC 340-40 / IFRS 15 incremental/fulfillment costs)
+export const contractCosts = pgTable("contract_costs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  contractId: varchar("contract_id").references(() => contracts.id).notNull(),
+  costType: costTypeEnum("cost_type").notNull(),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 18, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("BRL"),
+  incurredDate: timestamp("incurred_date").notNull(),
+  amortizationStartDate: timestamp("amortization_start_date").notNull(),
+  amortizationEndDate: timestamp("amortization_end_date").notNull(),
+  amortizationMethod: text("amortization_method").default("straight_line"),
+  totalAmortized: decimal("total_amortized", { precision: 18, scale: 2 }).default("0"),
+  remainingBalance: decimal("remaining_balance", { precision: 18, scale: 2 }),
+  isFullyAmortized: boolean("is_fully_amortized").default(false),
+  impairmentLoss: decimal("impairment_loss", { precision: 18, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Currency Exchange Rates
+export const exchangeRates = pgTable("exchange_rates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  fromCurrency: text("from_currency").notNull(),
+  toCurrency: text("to_currency").notNull(),
+  rate: decimal("rate", { precision: 18, scale: 6 }).notNull(),
+  effectiveDate: timestamp("effective_date").notNull(),
+  source: text("source").default("manual"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Significant Financing Component (when payment terms > 12 months)
+export const financingComponents = pgTable("financing_components", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  contractId: varchar("contract_id").references(() => contracts.id).notNull(),
+  nominalAmount: decimal("nominal_amount", { precision: 18, scale: 2 }).notNull(),
+  presentValue: decimal("present_value", { precision: 18, scale: 2 }).notNull(),
+  discountRate: decimal("discount_rate", { precision: 8, scale: 4 }).notNull(),
+  financingPeriodMonths: integer("financing_period_months").notNull(),
+  totalInterest: decimal("total_interest", { precision: 18, scale: 2 }).notNull(),
+  recognizedInterest: decimal("recognized_interest", { precision: 18, scale: 2 }).default("0"),
+  currency: text("currency").notNull().default("BRL"),
+  calculatedAt: timestamp("calculated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Consolidated Period Balances (monthly/quarterly snapshots for reporting)
+export const consolidatedBalances = pgTable("consolidated_balances", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  periodDate: timestamp("period_date").notNull(),
+  periodType: text("period_type").notNull().default("monthly"),
+  totalContractAssets: decimal("total_contract_assets", { precision: 18, scale: 2 }).default("0"),
+  totalContractLiabilities: decimal("total_contract_liabilities", { precision: 18, scale: 2 }).default("0"),
+  totalReceivables: decimal("total_receivables", { precision: 18, scale: 2 }).default("0"),
+  totalDeferredRevenue: decimal("total_deferred_revenue", { precision: 18, scale: 2 }).default("0"),
+  totalRecognizedRevenue: decimal("total_recognized_revenue", { precision: 18, scale: 2 }).default("0"),
+  totalBilledAmount: decimal("total_billed_amount", { precision: 18, scale: 2 }).default("0"),
+  totalCashReceived: decimal("total_cash_received", { precision: 18, scale: 2 }).default("0"),
+  totalRemainingObligations: decimal("total_remaining_obligations", { precision: 18, scale: 2 }).default("0"),
+  contractCount: integer("contract_count").default(0),
+  currency: text("currency").notNull().default("BRL"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relations
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   users: many(users),
@@ -456,6 +578,14 @@ export const insertAiIngestionJobSchema = createInsertSchema(aiIngestionJobs).om
 export const insertAiExtractionResultSchema = createInsertSchema(aiExtractionResults).omit({ id: true, createdAt: true });
 export const insertAiReviewTaskSchema = createInsertSchema(aiReviewTasks).omit({ id: true, createdAt: true });
 
+// Accounting Insert Schemas
+export const insertBillingScheduleSchema = createInsertSchema(billingSchedules).omit({ id: true, createdAt: true });
+export const insertRevenueLedgerEntrySchema = createInsertSchema(revenueLedgerEntries).omit({ id: true, createdAt: true });
+export const insertContractCostSchema = createInsertSchema(contractCosts).omit({ id: true, createdAt: true });
+export const insertExchangeRateSchema = createInsertSchema(exchangeRates).omit({ id: true, createdAt: true });
+export const insertFinancingComponentSchema = createInsertSchema(financingComponents).omit({ id: true, createdAt: true, calculatedAt: true });
+export const insertConsolidatedBalanceSchema = createInsertSchema(consolidatedBalances).omit({ id: true, createdAt: true });
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -498,6 +628,20 @@ export type AiExtractionResult = typeof aiExtractionResults.$inferSelect;
 export type InsertAiExtractionResult = z.infer<typeof insertAiExtractionResultSchema>;
 export type AiReviewTask = typeof aiReviewTasks.$inferSelect;
 export type InsertAiReviewTask = z.infer<typeof insertAiReviewTaskSchema>;
+
+// Accounting Types
+export type BillingSchedule = typeof billingSchedules.$inferSelect;
+export type InsertBillingSchedule = z.infer<typeof insertBillingScheduleSchema>;
+export type RevenueLedgerEntry = typeof revenueLedgerEntries.$inferSelect;
+export type InsertRevenueLedgerEntry = z.infer<typeof insertRevenueLedgerEntrySchema>;
+export type ContractCost = typeof contractCosts.$inferSelect;
+export type InsertContractCost = z.infer<typeof insertContractCostSchema>;
+export type ExchangeRate = typeof exchangeRates.$inferSelect;
+export type InsertExchangeRate = z.infer<typeof insertExchangeRateSchema>;
+export type FinancingComponent = typeof financingComponents.$inferSelect;
+export type InsertFinancingComponent = z.infer<typeof insertFinancingComponentSchema>;
+export type ConsolidatedBalance = typeof consolidatedBalances.$inferSelect;
+export type InsertConsolidatedBalance = z.infer<typeof insertConsolidatedBalanceSchema>;
 
 // AI Models available per provider
 export const aiModels = {
