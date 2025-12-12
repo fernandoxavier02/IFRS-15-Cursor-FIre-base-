@@ -688,6 +688,95 @@ export async function registerRoutes(
     res.json(data);
   });
 
+  // IFRS 15 Disclosure Report
+  app.get("/api/reports/disclosure", async (req: Request, res: Response) => {
+    const { period } = req.query;
+    const reportPeriod = (period as string) || "2024";
+
+    const disaggregatedRevenue = [
+      { category: "Software Licenses", overTime: 150000, pointInTime: 75000, total: 225000 },
+      { category: "Professional Services", overTime: 120000, pointInTime: 0, total: 120000 },
+      { category: "Support & Maintenance", overTime: 80000, pointInTime: 0, total: 80000 },
+      { category: "Training", overTime: 30000, pointInTime: 20000, total: 50000 },
+      { category: "Hardware", overTime: 0, pointInTime: 95000, total: 95000 },
+    ];
+
+    const contractBalances = [
+      { period: "Q1 2024", openingAsset: 45000, openingLiability: 120000, revenueRecognized: 185000, cashReceived: 175000, closingAsset: 55000, closingLiability: 110000 },
+      { period: "Q2 2024", openingAsset: 55000, openingLiability: 110000, revenueRecognized: 210000, cashReceived: 195000, closingAsset: 70000, closingLiability: 95000 },
+      { period: "Q3 2024", openingAsset: 70000, openingLiability: 95000, revenueRecognized: 195000, cashReceived: 220000, closingAsset: 45000, closingLiability: 70000 },
+      { period: "Q4 2024", openingAsset: 45000, openingLiability: 70000, revenueRecognized: 230000, cashReceived: 210000, closingAsset: 65000, closingLiability: 50000 },
+    ];
+
+    const remainingObligations = [
+      { period: "2025 H1", amount: 280000 },
+      { period: "2025 H2", amount: 195000 },
+      { period: "2026", amount: 320000 },
+      { period: "2027+", amount: 150000 },
+    ];
+
+    const significantJudgments = [
+      {
+        area: "Performance Obligation Identification",
+        description: "Determining whether goods and services are distinct within the context of the contract",
+        impact: "Affects timing and pattern of revenue recognition",
+        methodology: "Analysis of integration, modification, and interdependency criteria per IFRS 15.27-30"
+      },
+      {
+        area: "Transaction Price Allocation",
+        description: "Allocating transaction price to performance obligations based on standalone selling prices",
+        impact: "Determines revenue amount recognized for each obligation",
+        methodology: "Observable prices used where available; estimation techniques applied otherwise"
+      },
+      {
+        area: "Variable Consideration Estimation",
+        description: "Estimating variable components such as discounts, rebates, and performance bonuses",
+        impact: "Constrains transaction price to amounts highly probable of not reversing",
+        methodology: "Expected value or most likely amount based on historical data and current conditions"
+      },
+      {
+        area: "Over Time Recognition Measurement",
+        description: "Measuring progress toward complete satisfaction of performance obligations",
+        impact: "Determines timing of revenue recognition for services delivered over time",
+        methodology: "Input method (cost-to-cost) or output method based on nature of obligation"
+      },
+      {
+        area: "Contract Modification Assessment",
+        description: "Determining whether modifications are separate contracts or part of existing contracts",
+        impact: "Affects whether to account for prospectively or cumulatively",
+        methodology: "Evaluation of scope and price changes against IFRS 15.18-21 criteria"
+      }
+    ];
+
+    const accountingPolicies = [
+      "Revenue is recognized when control of goods or services is transferred to the customer at an amount that reflects the consideration expected to be received.",
+      "For performance obligations satisfied over time, revenue is recognized using the input method (cost-to-cost) unless output measures are more representative.",
+      "For performance obligations satisfied at a point in time, revenue is recognized when indicators of transfer of control are met.",
+      "Contract costs to obtain a contract are capitalized when incremental and expected to be recovered, amortized over the contract period.",
+      "Contract assets represent the right to consideration for goods or services transferred when that right is conditional on something other than the passage of time.",
+      "Contract liabilities represent the obligation to transfer goods or services for which consideration has been received.",
+      "The significant financing component is recognized separately when the timing of payments differs significantly from the transfer of goods or services."
+    ];
+
+    const totalRecognized = disaggregatedRevenue.reduce((sum, r) => sum + r.total, 0);
+    const totalRemaining = remainingObligations.reduce((sum, r) => sum + r.amount, 0);
+    const lastBalance = contractBalances[contractBalances.length - 1];
+
+    res.json({
+      reportPeriod,
+      generatedAt: new Date().toISOString(),
+      disaggregatedRevenue,
+      contractBalances,
+      remainingObligations,
+      significantJudgments,
+      accountingPolicies,
+      totalRecognizedRevenue: totalRecognized,
+      totalDeferredRevenue: totalRemaining,
+      totalContractAssets: lastBalance.closingAsset,
+      totalContractLiabilities: lastBalance.closingLiability,
+    });
+  });
+
   // Audit logs
   app.get("/api/audit-logs", async (req: Request, res: Response) => {
     try {

@@ -167,3 +167,24 @@ export interface ContractCostWithDetails {
   contractTitle: string;
   customerName: string;
 }
+
+export interface SignificantJudgment {
+  area: string;
+  description: string;
+  impact: string;
+  methodology: string;
+}
+
+export interface DisclosureReportData {
+  reportPeriod: string;
+  generatedAt: string;
+  disaggregatedRevenue: DisaggregatedRevenue[];
+  contractBalances: ContractBalanceSummary[];
+  remainingObligations: RemainingObligations[];
+  significantJudgments: SignificantJudgment[];
+  accountingPolicies: string[];
+  totalRecognizedRevenue: number;
+  totalDeferredRevenue: number;
+  totalContractAssets: number;
+  totalContractLiabilities: number;
+}
