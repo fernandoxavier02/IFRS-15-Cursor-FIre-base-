@@ -45,6 +45,9 @@ import {
   Users,
   Monitor,
   Loader2,
+  Copy,
+  Check,
+  AlertTriangle,
 } from "lucide-react";
 
 interface AdminLicense {
@@ -62,6 +65,13 @@ interface AdminLicense {
   createdAt: string;
 }
 
+interface CreatedCredentials {
+  email: string;
+  password: string;
+  licenseKey: string;
+  emailSent: boolean;
+}
+
 export default function AdminLicenses() {
   const { toast } = useToast();
   const { t } = useI18n();
@@ -71,23 +81,52 @@ export default function AdminLicenses() {
     seatCount: "1",
     planType: "professional",
   });
+  const [createdCredentials, setCreatedCredentials] = useState<CreatedCredentials | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const { data: licenses, isLoading } = useQuery<AdminLicense[]>({
     queryKey: ["/api/admin/licenses"],
   });
+
+  const copyToClipboard = async (text: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch {
+      toast({
+        title: "Copy failed",
+        description: "Could not copy to clipboard. Please select and copy the text manually.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const createLicenseMutation = useMutation({
     mutationFn: async (data: { email: string; seatCount: number; planType: string }) => {
       const response = await apiRequest("POST", "/api/admin/licenses", data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/licenses"] });
       setIsCreateOpen(false);
       setNewLicense({ email: "", seatCount: "1", planType: "professional" });
+      
+      if (data.credentials) {
+        setCreatedCredentials({
+          email: data.credentials.email,
+          password: data.credentials.password,
+          licenseKey: data.credentials.licenseKey,
+          emailSent: data.emailSent,
+        });
+      }
+      
       toast({
         title: "License created",
-        description: "The license has been created and credentials sent via email.",
+        description: data.emailSent 
+          ? "The license has been created and credentials sent via email."
+          : "License created but email could not be sent. Please share the credentials manually.",
+        variant: data.emailSent ? "default" : "destructive",
       });
     },
     onError: (error: Error) => {
@@ -375,6 +414,100 @@ export default function AdminLicenses() {
           <DataTable columns={columns} data={licenses || []} />
         </CardContent>
       </Card>
+
+      <Dialog open={!!createdCredentials} onOpenChange={(open) => !open && setCreatedCredentials(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {createdCredentials?.emailSent ? (
+                <Check className="h-5 w-5 text-chart-2" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-chart-4" />
+              )}
+              License Created
+            </DialogTitle>
+            <DialogDescription>
+              {createdCredentials?.emailSent
+                ? "Credentials have been sent to the user via email. You can also copy them below."
+                : "Email could not be sent. Please copy and share these credentials manually with the user."}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {createdCredentials && (
+            <div className="space-y-4" data-testid="credentials-container">
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-xs">Email</Label>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-muted px-3 py-2 rounded text-sm font-mono break-all" data-testid="text-credential-email">
+                    {createdCredentials.email}
+                  </code>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => copyToClipboard(createdCredentials.email, "email")}
+                    data-testid="button-copy-email"
+                  >
+                    {copiedField === "email" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-xs">Temporary Password</Label>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-muted px-3 py-2 rounded text-sm font-mono break-all" data-testid="text-credential-password">
+                    {createdCredentials.password}
+                  </code>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => copyToClipboard(createdCredentials.password, "password")}
+                    data-testid="button-copy-password"
+                  >
+                    {copiedField === "password" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-xs">License Key</Label>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-muted px-3 py-2 rounded text-sm font-mono break-all" data-testid="text-credential-license-key">
+                    {createdCredentials.licenseKey}
+                  </code>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => copyToClipboard(createdCredentials.licenseKey, "licenseKey")}
+                    data-testid="button-copy-license-key"
+                  >
+                    {copiedField === "licenseKey" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              
+              <Button
+                className="w-full"
+                variant="outline"
+                onClick={() => {
+                  const allText = `Email: ${createdCredentials.email}\nPassword: ${createdCredentials.password}\nLicense Key: ${createdCredentials.licenseKey}`;
+                  copyToClipboard(allText, "all");
+                }}
+                data-testid="button-copy-all"
+              >
+                {copiedField === "all" ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                Copy All Credentials
+              </Button>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button onClick={() => setCreatedCredentials(null)} data-testid="button-close-credentials">
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
