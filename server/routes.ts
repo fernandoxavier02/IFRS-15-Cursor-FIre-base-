@@ -2,11 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { randomUUID } from "crypto";
-import Stripe from "stripe";
-
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-04-30.basil" })
-  : null;
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 const DEFAULT_TENANT_ID = "default-tenant";
 
@@ -530,116 +526,39 @@ export async function registerRoutes(
     }
   });
 
-  // Stripe webhook
-  app.post("/api/billing/webhook", async (req: Request, res: Response) => {
-    if (!stripe) {
-      return res.status(500).json({ message: "Stripe not configured" });
-    }
-
-    const sig = req.headers["stripe-signature"] as string;
-    let event: Stripe.Event;
-
+  // Subscription checkout - public route
+  app.post("/api/subscribe/checkout", async (req: Request, res: Response) => {
     try {
-      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-      if (webhookSecret && req.rawBody) {
-        event = stripe.webhooks.constructEvent(req.rawBody as Buffer, sig, webhookSecret);
-      } else {
-        event = req.body as Stripe.Event;
-      }
-    } catch (err) {
-      console.error("Webhook signature verification failed");
-      return res.status(400).json({ message: "Webhook signature verification failed" });
-    }
-
-    // Check idempotency
-    const existingEvent = await storage.getStripeEvent(event.id);
-    if (existingEvent) {
-      return res.json({ received: true, message: "Event already processed" });
-    }
-
-    // Process event
-    try {
-      switch (event.type) {
-        case "checkout.session.completed": {
-          const session = event.data.object as Stripe.Checkout.Session;
-          if (session.subscription && session.customer) {
-            await storage.updateTenant(DEFAULT_TENANT_ID, {
-              stripeCustomerId: session.customer as string,
-              stripeSubscriptionId: session.subscription as string,
-              subscriptionStatus: "active",
-            });
-            
-            // Create a license for the new subscription
-            await storage.createLicense({
-              tenantId: DEFAULT_TENANT_ID,
-              licenseKey: `LIC-${randomUUID().substring(0, 8).toUpperCase()}`,
-              status: "active",
-              seatCount: 1,
-            });
-          }
-          break;
-        }
-        case "customer.subscription.updated": {
-          const subscription = event.data.object as Stripe.Subscription;
-          await storage.updateTenant(DEFAULT_TENANT_ID, {
-            subscriptionStatus: subscription.status as any,
-            currentPeriodStart: new Date(subscription.current_period_start * 1000),
-            currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-            cancelAtPeriodEnd: subscription.cancel_at_period_end,
-          });
-          break;
-        }
-        case "customer.subscription.deleted": {
-          await storage.updateTenant(DEFAULT_TENANT_ID, {
-            subscriptionStatus: "canceled",
-          });
-          // Suspend all licenses
-          const licenses = await storage.getLicenses(DEFAULT_TENANT_ID);
-          for (const license of licenses) {
-            await storage.updateLicense(license.id, { status: "suspended" });
-          }
-          break;
-        }
-        case "invoice.payment_failed": {
-          await storage.updateTenant(DEFAULT_TENANT_ID, {
-            subscriptionStatus: "past_due",
-          });
-          break;
-        }
+      const { email, planId } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
       }
 
-      await storage.createStripeEvent({
-        id: event.id,
-        eventType: event.type,
-        data: event.data,
-      });
+      const stripe = await getUncachableStripeClient();
 
-      res.json({ received: true });
-    } catch (error) {
-      console.error("Error processing webhook:", error);
-      res.status(500).json({ message: "Error processing webhook" });
-    }
-  });
+      // Pricing based on plan
+      const pricing: Record<string, { amount: number; name: string }> = {
+        starter: { amount: 9900, name: "IFRS 15 Starter Plan" },
+        professional: { amount: 29900, name: "IFRS 15 Professional Plan" },
+        enterprise: { amount: 59900, name: "IFRS 15 Enterprise Plan" },
+      };
 
-  // Checkout session
-  app.post("/api/billing/checkout-session", async (req: Request, res: Response) => {
-    if (!stripe) {
-      return res.status(500).json({ message: "Stripe not configured" });
-    }
+      const plan = pricing[planId] || pricing.professional;
 
-    try {
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         payment_method_types: ["card"],
+        customer_email: email,
         line_items: [
           {
             price_data: {
               currency: "usd",
               product_data: {
-                name: "IFRS 15 Enterprise Plan",
+                name: plan.name,
                 description: "Full access to IFRS 15 Revenue Recognition platform",
               },
-              unit_amount: 29900,
+              unit_amount: plan.amount,
               recurring: {
                 interval: "month",
               },
@@ -647,14 +566,249 @@ export async function registerRoutes(
             quantity: 1,
           },
         ],
-        success_url: `${req.headers.origin}/settings?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${req.headers.origin}/settings`,
+        success_url: `${req.headers.origin}/?subscription=success`,
+        cancel_url: `${req.headers.origin}/subscribe?cancelled=true`,
+        metadata: {
+          email,
+          planId,
+        },
+      });
+
+      // Track checkout session
+      await storage.createCheckoutSession({
+        stripeSessionId: session.id,
+        email,
+        status: "pending",
       });
 
       res.json({ url: session.url });
     } catch (error) {
       console.error("Error creating checkout session:", error);
       res.status(500).json({ message: "Failed to create checkout session" });
+    }
+  });
+
+  // Get Stripe publishable key
+  app.get("/api/stripe/publishable-key", async (req: Request, res: Response) => {
+    try {
+      const key = await getStripePublishableKey();
+      res.json({ publishableKey: key });
+    } catch (error) {
+      res.status(500).json({ message: "Stripe not configured" });
+    }
+  });
+
+  // Admin: Get all licenses
+  app.get("/api/admin/licenses", async (req: Request, res: Response) => {
+    try {
+      const licenses = await storage.getAllLicenses();
+      const users = await storage.getUsers(DEFAULT_TENANT_ID);
+      
+      const result = licenses.map((l) => {
+        const user = users.find((u) => u.id === l.currentUserId);
+        return {
+          id: l.id,
+          licenseKey: l.licenseKey,
+          status: l.status,
+          seatCount: l.seatCount,
+          currentIp: l.currentIp,
+          currentUserName: user?.fullName || null,
+          email: user?.email || null,
+          tenantName: null,
+          lockedAt: l.lockedAt?.toISOString() || null,
+          lastSeenAt: l.lastSeenAt?.toISOString() || null,
+          graceUntil: l.graceUntil?.toISOString() || null,
+          createdAt: l.createdAt.toISOString(),
+        };
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get licenses" });
+    }
+  });
+
+  // Admin: Create license
+  app.post("/api/admin/licenses", async (req: Request, res: Response) => {
+    try {
+      const { email, seatCount, planType } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Generate license key
+      const licenseKey = `LIC-${randomUUID().substring(0, 8).toUpperCase()}`;
+
+      // Generate random password
+      const password = randomUUID().substring(0, 12);
+
+      // Create tenant if needed
+      let tenant = await storage.getTenant(DEFAULT_TENANT_ID);
+      if (!tenant) {
+        tenant = await storage.createTenant({
+          name: "Demo Organization",
+          country: "United States",
+          currency: "USD",
+        });
+      }
+
+      // Create user
+      const user = await storage.createUser({
+        username: email.split("@")[0],
+        email,
+        password, // In production, this should be hashed
+        fullName: email.split("@")[0],
+        role: "finance",
+        tenantId: tenant.id,
+      });
+
+      // Create license
+      const license = await storage.createLicense({
+        tenantId: tenant.id,
+        licenseKey,
+        status: "active",
+        seatCount: seatCount || 1,
+      });
+
+      // Queue email with credentials
+      await storage.createEmailQueueItem({
+        toEmail: email,
+        subject: "Your IFRS 15 Revenue Manager Access Credentials",
+        body: `
+          Welcome to IFRS 15 Revenue Manager!
+
+          Your login credentials:
+          Email: ${email}
+          Password: ${password}
+          License Key: ${licenseKey}
+
+          Please login at: ${process.env.REPLIT_DOMAINS?.split(",")[0] || "https://app.ifrs15.com"}
+
+          Important: For security, please change your password after first login.
+          Note: Your license is locked to one IP address at a time.
+        `,
+        templateType: "credentials",
+        status: "pending",
+      });
+
+      await storage.createAuditLog({
+        tenantId: tenant.id,
+        entityType: "license",
+        entityId: license.id,
+        action: "create",
+        newValue: { licenseKey, email, seatCount },
+        justification: "Admin created license",
+      });
+
+      res.status(201).json({
+        license,
+        user: { email: user.email },
+        message: "License created and credentials queued for email",
+      });
+    } catch (error) {
+      console.error("Error creating license:", error);
+      res.status(500).json({ message: "Failed to create license" });
+    }
+  });
+
+  // Admin: License actions
+  app.post("/api/admin/licenses/:id/release", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const license = await storage.getLicense(id);
+      if (!license) {
+        return res.status(404).json({ message: "License not found" });
+      }
+
+      await storage.endLicenseSession(license.id, "admin_force_release");
+      await storage.updateLicense(id, {
+        currentIp: null,
+        currentUserId: null,
+        lockedAt: null,
+      });
+
+      await storage.createAuditLog({
+        tenantId: license.tenantId,
+        entityType: "license",
+        entityId: id,
+        action: "update",
+        justification: "Admin force released session",
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to release license" });
+    }
+  });
+
+  app.post("/api/admin/licenses/:id/suspend", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.updateLicense(id, { status: "suspended" });
+
+      const license = await storage.getLicense(id);
+      if (license) {
+        await storage.createAuditLog({
+          tenantId: license.tenantId,
+          entityType: "license",
+          entityId: id,
+          action: "update",
+          justification: "Admin suspended license",
+        });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to suspend license" });
+    }
+  });
+
+  app.post("/api/admin/licenses/:id/activate", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.updateLicense(id, { status: "active" });
+
+      const license = await storage.getLicense(id);
+      if (license) {
+        await storage.createAuditLog({
+          tenantId: license.tenantId,
+          entityType: "license",
+          entityId: id,
+          action: "update",
+          justification: "Admin activated license",
+        });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to activate license" });
+    }
+  });
+
+  app.post("/api/admin/licenses/:id/revoke", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.endLicenseSession(id, "admin_revoked");
+      await storage.updateLicense(id, {
+        status: "revoked",
+        currentIp: null,
+        currentUserId: null,
+      });
+
+      const license = await storage.getLicense(id);
+      if (license) {
+        await storage.createAuditLog({
+          tenantId: license.tenantId,
+          entityType: "license",
+          entityId: id,
+          action: "delete",
+          justification: "Admin revoked license",
+        });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to revoke license" });
     }
   });
 
