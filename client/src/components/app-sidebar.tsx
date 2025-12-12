@@ -1,17 +1,18 @@
 import { useLocation, Link } from "wouter";
-import { LucideIcon } from "lucide-react";
 import {
-  LayoutDashboard,
+  ChartLineUp,
   FileText,
   Users,
-  KeyRound,
-  BarChart3,
-  Settings,
+  Key,
+  ChartBar,
+  Gear,
   Calculator,
-  Shield,
-  LogOut,
   ShieldCheck,
-} from "lucide-react";
+  SignOut,
+  CurrencyDollar,
+  TrendUp,
+  ClockCounterClockwise,
+} from "@phosphor-icons/react";
 import {
   Sidebar,
   SidebarContent,
@@ -19,11 +20,11 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -32,7 +33,8 @@ import { cn } from "@/lib/utils";
 interface NavItem {
   titleKey: string;
   url: string;
-  icon: LucideIcon;
+  icon: React.ElementType;
+  gradient?: string;
 }
 
 export function AppSidebar() {
@@ -46,17 +48,20 @@ export function AppSidebar() {
     {
       titleKey: "nav.dashboard",
       url: "/",
-      icon: LayoutDashboard,
+      icon: ChartLineUp,
+      gradient: "from-emerald-500 to-emerald-600",
     },
     {
       titleKey: "nav.contracts",
       url: "/contracts",
       icon: FileText,
+      gradient: "from-blue-500 to-blue-600",
     },
     {
       titleKey: "nav.customers",
       url: "/customers",
       icon: Users,
+      gradient: "from-purple-500 to-purple-600",
     },
   ];
 
@@ -65,11 +70,13 @@ export function AppSidebar() {
       titleKey: "nav.ifrs15",
       url: "/ifrs15",
       icon: Calculator,
+      gradient: "from-emerald-500 to-blue-500",
     },
     {
       titleKey: "nav.reports",
       url: "/reports",
-      icon: BarChart3,
+      icon: ChartBar,
+      gradient: "from-blue-500 to-purple-500",
     },
   ];
 
@@ -77,17 +84,20 @@ export function AppSidebar() {
     {
       titleKey: "nav.licenses",
       url: "/licenses",
-      icon: KeyRound,
+      icon: Key,
+      gradient: "from-amber-500 to-orange-500",
     },
     {
       titleKey: "nav.audit",
       url: "/audit",
-      icon: Shield,
+      icon: ClockCounterClockwise,
+      gradient: "from-slate-500 to-slate-600",
     },
     {
       titleKey: "nav.settings",
       url: "/settings",
-      icon: Settings,
+      icon: Gear,
+      gradient: "from-slate-400 to-slate-500",
     },
   ];
 
@@ -96,107 +106,79 @@ export function AppSidebar() {
       titleKey: "nav.adminLicenses",
       url: "/admin/licenses",
       icon: ShieldCheck,
+      gradient: "from-rose-500 to-pink-500",
     },
   ];
 
   const NavButton = ({ item, isActive }: { item: NavItem; isActive: boolean }) => {
     const Icon = item.icon;
     const translationKey = item.titleKey as keyof typeof import("@/lib/i18n").translations["en"];
+    const testId = `nav-${item.titleKey.split(".")[1]}`;
+    
     return (
-      <Link href={item.url} data-testid={`nav-${item.titleKey.split(".")[1]}`}>
-        <Button
-          variant={isActive ? "default" : "ghost"}
-          className={cn(
-            "w-full justify-start gap-3 h-10",
-            isActive && "bg-primary text-primary-foreground shadow-md"
-          )}
-        >
+      <SidebarMenuButton 
+        asChild 
+        isActive={isActive}
+        className={cn(
+          "group flex items-center gap-3 px-3 py-2.5 h-auto rounded-lg transition-all duration-200",
+          isActive 
+            ? "sidebar-item-active bg-white/10" 
+            : "hover:bg-white/5"
+        )}
+        data-testid={testId}
+      >
+        <Link href={item.url}>
           <div className={cn(
-            "flex items-center justify-center rounded-md p-1.5",
-            isActive ? "bg-primary-foreground/20" : "bg-primary/10"
+            "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
+            isActive 
+              ? `bg-gradient-to-br ${item.gradient} shadow-lg` 
+              : "bg-white/10 group-hover:bg-white/15"
           )}>
-            <Icon className={cn(
-              "h-4 w-4",
-              isActive ? "text-primary-foreground" : "text-primary"
-            )} />
+            <Icon 
+              weight={isActive ? "fill" : "duotone"}
+              className={cn(
+                "w-5 h-5 transition-colors",
+                isActive ? "text-white" : "text-white/70 group-hover:text-white/90"
+              )} 
+            />
           </div>
-          <span className="font-medium">{t(translationKey)}</span>
-        </Button>
-      </Link>
+          <span className={cn(
+            "text-sm font-medium transition-colors",
+            isActive ? "text-white" : "text-white/70 group-hover:text-white/90"
+          )}>
+            {t(translationKey)}
+          </span>
+        </Link>
+      </SidebarMenuButton>
     );
   };
 
   return (
-    <Sidebar>
-      <SidebarHeader className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary shadow-lg">
-            <Calculator className="h-6 w-6 text-primary-foreground" />
+    <Sidebar className="border-r-0">
+      <div className="h-full flex flex-col sidebar-premium">
+        <SidebarHeader className="p-5 border-b border-white/10 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/20">
+                <CurrencyDollar weight="fill" className="h-6 w-6 text-white" />
+              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-900 animate-pulse" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg font-bold text-white tracking-tight">IFRS 15</span>
+              <span className="text-xs text-white/50 font-medium">Revenue Manager</span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-base font-bold text-primary">IFRS 15</span>
-            <span className="text-xs text-muted-foreground">Revenue Manager</span>
-          </div>
-        </div>
-      </SidebarHeader>
+        </SidebarHeader>
 
-      <SidebarContent className="px-3 py-4">
-        <SidebarGroup className="space-y-1">
-          <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-2 mb-2">
-            Main
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-1">
-              {mainNavItems.map((item) => (
-                <SidebarMenuItem key={item.titleKey}>
-                  <NavButton item={item} isActive={location === item.url} />
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup className="space-y-1 mt-6">
-          <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-2 mb-2">
-            IFRS 15
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-1">
-              {ifrs15Items.map((item) => (
-                <SidebarMenuItem key={item.titleKey}>
-                  <NavButton 
-                    item={item} 
-                    isActive={location === item.url || location.startsWith(item.url + "/")} 
-                  />
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup className="space-y-1 mt-6">
-          <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-2 mb-2">
-            Admin
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-1">
-              {adminItems.map((item) => (
-                <SidebarMenuItem key={item.titleKey}>
-                  <NavButton item={item} isActive={location === item.url} />
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {isAdmin && (
-          <SidebarGroup className="space-y-1 mt-6">
-            <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-2 mb-2">
-              Super Admin
+        <SidebarContent className="px-3 py-4 flex-1 overflow-y-auto">
+          <SidebarGroup className="space-y-1">
+            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-white/40 px-3 mb-2">
+              Overview
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="space-y-1">
-                {superAdminItems.map((item) => (
+                {mainNavItems.map((item) => (
                   <SidebarMenuItem key={item.titleKey}>
                     <NavButton item={item} isActive={location === item.url} />
                   </SidebarMenuItem>
@@ -204,34 +186,95 @@ export function AppSidebar() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-        )}
-      </SidebarContent>
 
-      <SidebarFooter className="p-4 border-t border-sidebar-border space-y-3">
-        {user && (
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-sm font-medium truncate">{user.fullName || user.email}</span>
-              <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+          <SidebarGroup className="space-y-1 mt-6">
+            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-white/40 px-3 mb-2">
+              Revenue Recognition
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-1">
+                {ifrs15Items.map((item) => (
+                  <SidebarMenuItem key={item.titleKey}>
+                    <NavButton 
+                      item={item} 
+                      isActive={location === item.url || location.startsWith(item.url + "/")} 
+                    />
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup className="space-y-1 mt-6">
+            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-white/40 px-3 mb-2">
+              Administration
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-1">
+                {adminItems.map((item) => (
+                  <SidebarMenuItem key={item.titleKey}>
+                    <NavButton item={item} isActive={location === item.url} />
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          {isAdmin && (
+            <SidebarGroup className="space-y-1 mt-6">
+              <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-white/40 px-3 mb-2">
+                Super Admin
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="space-y-1">
+                  {superAdminItems.map((item) => (
+                    <SidebarMenuItem key={item.titleKey}>
+                      <NavButton item={item} isActive={location === item.url} />
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
+        </SidebarContent>
+
+        <SidebarFooter className="p-4 border-t border-white/10 flex-shrink-0 mt-auto">
+          {user && (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-white/10">
+                <span className="text-sm font-semibold text-white">
+                  {user.fullName?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-sm font-medium text-white truncate">
+                  {user.fullName || user.email.split("@")[0]}
+                </span>
+                <span className="text-xs text-white/50 truncate">{user.email}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={logout}
+                data-testid="button-logout"
+                className="h-8 w-8 text-white/50 hover:text-white hover:bg-white/10"
+              >
+                <SignOut weight="bold" className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={logout}
-              data-testid="button-logout"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+          )}
+          
+          <div className="flex items-center justify-between mt-3 px-1">
+            <div className="flex items-center gap-2">
+              <TrendUp weight="fill" className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">
+                {isAdmin ? "Admin" : "Enterprise"}
+              </span>
+            </div>
+            <span className="text-[10px] text-white/30 font-medium">v1.0.0</span>
           </div>
-        )}
-        <div className="flex items-center justify-between">
-          <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-semibold">
-            {isAdmin ? "Admin" : "Enterprise"}
-          </Badge>
-          <span className="text-xs text-muted-foreground font-medium">v1.0.0</span>
-        </div>
-      </SidebarFooter>
+        </SidebarFooter>
+      </div>
     </Sidebar>
   );
 }
