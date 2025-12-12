@@ -2,22 +2,40 @@
 
 ## Design Approach
 
-**Selected System:** Carbon Design System (IBM)  
-**Justification:** Enterprise financial compliance application requiring precision data display, complex tables, audit trails, and professional workflows. Carbon excels at data-heavy interfaces with clear information hierarchy and robust component patterns for financial applications.
+**Selected System:** Custom Innovative Color Palette  
+**Justification:** Enterprise financial compliance application with a modern, vibrant aesthetic that stands out while maintaining professionalism. The color palette uses white as a clean background with vibrant green, blue, and purple accents for an innovative yet trustworthy appearance.
 
 **Key Principles:**
-- Clarity over decoration - financial data must be immediately comprehensible
-- Consistent information density across all data views
-- Professional, trustworthy aesthetic appropriate for auditors and finance teams
-- Scannable layouts for quick data verification
+- Clean white backgrounds for clarity and readability
+- Vibrant green (#10b981) as primary action color - represents growth and financial success
+- Blue (#3b82f6) for data visualization and information hierarchy
+- Purple (#8b5cf6) as accent color for highlights and special features
+- No emoji icons - using Lucide React icon library exclusively
+- Full light/dark mode support
 
 ---
 
 ## Core Design Elements
 
-### A. Typography
+### A. Color Palette
 
-**Font Stack:** IBM Plex Sans (Carbon's native typeface)
+**Light Mode:**
+- Background: Pure white (#ffffff)
+- Foreground: Deep purple-gray for text
+- Primary: Vibrant green (HSL 152 76% 40%) - buttons, links, active states
+- Accent: Purple (HSL 262 80% 55%) - highlights, badges, special features
+- Charts: Blue, Green, Purple variations for data visualization
+
+**Dark Mode:**
+- Background: Deep purple-gray (#141318)
+- Foreground: Near white (#fafafa)
+- Primary: Bright green (HSL 152 76% 45%) - enhanced for dark backgrounds
+- Accent: Bright purple (HSL 262 80% 60%) - enhanced visibility
+- Charts: Lighter versions of blue, green, purple for dark backgrounds
+
+### B. Typography
+
+**Font Stack:** Open Sans, system sans-serif fallback
 
 **Hierarchy:**
 - Page Headers: 32px, Semibold (font-semibold)
@@ -34,7 +52,7 @@
 - Form labels: 12px, Medium
 - Error messages: 14px, Regular
 
-### B. Layout System
+### C. Layout System
 
 **Spacing Primitives:** Tailwind units of **2, 4, 6, 8, 12, 16**
 
@@ -54,142 +72,92 @@
 
 ---
 
-## C. Component Library
+## D. Component Library
+
+### Icons
+
+**IMPORTANT: No emoji icons allowed**
+- Use Lucide React icons exclusively for all UI icons
+- Use react-icons/si for company/brand logos only
+- Icons should be sized appropriately: 16px for inline, 20px for buttons, 24px for headers
 
 ### Navigation
 
-**Top Navigation Bar:**
-- Fixed header with logo left, main navigation center, user menu/notifications right
-- Height: `h-16`
-- Includes: Subscription status indicator, license count badge
-- Persistent breadcrumb trail below header for deep navigation
+**Sidebar Navigation:**
+- Left sidebar using Shadcn sidebar primitives
+- Width: `20rem`, collapsible to icon-only
+- Module icons with labels (Lucide icons only)
+- Active state: Green accent background
 
-**Sidebar (Optional Secondary Nav):**
-- Left sidebar for module switching (Contracts, IFRS Engine, Licenses, Reports, Billing)
-- Width: `w-64`, collapsible to icon-only `w-16`
-- Module icons with labels
+**Header:**
+- Fixed header with sidebar trigger and theme toggle
+- Height: `h-14`
 
 ### Core UI Elements
 
 **Cards:**
-- Container: Bordered panel with `rounded-lg border p-6`
+- Container: White background (light) / dark purple-gray (dark)
+- Subtle border with rounded corners
 - Header with action buttons in opposite corner
-- Sections within cards separated by horizontal dividers
 
 **Data Tables:**
-- Striped rows for scannability (`even:bg-gray-50`)
+- Alternating row backgrounds for scannability
 - Sticky headers for long scrolls
 - Sortable columns with clear indicators
-- Row actions in rightmost column (icon buttons)
-- Pagination footer with items-per-page selector
-- Expandable rows for nested details (contract lines, revenue schedules)
+- Row actions in rightmost column
 
 **Badges/Status Indicators:**
-- Pill-shaped, `px-3 py-1 rounded-full text-xs font-medium`
-- Subscription status: Active, Past Due, Canceled, Suspended
-- License status: Active, In Use, Expired, Revoked
-- Contract status: Draft, Active, Modified, Terminated
+- Pill-shaped with small radius
+- Color-coded by status:
+  - Active/Success: Green variant
+  - Warning/Pending: Purple accent variant
+  - Error/Cancelled: Destructive red
+  - Neutral/Draft: Secondary gray
 
 ### Forms
 
 **Input Fields:**
 - Standard height: `h-10`
 - Label above input: `text-sm font-medium mb-1`
-- Helper text below: `text-xs text-gray-500 mt-1`
-- Error state: Border highlight + error message below
-- Required indicator: Asterisk in label
-
-**Form Layouts:**
-- Group related fields in sections with subtle dividers
-- Inline fields for related data (e.g., currency + amount)
-- Date range pickers for period selection
-- Multi-step forms with progress indicator for contract creation
-
-**Specialized Inputs:**
-- Currency selector + amount (inline)
-- Customer search with autocomplete dropdown
-- Revenue recognition method selector (radio cards with descriptions)
-- IP address display (monospace font, read-only field)
+- Focus ring: Green primary color
+- Error state: Red border + error message
 
 ### Data Displays
 
 **Financial Data Cards:**
 - Large metric display: 28px, Semibold
 - Label above: 12px, Medium, uppercase
-- Delta/change indicator with icon
-- Layout: 4-column grid on desktop (`grid-cols-4 gap-6`)
+- Trend indicator with Lucide icon (TrendingUp, TrendingDown)
+- Green for positive trends, red for negative
 
-**Contract Summary Panel:**
-- Two-column layout: Key details left, timeline/status right
-- Collapsible sections for contract lines, amendments
-- Version comparison view (side-by-side diff)
-
-**Revenue Schedule Table:**
-- Monthly/period columns
-- Recognized vs. deferred amounts
-- Running totals row (sticky footer)
-- Expandable to show calculation details
-
-**Audit Trail Log:**
-- Timeline-style list with timestamps
-- User avatar + action description
-- Filterable by date range, user, action type
-- Expandable entries for full change details
-
-### Reports & Dashboards
-
-**Dashboard Layout:**
-- Top row: Key metrics (4 cards)
-- Second row: Active subscriptions table + license usage gauge
-- Third row: Revenue recognition chart (line/area chart)
-- Widgets: Pending actions, recent contracts, upcoming renewals
-
-**IFRS 15 Disclosure Reports:**
-- Print-optimized layouts
-- Structured sections matching disclosure requirements
-- Tables with totals and subtotals
-- Export buttons (PDF, Excel) in top-right
-- Disaggregation tables with hierarchical grouping
-
-**License Management View:**
-- Active sessions list with IP, timestamp, user
-- License utilization gauge
-- Quick actions: Force release, extend grace period
-- Session history timeline per license
-
-### Overlays
-
-**Modal Dialogs:**
-- Standard size: `max-w-2xl`
-- Large modals for contract creation: `max-w-4xl`
-- Header with title and close button
-- Body with `max-h-96 overflow-y-auto` for long content
-- Footer with action buttons right-aligned
-
-**Notifications/Toasts:**
-- Top-right position, stack vertically
-- Auto-dismiss after 5 seconds (info/success)
-- Persistent for errors/warnings
-- Icons for status type
-
-**Drawers:**
-- Right-side panel for quick views (contract details, license info)
-- Width: `w-96` or `w-1/3`
-- Overlay backdrop with click-to-close
+**Charts:**
+- Primary chart color: Blue (#3b82f6)
+- Secondary: Green (#10b981)
+- Tertiary: Purple (#8b5cf6)
+- Use Recharts library
 
 ---
 
-## D. Animations
+## E. Animations
 
 **Minimal Motion:**
-- Table row hover: Subtle background transition
-- Modal entry: Fade + slight scale (0.95 → 1)
-- Notification slide-in from right
-- Loading spinners for async operations only
+- Hover: Subtle background elevation
+- Modal entry: Fade + slight scale
+- Loading: Skeleton placeholders
 - No decorative animations
+
+---
+
+## F. Theme Toggle
+
+**Implementation:**
+- Sun/Moon icon button in header
+- Smooth transition between modes
+- Persists preference in localStorage
+- System preference detection
 
 ---
 
 ## Images
 
-No hero images - this is a data-focused enterprise application. All visual emphasis on clear data presentation and functional efficiency.
+No hero images - this is a data-focused enterprise application. All visual emphasis on clear data presentation with the vibrant color palette providing visual interest.
