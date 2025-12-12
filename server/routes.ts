@@ -7,12 +7,15 @@ import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClie
 import { extractContractData, generateConfidenceScores } from "./ai-service";
 import { aiModels, insertAiProviderConfigSchema } from "@shared/schema";
 
-const DEFAULT_TENANT_ID = "default-tenant";
+let DEFAULT_TENANT_ID = "default-tenant";
 const ADMIN_EMAIL = "fernandocostaxavier@gmail.com";
 const ADMIN_PASSWORD = "Fcxv020781@";
 
 async function ensureDefaultData() {
-  let tenant = await storage.getTenant(DEFAULT_TENANT_ID);
+  // Try to get existing tenant first
+  const existingTenants = await storage.getAllTenants();
+  let tenant = existingTenants.length > 0 ? existingTenants[0] : null;
+  
   if (!tenant) {
     tenant = await storage.createTenant({
       name: "Demo Organization",
@@ -20,6 +23,9 @@ async function ensureDefaultData() {
       currency: "USD",
     });
   }
+  
+  // Update DEFAULT_TENANT_ID with the actual tenant ID
+  DEFAULT_TENANT_ID = tenant.id;
   
   // Ensure admin user exists
   const adminUser = await storage.getUserByEmail(ADMIN_EMAIL);

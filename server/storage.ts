@@ -91,6 +91,7 @@ export interface IStorage {
 
   // Tenants
   getTenant(id: string): Promise<Tenant | undefined>;
+  getAllTenants(): Promise<Tenant[]>;
   createTenant(tenant: InsertTenant): Promise<Tenant>;
   updateTenant(id: string, data: Partial<InsertTenant>): Promise<Tenant | undefined>;
 
@@ -282,6 +283,10 @@ export class DatabaseStorage implements IStorage {
   async getTenant(id: string): Promise<Tenant | undefined> {
     const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id));
     return tenant || undefined;
+  }
+
+  async getAllTenants(): Promise<Tenant[]> {
+    return await db.select().from(tenants).orderBy(tenants.createdAt);
   }
 
   async createTenant(tenant: InsertTenant): Promise<Tenant> {

@@ -75,7 +75,7 @@ export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
   name: text("name").notNull(),
-  country: text("country").notNull(),
+  country: text("country").default("BR"),
   currency: text("currency").notNull().default("USD"),
   taxId: text("tax_id"),
   creditRating: text("credit_rating"),
