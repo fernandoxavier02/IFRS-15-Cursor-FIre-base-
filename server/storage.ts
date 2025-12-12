@@ -149,6 +149,11 @@ export interface IStorage {
 
   // All Licenses (for admin)
   getAllLicenses(): Promise<License[]>;
+
+  // Authentication
+  getUserByEmail(email: string): Promise<User | undefined>;
+  updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
+  activateLicense(userId: string, licenseKey: string, ip: string): Promise<{ success: boolean; error?: string }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -479,6 +484,60 @@ export class DatabaseStorage implements IStorage {
   // All Licenses (for admin)
   async getAllLicenses(): Promise<License[]> {
     return db.select().from(licenses).orderBy(desc(licenses.createdAt));
+  }
+
+  // Authentication
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
+  async updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined> {
+    const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async activateLicense(userId: string, licenseKey: string, ip: string): Promise<{ success: boolean; error?: string }> {
+    const license = await this.getLicenseByKey(licenseKey);
+    
+    if (!license) {
+      return { success: false, error: "Invalid license key" };
+    }
+
+    if (license.status !== "active") {
+      return { success: false, error: "License is not active" };
+    }
+
+    if (license.activatedByUserId && license.activatedByUserId !== userId) {
+      return { success: false, error: "License already activated by another user" };
+    }
+
+    // Update license with activation info
+    await db.update(licenses).set({
+      activatedAt: new Date(),
+      activatedByUserId: userId,
+      activationIp: ip,
+      currentUserId: userId,
+      currentIp: ip,
+      lockedAt: new Date(),
+      lastSeenAt: new Date(),
+    }).where(eq(licenses.id, license.id));
+
+    // Update user with license info and activate
+    await db.update(users).set({
+      isActive: true,
+      licenseKey: licenseKey,
+      licenseActivatedAt: new Date(),
+    }).where(eq(users.id, userId));
+
+    // Create license session
+    await this.createLicenseSession({
+      licenseId: license.id,
+      ip,
+      userId,
+    });
+
+    return { success: true };
   }
 }
 

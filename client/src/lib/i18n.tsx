@@ -13,6 +13,7 @@ export const translations = {
     "nav.ifrs15": "IFRS 15 Engine",
     "nav.audit": "Audit Trail",
     "nav.settings": "Settings",
+    "nav.adminLicenses": "License Admin",
     
     // Dashboard
     "dashboard.title": "Dashboard",
@@ -185,6 +186,7 @@ export const translations = {
     "nav.ifrs15": "Motor IFRS 15",
     "nav.audit": "Trilha de Auditoria",
     "nav.settings": "Configurações",
+    "nav.adminLicenses": "Admin Licenças",
     
     // Painel
     "dashboard.title": "Painel",
@@ -357,6 +359,7 @@ export const translations = {
     "nav.ifrs15": "Motor NIIF 15",
     "nav.audit": "Pista de Auditoría",
     "nav.settings": "Configuración",
+    "nav.adminLicenses": "Admin Licencias",
     
     // Panel
     "dashboard.title": "Panel",

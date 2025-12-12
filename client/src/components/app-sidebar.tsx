@@ -9,6 +9,8 @@ import {
   Settings,
   Calculator,
   Shield,
+  LogOut,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -24,6 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -35,6 +38,9 @@ interface NavItem {
 export function AppSidebar() {
   const [location] = useLocation();
   const { t } = useI18n();
+  const { user, logout } = useAuth();
+
+  const isAdmin = user?.role === "admin";
 
   const mainNavItems: NavItem[] = [
     {
@@ -82,6 +88,14 @@ export function AppSidebar() {
       titleKey: "nav.settings",
       url: "/settings",
       icon: Settings,
+    },
+  ];
+
+  const superAdminItems: NavItem[] = [
+    {
+      titleKey: "nav.adminLicenses",
+      url: "/admin/licenses",
+      icon: ShieldCheck,
     },
   ];
 
@@ -174,12 +188,46 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {isAdmin && (
+          <SidebarGroup className="space-y-1 mt-6">
+            <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-2 mb-2">
+              Super Admin
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-1">
+                {superAdminItems.map((item) => (
+                  <SidebarMenuItem key={item.titleKey}>
+                    <NavButton item={item} isActive={location === item.url} />
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
-      <SidebarFooter className="p-4 border-t border-sidebar-border">
+      <SidebarFooter className="p-4 border-t border-sidebar-border space-y-3">
+        {user && (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-sm font-medium truncate">{user.fullName || user.email}</span>
+              <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={logout}
+              data-testid="button-logout"
+              title="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-semibold">
-            Enterprise
+            {isAdmin ? "Admin" : "Enterprise"}
           </Badge>
           <span className="text-xs text-muted-foreground font-medium">v1.0.0</span>
         </div>

@@ -13,6 +13,9 @@ This is an enterprise financial compliance application for managing contracts an
 - **IP-Based License Management**: Implemented license validation, heartbeat, and session tracking
 - **IFRS 15 Reports**: Added disaggregated revenue, contract balances, and remaining obligations reports
 - **Audit Trail**: Complete audit logging for all entity changes
+- **Authentication System**: Complete session-based auth with bcrypt password hashing, login/logout, password change, and license activation flows
+- **Admin User**: Seeded admin account (fernandocostaxavier@gmail.com) with role-based access control
+- **Protected Routes**: Authentication flow with redirect to login, mandatory password change for new users, license activation before dashboard access
 
 ## User Preferences
 
@@ -55,9 +58,13 @@ Preferred communication style: Simple, everyday language.
   - `stripeEvents` - Stripe webhook event storage
 
 ### Authentication and Authorization
-- Role-based access control (RBAC) with enumerated user roles
-- Session-based authentication stored in PostgreSQL
+- Session-based authentication with HTTP-only cookies
+- Password security: bcrypt hashing with salt rounds of 10
+- Role-based access control (RBAC) with enumerated user roles (admin, finance, auditor, operations, readonly)
 - Tenant isolation for multi-organization support
+- Authentication flow: Login → Change Password (if required) → Activate License → Dashboard
+- Admin sidebar sections visible only to admin role users
+- Default admin: fernandocostaxavier@gmail.com (seeded on startup)
 
 ### External Service Integrations
 - **Stripe**: Payment processing and subscription billing via Stripe Billing API
