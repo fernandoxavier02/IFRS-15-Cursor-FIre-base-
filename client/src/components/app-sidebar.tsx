@@ -19,6 +19,8 @@ import {
   Scales,
   Funnel,
   Receipt,
+  ArrowsLeftRight,
+  Percent,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -111,6 +113,18 @@ export function AppSidebar() {
       url: "/contract-costs",
       icon: Receipt,
       gradient: "from-rose-500 to-pink-500",
+    },
+    {
+      titleKey: "nav.exchangeRates",
+      url: "/exchange-rates",
+      icon: ArrowsLeftRight,
+      gradient: "from-green-500 to-emerald-500",
+    },
+    {
+      titleKey: "nav.financingComponents",
+      url: "/financing-components",
+      icon: Percent,
+      gradient: "from-violet-500 to-purple-500",
     },
     {
       titleKey: "nav.reports",
