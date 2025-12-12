@@ -16,6 +16,10 @@ import {
   subscriptionPlans,
   checkoutSessions,
   emailQueue,
+  aiProviderConfigs,
+  aiIngestionJobs,
+  aiExtractionResults,
+  aiReviewTasks,
   type User,
   type InsertUser,
   type Tenant,
@@ -47,6 +51,14 @@ import {
   type InsertCheckoutSession,
   type EmailQueueItem,
   type InsertEmailQueueItem,
+  type AiProviderConfig,
+  type InsertAiProviderConfig,
+  type AiIngestionJob,
+  type InsertAiIngestionJob,
+  type AiExtractionResult,
+  type InsertAiExtractionResult,
+  type AiReviewTask,
+  type InsertAiReviewTask,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, isNotNull, lt, gte } from "drizzle-orm";
@@ -154,6 +166,32 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
   activateLicense(userId: string, licenseKey: string, ip: string): Promise<{ success: boolean; error?: string }>;
+
+  // AI Provider Configs (BYOK)
+  getAiProviderConfigs(tenantId: string): Promise<AiProviderConfig[]>;
+  getAiProviderConfig(id: string): Promise<AiProviderConfig | undefined>;
+  createAiProviderConfig(config: InsertAiProviderConfig): Promise<AiProviderConfig>;
+  updateAiProviderConfig(id: string, data: Partial<InsertAiProviderConfig>): Promise<AiProviderConfig | undefined>;
+  deleteAiProviderConfig(id: string): Promise<boolean>;
+  getDefaultAiProviderConfig(tenantId: string): Promise<AiProviderConfig | undefined>;
+
+  // AI Ingestion Jobs
+  getAiIngestionJobs(tenantId: string): Promise<AiIngestionJob[]>;
+  getAiIngestionJob(id: string): Promise<AiIngestionJob | undefined>;
+  createAiIngestionJob(job: InsertAiIngestionJob): Promise<AiIngestionJob>;
+  updateAiIngestionJob(id: string, data: Partial<InsertAiIngestionJob>): Promise<AiIngestionJob | undefined>;
+  getPendingIngestionJobs(): Promise<AiIngestionJob[]>;
+
+  // AI Extraction Results
+  getAiExtractionResult(jobId: string): Promise<AiExtractionResult | undefined>;
+  createAiExtractionResult(result: InsertAiExtractionResult): Promise<AiExtractionResult>;
+
+  // AI Review Tasks
+  getAiReviewTasks(tenantId: string): Promise<AiReviewTask[]>;
+  getAiReviewTask(id: string): Promise<AiReviewTask | undefined>;
+  getPendingReviewTasks(tenantId: string): Promise<AiReviewTask[]>;
+  createAiReviewTask(task: InsertAiReviewTask): Promise<AiReviewTask>;
+  updateAiReviewTask(id: string, data: Partial<InsertAiReviewTask>): Promise<AiReviewTask | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -538,6 +576,111 @@ export class DatabaseStorage implements IStorage {
     });
 
     return { success: true };
+  }
+
+  // AI Provider Configs (BYOK)
+  async getAiProviderConfigs(tenantId: string): Promise<AiProviderConfig[]> {
+    return db.select().from(aiProviderConfigs).where(eq(aiProviderConfigs.tenantId, tenantId)).orderBy(desc(aiProviderConfigs.createdAt));
+  }
+
+  async getAiProviderConfig(id: string): Promise<AiProviderConfig | undefined> {
+    const [config] = await db.select().from(aiProviderConfigs).where(eq(aiProviderConfigs.id, id));
+    return config || undefined;
+  }
+
+  async createAiProviderConfig(config: InsertAiProviderConfig): Promise<AiProviderConfig> {
+    // If this is the first config or marked as default, ensure only one default
+    if (config.isDefault) {
+      await db.update(aiProviderConfigs).set({ isDefault: false }).where(eq(aiProviderConfigs.tenantId, config.tenantId));
+    }
+    const [created] = await db.insert(aiProviderConfigs).values(config).returning();
+    return created;
+  }
+
+  async updateAiProviderConfig(id: string, data: Partial<InsertAiProviderConfig>): Promise<AiProviderConfig | undefined> {
+    const existing = await this.getAiProviderConfig(id);
+    if (existing && data.isDefault) {
+      await db.update(aiProviderConfigs).set({ isDefault: false }).where(eq(aiProviderConfigs.tenantId, existing.tenantId));
+    }
+    const [updated] = await db.update(aiProviderConfigs).set({ ...data, updatedAt: new Date() }).where(eq(aiProviderConfigs.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteAiProviderConfig(id: string): Promise<boolean> {
+    const result = await db.delete(aiProviderConfigs).where(eq(aiProviderConfigs.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getDefaultAiProviderConfig(tenantId: string): Promise<AiProviderConfig | undefined> {
+    const [config] = await db.select().from(aiProviderConfigs).where(and(eq(aiProviderConfigs.tenantId, tenantId), eq(aiProviderConfigs.isDefault, true)));
+    return config || undefined;
+  }
+
+  // AI Ingestion Jobs
+  async getAiIngestionJobs(tenantId: string): Promise<AiIngestionJob[]> {
+    return db.select().from(aiIngestionJobs).where(eq(aiIngestionJobs.tenantId, tenantId)).orderBy(desc(aiIngestionJobs.createdAt));
+  }
+
+  async getAiIngestionJob(id: string): Promise<AiIngestionJob | undefined> {
+    const [job] = await db.select().from(aiIngestionJobs).where(eq(aiIngestionJobs.id, id));
+    return job || undefined;
+  }
+
+  async createAiIngestionJob(job: InsertAiIngestionJob): Promise<AiIngestionJob> {
+    const [created] = await db.insert(aiIngestionJobs).values(job).returning();
+    return created;
+  }
+
+  async updateAiIngestionJob(id: string, data: Partial<InsertAiIngestionJob>): Promise<AiIngestionJob | undefined> {
+    const [updated] = await db.update(aiIngestionJobs).set(data).where(eq(aiIngestionJobs.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async getPendingIngestionJobs(): Promise<AiIngestionJob[]> {
+    return db.select().from(aiIngestionJobs).where(eq(aiIngestionJobs.status, "pending")).orderBy(aiIngestionJobs.createdAt);
+  }
+
+  // AI Extraction Results
+  async getAiExtractionResult(jobId: string): Promise<AiExtractionResult | undefined> {
+    const [result] = await db.select().from(aiExtractionResults).where(eq(aiExtractionResults.jobId, jobId));
+    return result || undefined;
+  }
+
+  async createAiExtractionResult(result: InsertAiExtractionResult): Promise<AiExtractionResult> {
+    const [created] = await db.insert(aiExtractionResults).values(result).returning();
+    return created;
+  }
+
+  // AI Review Tasks
+  async getAiReviewTasks(tenantId: string): Promise<AiReviewTask[]> {
+    const jobs = await db.select().from(aiIngestionJobs).where(eq(aiIngestionJobs.tenantId, tenantId));
+    const jobIds = jobs.map(j => j.id);
+    if (jobIds.length === 0) return [];
+    const tasks = await db.select().from(aiReviewTasks);
+    return tasks.filter(t => jobIds.includes(t.jobId));
+  }
+
+  async getAiReviewTask(id: string): Promise<AiReviewTask | undefined> {
+    const [task] = await db.select().from(aiReviewTasks).where(eq(aiReviewTasks.id, id));
+    return task || undefined;
+  }
+
+  async getPendingReviewTasks(tenantId: string): Promise<AiReviewTask[]> {
+    const jobs = await db.select().from(aiIngestionJobs).where(eq(aiIngestionJobs.tenantId, tenantId));
+    const jobIds = jobs.map(j => j.id);
+    if (jobIds.length === 0) return [];
+    const tasks = await db.select().from(aiReviewTasks).where(eq(aiReviewTasks.status, "pending"));
+    return tasks.filter(t => jobIds.includes(t.jobId));
+  }
+
+  async createAiReviewTask(task: InsertAiReviewTask): Promise<AiReviewTask> {
+    const [created] = await db.insert(aiReviewTasks).values(task).returning();
+    return created;
+  }
+
+  async updateAiReviewTask(id: string, data: Partial<InsertAiReviewTask>): Promise<AiReviewTask | undefined> {
+    const [updated] = await db.update(aiReviewTasks).set(data).where(eq(aiReviewTasks.id, id)).returning();
+    return updated || undefined;
   }
 }
 
