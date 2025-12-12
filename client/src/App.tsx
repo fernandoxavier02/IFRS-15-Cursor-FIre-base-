@@ -36,6 +36,7 @@ import RevenueWaterfall from "@/pages/revenue-waterfall";
 import ContractCosts from "@/pages/contract-costs";
 import ExchangeRates from "@/pages/exchange-rates";
 import FinancingComponents from "@/pages/financing-components";
+import ExecutiveDashboard from "@/pages/executive-dashboard";
 
 function LoadingSpinner() {
   return (
@@ -116,6 +117,7 @@ function MainRouter() {
         <Route path="/contract-costs" component={ContractCosts} />
         <Route path="/exchange-rates" component={ExchangeRates} />
         <Route path="/financing-components" component={FinancingComponents} />
+        <Route path="/executive-dashboard" component={ExecutiveDashboard} />
         <Route path="/audit" component={AuditTrail} />
         <Route path="/settings" component={Settings} />
         <Route path="/ai-settings" component={AiSettings} />

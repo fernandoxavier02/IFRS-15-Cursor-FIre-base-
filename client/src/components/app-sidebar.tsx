@@ -21,6 +21,7 @@ import {
   Receipt,
   ArrowsLeftRight,
   Percent,
+  Gauge,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -125,6 +126,12 @@ export function AppSidebar() {
       url: "/financing-components",
       icon: Percent,
       gradient: "from-violet-500 to-purple-500",
+    },
+    {
+      titleKey: "nav.executiveDashboard",
+      url: "/executive-dashboard",
+      icon: Gauge,
+      gradient: "from-violet-500 to-purple-600",
     },
     {
       titleKey: "nav.reports",
