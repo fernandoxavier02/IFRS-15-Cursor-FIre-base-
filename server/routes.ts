@@ -4,6 +4,8 @@ import { storage } from "./storage";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import { extractContractData, generateConfidenceScores } from "./ai-service";
+import { aiModels, insertAiProviderConfigSchema } from "@shared/schema";
 
 const DEFAULT_TENANT_ID = "default-tenant";
 const ADMIN_EMAIL = "fernandocostaxavier@gmail.com";
@@ -1045,6 +1047,591 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to revoke license" });
+    }
+  });
+
+  // ============ AI Provider Configs (BYOK) Routes ============
+
+  // Get available AI models
+  app.get("/api/ai/models", async (req: Request, res: Response) => {
+    res.json(aiModels);
+  });
+
+  // Get AI provider configs for tenant
+  app.get("/api/ai/providers", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Invalid session" });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user || !user.tenantId) {
+        return res.status(401).json({ message: "Invalid user" });
+      }
+
+      // Check enterprise plan
+      const tenant = await storage.getTenant(user.tenantId);
+      if (!tenant || tenant.planType !== "enterprise") {
+        return res.status(403).json({ message: "AI features are only available for Enterprise plan" });
+      }
+
+      const configs = await storage.getAiProviderConfigs(user.tenantId);
+      // Don't return actual API keys
+      const safeConfigs = configs.map(c => ({
+        ...c,
+        apiKey: c.apiKey ? "***" + c.apiKey.slice(-4) : "",
+      }));
+
+      res.json(safeConfigs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch AI providers" });
+    }
+  });
+
+  // Create AI provider config
+  app.post("/api/ai/providers", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Invalid session" });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user || !user.tenantId) {
+        return res.status(401).json({ message: "Invalid user" });
+      }
+
+      // Check enterprise plan
+      const tenant = await storage.getTenant(user.tenantId);
+      if (!tenant || tenant.planType !== "enterprise") {
+        return res.status(403).json({ message: "AI features are only available for Enterprise plan" });
+      }
+
+      const { provider, name, apiKey, model, baseUrl, isDefault } = req.body;
+
+      if (!provider || !name || !apiKey || !model) {
+        return res.status(400).json({ message: "Provider, name, API key, and model are required" });
+      }
+
+      const config = await storage.createAiProviderConfig({
+        tenantId: user.tenantId,
+        provider,
+        name,
+        apiKey,
+        model,
+        baseUrl,
+        isDefault: isDefault || false,
+      });
+
+      await storage.createAuditLog({
+        tenantId: user.tenantId,
+        userId: user.id,
+        entityType: "ai_provider_config",
+        entityId: config.id,
+        action: "create",
+        newValue: { provider, name, model },
+      });
+
+      res.json({ ...config, apiKey: "***" + apiKey.slice(-4) });
+    } catch (error) {
+      console.error("Create AI provider error:", error);
+      res.status(500).json({ message: "Failed to create AI provider" });
+    }
+  });
+
+  // Update AI provider config
+  app.patch("/api/ai/providers/:id", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Invalid session" });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user || !user.tenantId) {
+        return res.status(401).json({ message: "Invalid user" });
+      }
+
+      const { id } = req.params;
+      const { name, apiKey, model, baseUrl, isDefault, isActive } = req.body;
+
+      const existing = await storage.getAiProviderConfig(id);
+      if (!existing || existing.tenantId !== user.tenantId) {
+        return res.status(404).json({ message: "Provider not found" });
+      }
+
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (apiKey !== undefined) updateData.apiKey = apiKey;
+      if (model !== undefined) updateData.model = model;
+      if (baseUrl !== undefined) updateData.baseUrl = baseUrl;
+      if (isDefault !== undefined) updateData.isDefault = isDefault;
+      if (isActive !== undefined) updateData.isActive = isActive;
+
+      const updated = await storage.updateAiProviderConfig(id, updateData);
+
+      await storage.createAuditLog({
+        tenantId: user.tenantId,
+        userId: user.id,
+        entityType: "ai_provider_config",
+        entityId: id,
+        action: "update",
+        newValue: updateData,
+      });
+
+      res.json({ ...updated, apiKey: "***" + (updated?.apiKey || "").slice(-4) });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update AI provider" });
+    }
+  });
+
+  // Delete AI provider config
+  app.delete("/api/ai/providers/:id", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Invalid session" });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user || !user.tenantId) {
+        return res.status(401).json({ message: "Invalid user" });
+      }
+
+      const { id } = req.params;
+
+      const existing = await storage.getAiProviderConfig(id);
+      if (!existing || existing.tenantId !== user.tenantId) {
+        return res.status(404).json({ message: "Provider not found" });
+      }
+
+      await storage.deleteAiProviderConfig(id);
+
+      await storage.createAuditLog({
+        tenantId: user.tenantId,
+        userId: user.id,
+        entityType: "ai_provider_config",
+        entityId: id,
+        action: "delete",
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete AI provider" });
+    }
+  });
+
+  // ============ AI Contract Ingestion Routes ============
+
+  // Get ingestion jobs
+  app.get("/api/ai/ingestion-jobs", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Invalid session" });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user || !user.tenantId) {
+        return res.status(401).json({ message: "Invalid user" });
+      }
+
+      const jobs = await storage.getAiIngestionJobs(user.tenantId);
+      res.json(jobs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch ingestion jobs" });
+    }
+  });
+
+  // Get single ingestion job with extraction result
+  app.get("/api/ai/ingestion-jobs/:id", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Invalid session" });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user || !user.tenantId) {
+        return res.status(401).json({ message: "Invalid user" });
+      }
+
+      const { id } = req.params;
+      const job = await storage.getAiIngestionJob(id);
+      
+      if (!job || job.tenantId !== user.tenantId) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      const extractionResult = await storage.getAiExtractionResult(id);
+      const reviewTasks = await storage.getAiReviewTasks(user.tenantId);
+      const reviewTask = reviewTasks.find(t => t.jobId === id);
+
+      res.json({
+        job,
+        extractionResult,
+        reviewTask,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch ingestion job" });
+    }
+  });
+
+  // Upload PDF and start ingestion
+  app.post("/api/ai/ingest", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Invalid session" });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user || !user.tenantId) {
+        return res.status(401).json({ message: "Invalid user" });
+      }
+
+      // Check enterprise plan
+      const tenant = await storage.getTenant(user.tenantId);
+      if (!tenant || tenant.planType !== "enterprise") {
+        return res.status(403).json({ message: "AI features are only available for Enterprise plan" });
+      }
+
+      const { providerId, fileName, fileContent, pdfText } = req.body;
+
+      if (!providerId || !fileName || !pdfText) {
+        return res.status(400).json({ message: "Provider ID, file name, and PDF text are required" });
+      }
+
+      // Verify provider belongs to tenant
+      const provider = await storage.getAiProviderConfig(providerId);
+      if (!provider || provider.tenantId !== user.tenantId) {
+        return res.status(400).json({ message: "Invalid provider" });
+      }
+
+      // Create ingestion job
+      const job = await storage.createAiIngestionJob({
+        tenantId: user.tenantId,
+        userId: user.id,
+        providerId,
+        fileName,
+        fileSize: fileContent?.length || pdfText.length,
+        filePath: fileContent || "", // Store base64 or reference
+        status: "processing",
+        processingStartedAt: new Date(),
+      });
+
+      // Process with AI (async)
+      try {
+        await storage.updateAiIngestionJob(job.id, { progress: 25 });
+
+        const result = await extractContractData(provider, pdfText);
+
+        if (!result.success || !result.data) {
+          await storage.updateAiIngestionJob(job.id, {
+            status: "failed",
+            errorMessage: result.error || "Extraction failed",
+            processingCompletedAt: new Date(),
+          });
+          return res.status(400).json({ message: result.error || "Extraction failed" });
+        }
+
+        await storage.updateAiIngestionJob(job.id, { progress: 75 });
+
+        // Generate confidence scores
+        const confidenceScores = generateConfidenceScores(result.data);
+
+        // Save extraction result
+        const extractionResult = await storage.createAiExtractionResult({
+          jobId: job.id,
+          extractedData: result.data,
+          confidenceScores,
+          tokensUsed: result.tokensUsed,
+          processingTimeMs: result.processingTimeMs,
+        });
+
+        // Create review task
+        const reviewTask = await storage.createAiReviewTask({
+          jobId: job.id,
+          extractionResultId: extractionResult.id,
+          assignedTo: user.id,
+          status: "pending",
+        });
+
+        // Update job status
+        await storage.updateAiIngestionJob(job.id, {
+          status: "awaiting_review",
+          progress: 100,
+          processingCompletedAt: new Date(),
+        });
+
+        // Log audit
+        await storage.createAuditLog({
+          tenantId: user.tenantId,
+          userId: user.id,
+          entityType: "ai_ingestion_job",
+          entityId: job.id,
+          action: "create",
+          newValue: { fileName, provider: provider.provider, model: provider.model },
+        });
+
+        res.json({
+          job: { ...job, status: "awaiting_review", progress: 100 },
+          extractionResult,
+          reviewTask,
+        });
+      } catch (processingError) {
+        await storage.updateAiIngestionJob(job.id, {
+          status: "failed",
+          errorMessage: String(processingError),
+          processingCompletedAt: new Date(),
+        });
+        throw processingError;
+      }
+    } catch (error) {
+      console.error("Ingestion error:", error);
+      res.status(500).json({ message: "Failed to process contract" });
+    }
+  });
+
+  // Get pending review tasks
+  app.get("/api/ai/review-tasks", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Invalid session" });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user || !user.tenantId) {
+        return res.status(401).json({ message: "Invalid user" });
+      }
+
+      const tasks = await storage.getPendingReviewTasks(user.tenantId);
+      res.json(tasks);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch review tasks" });
+    }
+  });
+
+  // Approve review and create contract
+  app.post("/api/ai/review-tasks/:id/approve", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Invalid session" });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user || !user.tenantId) {
+        return res.status(401).json({ message: "Invalid user" });
+      }
+
+      const { id } = req.params;
+      const { reviewedData, reviewNotes, customerId } = req.body;
+
+      const task = await storage.getAiReviewTask(id);
+      if (!task) {
+        return res.status(404).json({ message: "Review task not found" });
+      }
+
+      // Get extraction result
+      const extractionResult = await storage.getAiExtractionResult(task.jobId);
+      if (!extractionResult) {
+        return res.status(404).json({ message: "Extraction result not found" });
+      }
+
+      const contractData = reviewedData || extractionResult.extractedData;
+
+      // Create or get customer
+      let customerIdToUse = customerId;
+      if (!customerIdToUse) {
+        // Create customer from extracted data
+        const customer = await storage.createCustomer({
+          tenantId: user.tenantId,
+          name: contractData.customerName,
+          country: "Brasil",
+          currency: contractData.currency || "BRL",
+        });
+        customerIdToUse = customer.id;
+      }
+
+      // Create contract
+      const contract = await storage.createContract({
+        tenantId: user.tenantId,
+        customerId: customerIdToUse,
+        contractNumber: contractData.contractNumber || `AI-${Date.now()}`,
+        title: contractData.title,
+        status: "draft",
+        startDate: new Date(contractData.startDate),
+        endDate: contractData.endDate ? new Date(contractData.endDate) : null,
+        totalValue: String(contractData.totalValue),
+        currency: contractData.currency || "BRL",
+        paymentTerms: contractData.paymentTerms,
+      });
+
+      // Create contract version
+      const version = await storage.createContractVersion({
+        contractId: contract.id,
+        versionNumber: 1,
+        effectiveDate: new Date(contractData.startDate),
+        description: "Initial version from AI extraction",
+        totalValue: String(contractData.totalValue),
+        createdBy: user.id,
+      });
+
+      // Create line items
+      for (const item of contractData.lineItems) {
+        await storage.createLineItem({
+          contractVersionId: version.id,
+          description: item.description,
+          quantity: String(item.quantity),
+          unitPrice: String(item.unitPrice),
+          totalPrice: String(item.totalPrice),
+          recognitionMethod: item.recognitionMethod || "point_in_time",
+          isDistinct: true,
+          distinctWithinContext: true,
+          deliveryStartDate: item.deliveryStartDate ? new Date(item.deliveryStartDate) : null,
+          deliveryEndDate: item.deliveryEndDate ? new Date(item.deliveryEndDate) : null,
+        });
+      }
+
+      // Create performance obligations if available
+      if (contractData.performanceObligations) {
+        for (const po of contractData.performanceObligations) {
+          await storage.createPerformanceObligation({
+            contractVersionId: version.id,
+            description: po.description,
+            allocatedPrice: String(po.allocatedPrice),
+            recognitionMethod: po.recognitionMethod,
+            justification: po.justification,
+          });
+        }
+      }
+
+      // Update contract with current version
+      await storage.updateContract(contract.id, {
+        currentVersionId: version.id,
+      });
+
+      // Update review task
+      await storage.updateAiReviewTask(id, {
+        status: "approved",
+        reviewedData: contractData,
+        reviewNotes,
+        contractId: contract.id,
+        reviewedAt: new Date(),
+        reviewedBy: user.id,
+      });
+
+      // Update ingestion job
+      await storage.updateAiIngestionJob(task.jobId, {
+        status: "approved",
+      });
+
+      // Audit log
+      await storage.createAuditLog({
+        tenantId: user.tenantId,
+        userId: user.id,
+        entityType: "contract",
+        entityId: contract.id,
+        action: "create",
+        newValue: { source: "ai_ingestion", jobId: task.jobId },
+        justification: "Contract created from AI extraction",
+      });
+
+      res.json({ success: true, contract });
+    } catch (error) {
+      console.error("Approve review error:", error);
+      res.status(500).json({ message: "Failed to approve and create contract" });
+    }
+  });
+
+  // Reject review task
+  app.post("/api/ai/review-tasks/:id/reject", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Invalid session" });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user || !user.tenantId) {
+        return res.status(401).json({ message: "Invalid user" });
+      }
+
+      const { id } = req.params;
+      const { reviewNotes } = req.body;
+
+      const task = await storage.getAiReviewTask(id);
+      if (!task) {
+        return res.status(404).json({ message: "Review task not found" });
+      }
+
+      await storage.updateAiReviewTask(id, {
+        status: "rejected",
+        reviewNotes,
+        reviewedAt: new Date(),
+        reviewedBy: user.id,
+      });
+
+      await storage.updateAiIngestionJob(task.jobId, {
+        status: "rejected",
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to reject review" });
     }
   });
 
