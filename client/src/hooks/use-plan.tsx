@@ -50,7 +50,7 @@ const planFeatureMatrix = {
   },
 };
 
-const ADMIN_FULL_ACCESS: PlanFeatures = {
+const MASTER_FULL_ACCESS: PlanFeatures = {
   canCreateContract: true,
   canCreateLicense: true,
   hasAdvancedReports: true,
@@ -64,9 +64,11 @@ const ADMIN_FULL_ACCESS: PlanFeatures = {
   isUnlimited: true,
 };
 
+const MASTER_USER_EMAIL = "fernandocostaxavier@gmail.com";
+
 export function usePlan() {
   const { isAuthenticated, user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isMasterUser = user?.email === MASTER_USER_EMAIL;
 
   const { data: planInfo, isLoading } = useQuery<PlanInfo>({
     queryKey: ["/api/plan"],
@@ -74,8 +76,8 @@ export function usePlan() {
   });
 
   const getPlanFeatures = (): PlanFeatures => {
-    if (isAdmin) {
-      return ADMIN_FULL_ACCESS;
+    if (isMasterUser) {
+      return MASTER_FULL_ACCESS;
     }
 
     if (!planInfo) {

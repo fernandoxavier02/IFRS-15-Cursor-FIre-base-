@@ -524,16 +524,43 @@ export class DatabaseStorage implements IStorage {
     const activeLicenses = licensesList.filter((l) => l.status === "active").length;
     const licensesInUse = licensesList.filter((l) => l.currentIp !== null).length;
 
+    // Calculate real recognized/deferred revenue from performance obligations (using latest version)
+    let recognizedRevenue = 0;
+    let contractAssets = 0;
+    let contractLiabilities = 0;
+
+    for (const contract of contractsList) {
+      const versions = await this.getContractVersions(contract.id);
+      if (versions.length > 0) {
+        // Get the latest version (highest version number)
+        const latestVersion = versions.reduce((latest, v) => 
+          (v.versionNumber || 0) > (latest.versionNumber || 0) ? v : latest, versions[0]);
+        const obligations = await this.getPerformanceObligations(latestVersion.id);
+        for (const po of obligations) {
+          recognizedRevenue += Number(po.recognizedAmount || 0);
+        }
+      }
+      // Get contract balances for assets/liabilities
+      const balances = await this.getContractBalances(contract.id);
+      if (balances.length > 0) {
+        const latestBalance = balances[0];
+        contractAssets += Number(latestBalance.contractAsset || 0);
+        contractLiabilities += Number(latestBalance.contractLiability || 0);
+      }
+    }
+
+    const deferredRevenue = totalRevenue - recognizedRevenue;
+
     return {
       totalContracts,
       activeContracts,
       totalRevenue: totalRevenue.toFixed(2),
-      recognizedRevenue: (totalRevenue * 0.6).toFixed(2),
-      deferredRevenue: (totalRevenue * 0.4).toFixed(2),
+      recognizedRevenue: recognizedRevenue.toFixed(2),
+      deferredRevenue: deferredRevenue.toFixed(2),
       activeLicenses,
       licensesInUse,
-      contractAssets: (totalRevenue * 0.15).toFixed(2),
-      contractLiabilities: (totalRevenue * 0.25).toFixed(2),
+      contractAssets: contractAssets.toFixed(2),
+      contractLiabilities: contractLiabilities.toFixed(2),
     };
   }
   // Subscription Plans

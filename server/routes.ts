@@ -251,25 +251,94 @@ export async function registerRoutes(
     }
   });
 
-  // Revenue trend for dashboard
+  // Revenue trend for dashboard - shows monthly revenue recognition amounts (not cumulative)
   app.get("/api/dashboard/revenue-trend", async (req: Request, res: Response) => {
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const currentMonth = new Date().getMonth();
-    const data = months.slice(0, currentMonth + 1).map((month, i) => ({
-      period: month,
-      recognized: Math.floor(50000 + Math.random() * 100000 * (i + 1) / 12),
-      deferred: Math.floor(20000 + Math.random() * 50000 * (12 - i) / 12),
-    }));
-    res.json(data);
+    try {
+      const contracts = await storage.getContracts(DEFAULT_TENANT_ID);
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const currentYear = new Date().getFullYear();
+      const currentMonth = new Date().getMonth();
+      
+      // Helper to get calendar month difference (inclusive)
+      const getCalendarMonths = (start: Date, end: Date): number => {
+        return (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+      };
+      
+      const data = months.slice(0, currentMonth + 1).map((month, monthIndex) => {
+        let monthlyRecognized = 0;
+        let remainingDeferred = 0;
+        
+        for (const contract of contracts) {
+          if (!contract.startDate) continue;
+          
+          const totalValue = Number(contract.totalValue || 0);
+          const contractStart = contract.startDate;
+          const contractEnd = contract.endDate || new Date(currentYear, 11, 31);
+          
+          // Get start/end month indices relative to calendar
+          const startMonthIndex = contractStart.getFullYear() === currentYear ? contractStart.getMonth() : 0;
+          const endMonthIndex = contractEnd.getFullYear() === currentYear ? contractEnd.getMonth() : 11;
+          
+          // Skip if contract hasn't started yet this month
+          if (monthIndex < startMonthIndex) continue;
+          
+          // Calculate contract duration using calendar months
+          const durationMonths = Math.max(1, getCalendarMonths(contractStart, contractEnd));
+          const monthlyRate = totalValue / durationMonths;
+          
+          // Check if this month falls within contract period
+          const contractActive = monthIndex >= startMonthIndex && monthIndex <= endMonthIndex;
+          if (contractActive) {
+            monthlyRecognized += monthlyRate;
+          }
+          
+          // Calculate how many months have been recognized up to and including this month
+          const monthsRecognized = contractActive 
+            ? Math.min(monthIndex - startMonthIndex + 1, durationMonths)
+            : (monthIndex > endMonthIndex ? durationMonths : 0);
+          
+          const recognizedToDate = monthlyRate * monthsRecognized;
+          remainingDeferred += Math.max(0, totalValue - recognizedToDate);
+        }
+        
+        return {
+          period: month,
+          recognized: Math.round(monthlyRecognized),
+          deferred: Math.round(remainingDeferred),
+        };
+      });
+      
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get revenue trend" });
+    }
   });
+
+  // Helper function to get contract revenue data using latest version
+  async function getContractRevenueData(contractId: string, totalValue: string) {
+    const versions = await storage.getContractVersions(contractId);
+    let recognizedRevenue = 0;
+    if (versions.length > 0) {
+      // Get the latest version (highest version number)
+      const latestVersion = versions.reduce((latest, v) => 
+        (v.versionNumber || 0) > (latest.versionNumber || 0) ? v : latest, versions[0]);
+      const obligations = await storage.getPerformanceObligations(latestVersion.id);
+      for (const po of obligations) {
+        recognizedRevenue += Number(po.recognizedAmount || 0);
+      }
+    }
+    const deferredRevenue = Number(totalValue || 0) - recognizedRevenue;
+    return { recognizedRevenue, deferredRevenue };
+  }
 
   // Recent contracts
   app.get("/api/contracts/recent", async (req: Request, res: Response) => {
     try {
       const contracts = await storage.getRecentContracts(DEFAULT_TENANT_ID, 5);
       const customers = await storage.getCustomers(DEFAULT_TENANT_ID);
-      const result = contracts.map((c) => {
+      const result = await Promise.all(contracts.map(async (c) => {
         const customer = customers.find((cust) => cust.id === c.customerId);
+        const revenueData = await getContractRevenueData(c.id, c.totalValue);
         return {
           id: c.id,
           contractNumber: c.contractNumber,
@@ -280,10 +349,10 @@ export async function registerRoutes(
           currency: c.currency,
           startDate: c.startDate?.toISOString(),
           endDate: c.endDate?.toISOString() || null,
-          recognizedRevenue: (Number(c.totalValue) * 0.6).toFixed(2),
-          deferredRevenue: (Number(c.totalValue) * 0.4).toFixed(2),
+          recognizedRevenue: revenueData.recognizedRevenue.toFixed(2),
+          deferredRevenue: revenueData.deferredRevenue.toFixed(2),
         };
-      });
+      }));
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to get recent contracts" });
@@ -295,8 +364,9 @@ export async function registerRoutes(
     try {
       const contracts = await storage.getContracts(DEFAULT_TENANT_ID);
       const customers = await storage.getCustomers(DEFAULT_TENANT_ID);
-      const result = contracts.map((c) => {
+      const result = await Promise.all(contracts.map(async (c) => {
         const customer = customers.find((cust) => cust.id === c.customerId);
+        const revenueData = await getContractRevenueData(c.id, c.totalValue);
         return {
           id: c.id,
           contractNumber: c.contractNumber,
@@ -307,10 +377,10 @@ export async function registerRoutes(
           currency: c.currency,
           startDate: c.startDate?.toISOString(),
           endDate: c.endDate?.toISOString() || null,
-          recognizedRevenue: (Number(c.totalValue) * 0.6).toFixed(2),
-          deferredRevenue: (Number(c.totalValue) * 0.4).toFixed(2),
+          recognizedRevenue: revenueData.recognizedRevenue.toFixed(2),
+          deferredRevenue: revenueData.deferredRevenue.toFixed(2),
         };
-      });
+      }));
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to get contracts" });
@@ -357,6 +427,141 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error creating contract:", error);
       res.status(500).json({ message: "Failed to create contract" });
+    }
+  });
+
+  // Get single contract with full details
+  app.get("/api/contracts/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const contract = await storage.getContract(id);
+      
+      if (!contract) {
+        return res.status(404).json({ message: "Contract not found" });
+      }
+
+      const customers = await storage.getCustomers(DEFAULT_TENANT_ID);
+      const customer = customers.find((c) => c.id === contract.customerId);
+      
+      // Get revenue schedule data for this contract
+      const revenueSchedules = await storage.getRevenueSchedules(id);
+      const recognizedRevenue = revenueSchedules
+        .filter((s) => s.isRecognized)
+        .reduce((sum, s) => sum + Number(s.recognizedAmount || 0), 0);
+      const deferredRevenue = Number(contract.totalValue || 0) - recognizedRevenue;
+
+      res.json({
+        id: contract.id,
+        contractNumber: contract.contractNumber,
+        title: contract.title,
+        status: contract.status,
+        customerId: contract.customerId,
+        customerName: customer?.name || "Unknown",
+        totalValue: contract.totalValue,
+        currency: contract.currency,
+        paymentTerms: contract.paymentTerms,
+        startDate: contract.startDate?.toISOString(),
+        endDate: contract.endDate?.toISOString() || null,
+        createdAt: contract.createdAt?.toISOString(),
+        updatedAt: contract.updatedAt?.toISOString(),
+        recognizedRevenue: recognizedRevenue.toFixed(2),
+        deferredRevenue: deferredRevenue.toFixed(2),
+      });
+    } catch (error) {
+      console.error("Error getting contract:", error);
+      res.status(500).json({ message: "Failed to get contract" });
+    }
+  });
+
+  // Performance obligations for a specific contract
+  app.get("/api/contracts/:id/performance-obligations", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const contract = await storage.getContract(id);
+      if (!contract) {
+        return res.status(404).json({ message: "Contract not found" });
+      }
+
+      const versions = await storage.getContractVersions(id);
+      if (versions.length === 0) {
+        return res.json([]);
+      }
+
+      const latestVersion = versions[0];
+      const obligations = await storage.getPerformanceObligations(latestVersion.id);
+      
+      const result = obligations.map((o) => ({
+        id: o.id,
+        description: o.description,
+        allocatedPrice: o.allocatedPrice,
+        recognitionMethod: o.recognitionMethod,
+        percentComplete: o.percentComplete,
+        recognizedAmount: o.recognizedAmount,
+        deferredAmount: o.deferredAmount,
+        isSatisfied: o.isSatisfied,
+      }));
+      
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get performance obligations" });
+    }
+  });
+
+  // Billing schedules for a specific contract
+  app.get("/api/contracts/:id/billing-schedules", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const contract = await storage.getContract(id);
+      if (!contract) {
+        return res.status(404).json({ message: "Contract not found" });
+      }
+
+      const schedules = await storage.getBillingSchedulesByContract(id);
+      
+      const result = schedules.map((s) => ({
+        id: s.id,
+        billingDate: s.billingDate?.toISOString(),
+        dueDate: s.dueDate?.toISOString(),
+        amount: s.amount,
+        currency: contract.currency,
+        frequency: s.frequency,
+        status: s.status,
+        invoiceNumber: s.invoiceNumber,
+      }));
+      
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get billing schedules" });
+    }
+  });
+
+  // Revenue ledger entries for a specific contract
+  app.get("/api/contracts/:id/ledger-entries", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const contract = await storage.getContract(id);
+      if (!contract) {
+        return res.status(404).json({ message: "Contract not found" });
+      }
+
+      const entries = await storage.getRevenueLedgerEntriesByContract(id);
+      
+      const result = entries.map((e) => ({
+        id: e.id,
+        entryDate: e.entryDate?.toISOString(),
+        entryType: e.entryType,
+        debitAccount: e.debitAccount,
+        creditAccount: e.creditAccount,
+        amount: e.amount,
+        currency: contract.currency,
+        isPosted: e.isPosted,
+        postedAt: e.postedAt?.toISOString() || null,
+        description: e.description,
+      }));
+      
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get ledger entries" });
     }
   });
 

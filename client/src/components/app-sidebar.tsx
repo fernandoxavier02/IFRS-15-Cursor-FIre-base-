@@ -48,13 +48,15 @@ interface NavItem {
   gradient?: string;
 }
 
+const MASTER_USER_EMAIL = "fernandocostaxavier@gmail.com";
+
 export function AppSidebar() {
   const [location] = useLocation();
   const { t } = useI18n();
   const { user, logout } = useAuth();
   const { features } = usePlan();
 
-  const isAdmin = user?.role === "admin";
+  const isMasterUser = user?.email === MASTER_USER_EMAIL;
   const hasAiIngestion = features.hasCustomIntegrations;
 
   const mainNavItems: NavItem[] = [
@@ -316,7 +318,7 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
 
-          {isAdmin && (
+          {isMasterUser && (
             <SidebarGroup className="space-y-1 mt-6">
               <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-white/40 px-3 mb-2">
                 Super Admin
@@ -364,7 +366,7 @@ export function AppSidebar() {
             <div className="flex items-center gap-2">
               <TrendUp weight="fill" className="h-3.5 w-3.5 text-emerald-400" />
               <span className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">
-                {isAdmin ? "Admin" : "Enterprise"}
+                {isMasterUser ? "Master" : "Enterprise"}
               </span>
             </div>
             <span className="text-[10px] text-white/30 font-medium">v1.0.0</span>
