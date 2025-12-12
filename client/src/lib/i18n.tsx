@@ -19,6 +19,7 @@ export const translations = {
     "nav.billingSchedules": "Billing Schedules",
     "nav.revenueLedger": "Revenue Ledger",
     "nav.consolidatedBalances": "Consolidated Balances",
+    "nav.revenueWaterfall": "Revenue Waterfall",
     
     // Dashboard
     "dashboard.title": "Dashboard",
@@ -197,6 +198,7 @@ export const translations = {
     "nav.billingSchedules": "Cronograma de Faturamento",
     "nav.revenueLedger": "Livro de Receitas",
     "nav.consolidatedBalances": "Saldos Consolidados",
+    "nav.revenueWaterfall": "Cascata de Receita",
     
     // Painel
     "dashboard.title": "Painel",
@@ -375,6 +377,7 @@ export const translations = {
     "nav.billingSchedules": "Programación de Facturación",
     "nav.revenueLedger": "Libro de Ingresos",
     "nav.consolidatedBalances": "Saldos Consolidados",
+    "nav.revenueWaterfall": "Cascada de Ingresos",
     
     // Panel
     "dashboard.title": "Panel",

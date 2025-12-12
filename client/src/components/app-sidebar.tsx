@@ -17,6 +17,7 @@ import {
   CalendarCheck,
   BookOpen,
   Scales,
+  Funnel,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -97,6 +98,12 @@ export function AppSidebar() {
       url: "/consolidated-balances",
       icon: Scales,
       gradient: "from-amber-500 to-orange-500",
+    },
+    {
+      titleKey: "nav.revenueWaterfall",
+      url: "/revenue-waterfall",
+      icon: Funnel,
+      gradient: "from-cyan-500 to-blue-500",
     },
     {
       titleKey: "nav.reports",
