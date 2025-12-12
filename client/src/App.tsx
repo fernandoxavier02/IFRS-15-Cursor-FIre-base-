@@ -23,6 +23,7 @@ import Settings from "@/pages/settings";
 import Subscribe from "@/pages/subscribe";
 import AdminLicenses from "@/pages/admin-licenses";
 import Login from "@/pages/login";
+import Landing from "@/pages/landing";
 import ChangePassword from "@/pages/change-password";
 import ActivateLicense from "@/pages/activate-license";
 
@@ -39,6 +40,10 @@ function MainRouter() {
   const { isLoading, isAuthenticated, needsPasswordChange, needsLicenseActivation, user } = useAuth();
 
   // Public routes without sidebar
+  if (location === "/landing") {
+    return <Landing />;
+  }
+
   if (location === "/subscribe") {
     return <Subscribe />;
   }

@@ -735,6 +735,30 @@ export async function registerRoutes(
     }
   });
 
+  // Plan information for feature gating
+  app.get("/api/plan", async (req: Request, res: Response) => {
+    try {
+      const tenant = await storage.getTenant(DEFAULT_TENANT_ID);
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      const contracts = await storage.getContracts(DEFAULT_TENANT_ID);
+      const licenses = await storage.getAllLicenses();
+
+      res.json({
+        planType: tenant.planType || "starter",
+        maxContracts: tenant.maxContracts ?? 10,
+        maxLicenses: tenant.maxLicenses ?? 1,
+        currentContracts: contracts.length,
+        currentLicenses: licenses.length,
+      });
+    } catch (error) {
+      console.error("Error getting plan info:", error);
+      res.status(500).json({ message: "Failed to get plan info" });
+    }
+  });
+
   // Subscription checkout - public route
   app.post("/api/subscribe/checkout", async (req: Request, res: Response) => {
     try {
@@ -746,11 +770,11 @@ export async function registerRoutes(
 
       const stripe = await getUncachableStripeClient();
 
-      // Pricing based on plan
-      const pricing: Record<string, { amount: number; name: string }> = {
-        starter: { amount: 9900, name: "IFRS 15 Starter Plan" },
-        professional: { amount: 29900, name: "IFRS 15 Professional Plan" },
-        enterprise: { amount: 59900, name: "IFRS 15 Enterprise Plan" },
+      // Pricing based on plan (BRL - Brazilian Real)
+      const pricing: Record<string, { amount: number; name: string; contracts: number; licenses: number }> = {
+        starter: { amount: 29900, name: "IFRS 15 Starter", contracts: 10, licenses: 1 },
+        professional: { amount: 69900, name: "IFRS 15 Professional", contracts: 30, licenses: 3 },
+        enterprise: { amount: 99900, name: "IFRS 15 Enterprise", contracts: -1, licenses: -1 },
       };
 
       const plan = pricing[planId] || pricing.professional;
@@ -762,7 +786,7 @@ export async function registerRoutes(
         line_items: [
           {
             price_data: {
-              currency: "usd",
+              currency: "brl",
               product_data: {
                 name: plan.name,
                 description: "Full access to IFRS 15 Revenue Recognition platform",
