@@ -27,6 +27,8 @@ import Landing from "@/pages/landing";
 import Showcase from "@/pages/showcase";
 import ChangePassword from "@/pages/change-password";
 import ActivateLicense from "@/pages/activate-license";
+import AiSettings from "@/pages/ai-settings";
+import ContractIngestion from "@/pages/contract-ingestion";
 
 function LoadingSpinner() {
   return (
@@ -102,6 +104,8 @@ function MainRouter() {
         <Route path="/ifrs15" component={IFRS15Engine} />
         <Route path="/audit" component={AuditTrail} />
         <Route path="/settings" component={Settings} />
+        <Route path="/ai-settings" component={AiSettings} />
+        <Route path="/contract-ingestion" component={ContractIngestion} />
         {user?.role === "admin" && (
           <Route path="/admin/licenses" component={AdminLicenses} />
         )}

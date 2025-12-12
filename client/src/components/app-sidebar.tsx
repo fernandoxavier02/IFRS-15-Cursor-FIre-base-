@@ -12,6 +12,8 @@ import {
   CurrencyDollar,
   TrendUp,
   ClockCounterClockwise,
+  Brain,
+  FileArrowUp,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -77,6 +79,21 @@ export function AppSidebar() {
       url: "/reports",
       icon: ChartBar,
       gradient: "from-blue-500 to-purple-500",
+    },
+  ];
+
+  const aiItems: NavItem[] = [
+    {
+      titleKey: "nav.contractIngestion",
+      url: "/contract-ingestion",
+      icon: FileArrowUp,
+      gradient: "from-blue-500 to-purple-600",
+    },
+    {
+      titleKey: "nav.aiSettings",
+      url: "/ai-settings",
+      icon: Brain,
+      gradient: "from-purple-500 to-pink-500",
     },
   ];
 
@@ -199,6 +216,24 @@ export function AppSidebar() {
                       item={item} 
                       isActive={location === item.url || location.startsWith(item.url + "/")} 
                     />
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup className="space-y-1 mt-6">
+            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-white/40 px-3 mb-2 flex items-center gap-1.5">
+              AI Ingestion
+              <span className="px-1.5 py-0.5 text-[8px] rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold">
+                NEW
+              </span>
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-1">
+                {aiItems.map((item) => (
+                  <SidebarMenuItem key={item.titleKey}>
+                    <NavButton item={item} isActive={location === item.url} />
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>

@@ -14,6 +14,8 @@ export const translations = {
     "nav.audit": "Audit Trail",
     "nav.settings": "Settings",
     "nav.adminLicenses": "License Admin",
+    "nav.contractIngestion": "Contract Ingestion",
+    "nav.aiSettings": "AI Settings",
     
     // Dashboard
     "dashboard.title": "Dashboard",
@@ -187,6 +189,8 @@ export const translations = {
     "nav.audit": "Trilha de Auditoria",
     "nav.settings": "Configurações",
     "nav.adminLicenses": "Admin Licenças",
+    "nav.contractIngestion": "Ingestão de Contratos",
+    "nav.aiSettings": "Configurações de IA",
     
     // Painel
     "dashboard.title": "Painel",
@@ -360,6 +364,8 @@ export const translations = {
     "nav.audit": "Pista de Auditoría",
     "nav.settings": "Configuración",
     "nav.adminLicenses": "Admin Licencias",
+    "nav.contractIngestion": "Ingestión de Contratos",
+    "nav.aiSettings": "Configuración de IA",
     
     // Panel
     "dashboard.title": "Panel",
