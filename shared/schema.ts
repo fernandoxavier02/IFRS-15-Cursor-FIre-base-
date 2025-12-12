@@ -22,6 +22,12 @@ export const users = pgTable("users", {
   fullName: text("full_name").notNull(),
   role: userRoleEnum("role").notNull().default("readonly"),
   tenantId: varchar("tenant_id").references(() => tenants.id),
+  mustChangePassword: boolean("must_change_password").default(true),
+  isActive: boolean("is_active").default(false),
+  licenseKey: text("license_key"),
+  licenseActivatedAt: timestamp("license_activated_at"),
+  lastLoginAt: timestamp("last_login_at"),
+  lastLoginIp: text("last_login_ip"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -176,6 +182,9 @@ export const licenses = pgTable("licenses", {
   lockedAt: timestamp("locked_at"),
   lastSeenAt: timestamp("last_seen_at"),
   graceUntil: timestamp("grace_until"),
+  activatedAt: timestamp("activated_at"),
+  activatedByUserId: varchar("activated_by_user_id").references(() => users.id),
+  activationIp: text("activation_ip"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

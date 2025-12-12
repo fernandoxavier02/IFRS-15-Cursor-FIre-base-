@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,8 +7,10 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSelector } from "@/components/language-selector";
 import { I18nProvider } from "@/lib/i18n";
+import { AuthProvider, useAuth } from "@/lib/auth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { Loader2 } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Contracts from "@/pages/contracts";
@@ -20,16 +22,61 @@ import AuditTrail from "@/pages/audit";
 import Settings from "@/pages/settings";
 import Subscribe from "@/pages/subscribe";
 import AdminLicenses from "@/pages/admin-licenses";
+import Login from "@/pages/login";
+import ChangePassword from "@/pages/change-password";
+import ActivateLicense from "@/pages/activate-license";
+
+function LoadingSpinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
 
 function MainRouter() {
   const [location] = useLocation();
-  
+  const { isLoading, isAuthenticated, needsPasswordChange, needsLicenseActivation, user } = useAuth();
+
   // Public routes without sidebar
   if (location === "/subscribe") {
     return <Subscribe />;
   }
 
-  // Authenticated routes with sidebar layout
+  if (location === "/login") {
+    if (isAuthenticated) {
+      return <Redirect to="/" />;
+    }
+    return <Login />;
+  }
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
+  // Not authenticated - redirect to login
+  if (!isAuthenticated) {
+    return <Redirect to="/login" />;
+  }
+
+  // Authenticated but needs password change
+  if (needsPasswordChange) {
+    if (location !== "/change-password") {
+      return <Redirect to="/change-password" />;
+    }
+    return <ChangePassword />;
+  }
+
+  // Authenticated, password changed, but needs license activation
+  if (needsLicenseActivation) {
+    if (location !== "/activate-license") {
+      return <Redirect to="/activate-license" />;
+    }
+    return <ActivateLicense />;
+  }
+
+  // Fully authenticated - show main app with sidebar
   return (
     <AppLayout>
       <Switch>
@@ -41,7 +88,9 @@ function MainRouter() {
         <Route path="/ifrs15" component={IFRS15Engine} />
         <Route path="/audit" component={AuditTrail} />
         <Route path="/settings" component={Settings} />
-        <Route path="/admin/licenses" component={AdminLicenses} />
+        {user?.role === "admin" && (
+          <Route path="/admin/licenses" component={AdminLicenses} />
+        )}
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
@@ -82,10 +131,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="ifrs15-theme">
         <I18nProvider>
-          <TooltipProvider>
-            <MainRouter />
-            <Toaster />
-          </TooltipProvider>
+          <AuthProvider>
+            <TooltipProvider>
+              <MainRouter />
+              <Toaster />
+            </TooltipProvider>
+          </AuthProvider>
         </I18nProvider>
       </ThemeProvider>
     </QueryClientProvider>

@@ -2,9 +2,12 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { randomUUID } from "crypto";
+import bcrypt from "bcryptjs";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 const DEFAULT_TENANT_ID = "default-tenant";
+const ADMIN_EMAIL = "fernandocostaxavier@gmail.com";
+const ADMIN_PASSWORD = "Fcxv020781@";
 
 async function ensureDefaultData() {
   let tenant = await storage.getTenant(DEFAULT_TENANT_ID);
@@ -15,7 +18,35 @@ async function ensureDefaultData() {
       currency: "USD",
     });
   }
+  
+  // Ensure admin user exists
+  const adminUser = await storage.getUserByEmail(ADMIN_EMAIL);
+  if (!adminUser) {
+    const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
+    await storage.createUser({
+      username: "admin",
+      email: ADMIN_EMAIL,
+      password: hashedPassword,
+      fullName: "System Administrator",
+      role: "admin",
+      tenantId: tenant.id,
+      mustChangePassword: false,
+      isActive: true,
+    });
+  }
+  
   return tenant;
+}
+
+// Simple session store (in production, use Redis or database sessions)
+const sessions: Map<string, { userId: string; createdAt: Date }> = new Map();
+
+function getClientIp(req: Request): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string") {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.socket?.remoteAddress || "unknown";
 }
 
 export async function registerRoutes(
@@ -23,6 +54,184 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   await ensureDefaultData();
+
+  // ============ Authentication Routes ============
+  
+  // Login
+  app.post("/api/auth/login", async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      // Generate session token
+      const sessionToken = randomUUID();
+      sessions.set(sessionToken, { userId: user.id, createdAt: new Date() });
+
+      // Update last login
+      const clientIp = getClientIp(req);
+      await storage.updateUser(user.id, {
+        lastLoginAt: new Date(),
+        lastLoginIp: clientIp,
+      } as any);
+
+      // Set session cookie
+      res.cookie("session", sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      });
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          mustChangePassword: user.mustChangePassword,
+          isActive: user.isActive,
+          licenseKey: user.licenseKey,
+        },
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Get current user
+  app.get("/api/auth/me", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Session expired" });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user) {
+        sessions.delete(sessionToken);
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          mustChangePassword: user.mustChangePassword,
+          isActive: user.isActive,
+          licenseKey: user.licenseKey,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get user" });
+    }
+  });
+
+  // Logout
+  app.post("/api/auth/logout", async (req: Request, res: Response) => {
+    const sessionToken = req.cookies?.session;
+    if (sessionToken) {
+      sessions.delete(sessionToken);
+    }
+    res.clearCookie("session");
+    res.json({ success: true });
+  });
+
+  // Change password
+  app.post("/api/auth/change-password", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Session expired" });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      const { currentPassword, newPassword } = req.body;
+
+      const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+      if (!isValidPassword) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+
+      const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+      await storage.updateUser(user.id, {
+        password: hashedNewPassword,
+        mustChangePassword: false,
+      } as any);
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
+  // Activate license
+  app.post("/api/licenses/activate", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.cookies?.session;
+      if (!sessionToken) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const session = sessions.get(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Session expired" });
+      }
+
+      const { licenseKey } = req.body;
+      if (!licenseKey) {
+        return res.status(400).json({ message: "License key is required" });
+      }
+
+      const clientIp = getClientIp(req);
+      const result = await storage.activateLicense(session.userId, licenseKey, clientIp);
+
+      if (!result.success) {
+        return res.status(400).json({ message: result.error });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to activate license" });
+    }
+  });
+
+  // ============ End Authentication Routes ============
 
   // Dashboard stats
   app.get("/api/dashboard/stats", async (req: Request, res: Response) => {
@@ -640,7 +849,8 @@ export async function registerRoutes(
       const licenseKey = `LIC-${randomUUID().substring(0, 8).toUpperCase()}`;
 
       // Generate random password
-      const password = randomUUID().substring(0, 12);
+      const tempPassword = randomUUID().substring(0, 12);
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
       // Create tenant if needed
       let tenant = await storage.getTenant(DEFAULT_TENANT_ID);
@@ -652,14 +862,16 @@ export async function registerRoutes(
         });
       }
 
-      // Create user
+      // Create user with hashed password
       const user = await storage.createUser({
         username: email.split("@")[0],
         email,
-        password, // In production, this should be hashed
+        password: hashedPassword,
         fullName: email.split("@")[0],
         role: "finance",
         tenantId: tenant.id,
+        mustChangePassword: true,
+        isActive: false,
       });
 
       // Create license
@@ -670,7 +882,7 @@ export async function registerRoutes(
         seatCount: seatCount || 1,
       });
 
-      // Queue email with credentials
+      // Queue email with credentials (plaintext password for user, hashed in DB)
       await storage.createEmailQueueItem({
         toEmail: email,
         subject: "Your IFRS 15 Revenue Manager Access Credentials",
@@ -679,7 +891,7 @@ export async function registerRoutes(
 
           Your login credentials:
           Email: ${email}
-          Password: ${password}
+          Password: ${tempPassword}
           License Key: ${licenseKey}
 
           Please login at: ${process.env.REPLIT_DOMAINS?.split(",")[0] || "https://app.ifrs15.com"}
