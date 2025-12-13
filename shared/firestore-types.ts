@@ -137,7 +137,23 @@ export type CostType = (typeof CostType)[keyof typeof CostType];
 // ==================== FIRESTORE DOCUMENT INTERFACES ====================
 
 // Helper type for Firestore timestamps
-type FirestoreTimestamp = Timestamp | Date;
+export type FirestoreTimestamp = Timestamp | Date;
+
+// Helper function to convert Firestore timestamps to Date
+export function toDate(timestamp: FirestoreTimestamp | undefined | null): Date | null {
+  if (!timestamp) return null;
+  if (timestamp instanceof Date) return timestamp;
+  if (typeof (timestamp as Timestamp).toDate === "function") {
+    return (timestamp as Timestamp).toDate();
+  }
+  return null;
+}
+
+// Helper function to convert to ISO string
+export function toISOString(timestamp: FirestoreTimestamp | undefined | null): string {
+  const date = toDate(timestamp);
+  return date ? date.toISOString() : "";
+}
 
 // Base interface for all documents
 interface BaseDocument {
@@ -293,6 +309,7 @@ export interface License extends BaseDocument {
   seatCount: number;
   currentIp?: string;
   currentUserId?: string;
+  currentUserName?: string;
   lockedAt?: FirestoreTimestamp;
   lastSeenAt?: FirestoreTimestamp;
   graceUntil?: FirestoreTimestamp;

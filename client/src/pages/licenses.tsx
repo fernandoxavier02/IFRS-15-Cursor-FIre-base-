@@ -1,58 +1,85 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import {
-  Search,
-  KeyRound,
-  MoreHorizontal,
-  Power,
-  Shield,
-  Ban,
-  RefreshCw,
-  Wifi,
-  WifiOff,
-  Clock,
-} from "lucide-react";
+import { useAuth } from "@/lib/auth-firebase";
+import { licenseService } from "@/lib/firestore-service";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { LicenseWithSession } from "@/lib/types";
+import type { License } from "@shared/firestore-types";
+import { toISOString } from "@shared/firestore-types";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+    Ban,
+    Clock,
+    KeyRound,
+    MoreHorizontal,
+    Power,
+    RefreshCw,
+    Search,
+    Shield,
+    Wifi,
+    WifiOff,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 
 export default function Licenses() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLicense, setSelectedLicense] = useState<LicenseWithSession | null>(null);
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<"release" | "suspend" | "revoke" | null>(null);
 
-  const { data: licenses, isLoading } = useQuery<LicenseWithSession[]>({
-    queryKey: ["/api/licenses"],
+  // Fetch licenses from Firestore
+  const { data: licenses, isLoading, refetch: refetchLicenses } = useQuery<License[]>({
+    queryKey: ["licenses", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return licenseService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
+
+  // Transform licenses to LicenseWithSession format
+  const licensesWithSession: LicenseWithSession[] = useMemo(() => {
+    return (licenses || []).map((license) => ({
+      id: license.id,
+      licenseKey: license.licenseKey,
+      status: license.status as any,
+      seatCount: license.seatCount,
+      currentIp: license.currentIp || null,
+      currentUserName: license.currentUserName || null,
+      lockedAt: toISOString(license.lockedAt) || null,
+      lastSeenAt: toISOString(license.lastSeenAt) || null,
+      graceUntil: toISOString(license.graceUntil) || null,
+    }));
+  }, [licenses]);
 
   const releaseMutation = useMutation({
     mutationFn: async (licenseId: string) => {
       return apiRequest("POST", `/api/licenses/${licenseId}/release`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/licenses"] });
+      queryClient.invalidateQueries({ queryKey: ["licenses", user?.tenantId] });
+      refetchLicenses();
       setActionDialogOpen(false);
       setSelectedLicense(null);
       toast({
@@ -74,7 +101,8 @@ export default function Licenses() {
       return apiRequest("POST", `/api/licenses/${licenseId}/suspend`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/licenses"] });
+      queryClient.invalidateQueries({ queryKey: ["licenses", user?.tenantId] });
+      refetchLicenses();
       setActionDialogOpen(false);
       setSelectedLicense(null);
       toast({
@@ -96,7 +124,8 @@ export default function Licenses() {
       return apiRequest("POST", `/api/licenses/${licenseId}/revoke`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/licenses"] });
+      queryClient.invalidateQueries({ queryKey: ["licenses", user?.tenantId] });
+      refetchLicenses();
       setActionDialogOpen(false);
       setSelectedLicense(null);
       toast({
@@ -113,15 +142,15 @@ export default function Licenses() {
     },
   });
 
-  const filteredLicenses = licenses?.filter((license) =>
+  const filteredLicenses = licensesWithSession.filter((license) =>
     license.licenseKey.toLowerCase().includes(searchQuery.toLowerCase()) ||
     license.currentIp?.includes(searchQuery) ||
     license.currentUserName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const activeLicenses = licenses?.filter((l) => l.status === "active").length ?? 0;
-  const inUseLicenses = licenses?.filter((l) => l.currentIp !== null).length ?? 0;
-  const suspendedLicenses = licenses?.filter((l) => l.status === "suspended").length ?? 0;
+  const activeLicenses = licensesWithSession.filter((l) => l.status === "active").length;
+  const inUseLicenses = licensesWithSession.filter((l) => l.currentIp !== null).length;
+  const suspendedLicenses = licensesWithSession.filter((l) => l.status === "suspended").length;
 
   const handleAction = (license: LicenseWithSession, action: "release" | "suspend" | "revoke") => {
     setSelectedLicense(license);
@@ -295,7 +324,11 @@ export default function Licenses() {
             Monitor and control software licenses and active sessions
           </p>
         </div>
-        <Button variant="outline" data-testid="button-refresh-licenses">
+        <Button 
+          variant="outline" 
+          onClick={() => refetchLicenses()}
+          data-testid="button-refresh-licenses"
+        >
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -352,7 +385,7 @@ export default function Licenses() {
 
       <DataTable
         columns={columns}
-        data={filteredLicenses ?? []}
+        data={filteredLicenses}
         isLoading={isLoading}
         emptyMessage="No licenses found."
         testIdPrefix="license"

@@ -1,53 +1,56 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { 
-  Plus, 
-  Search, 
-  BookOpen,
-  CheckCircle,
-  Clock,
-  FileText,
-  ArrowRightLeft,
-  Send
-} from "lucide-react";
-import type { LedgerEntryWithDetails } from "@/lib/types";
-import type { ContractWithDetails } from "@/lib/types";
+import { useAuth } from "@/lib/auth-firebase";
+import { contractService, customerService, revenueLedgerService } from "@/lib/firestore-service";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { ContractWithDetails, LedgerEntryWithDetails } from "@/lib/types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { Contract, Customer, RevenueLedgerEntry } from "@shared/firestore-types";
+import { toISOString } from "@shared/firestore-types";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import {
+    ArrowRightLeft,
+    BookOpen,
+    CheckCircle,
+    Clock,
+    FileText,
+    Plus,
+    Search,
+    Send
+} from "lucide-react";
+import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 const ledgerFormSchema = z.object({
   contractId: z.string().min(1, "Contract is required"),
@@ -67,6 +70,7 @@ type LedgerFormValues = z.infer<typeof ledgerFormSchema>;
 
 export default function RevenueLedger() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [postedFilter, setPostedFilter] = useState<string>("all");
@@ -89,25 +93,163 @@ export default function RevenueLedger() {
     },
   });
 
-  const { data: ledgerEntries, isLoading } = useQuery<LedgerEntryWithDetails[]>({
-    queryKey: ["/api/ledger-entries"],
+  // Fetch ledger entries from Firestore
+  const { data: ledgerEntries, isLoading, refetch: refetchLedger } = useQuery<RevenueLedgerEntry[]>({
+    queryKey: ["ledger-entries", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return revenueLedgerService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
 
-  const { data: unpostedEntries } = useQuery<LedgerEntryWithDetails[]>({
-    queryKey: ["/api/ledger-entries/unposted"],
+  // Fetch unposted entries
+  const { data: unpostedEntries } = useQuery<RevenueLedgerEntry[]>({
+    queryKey: ["ledger-entries-unposted", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return revenueLedgerService.getUnposted(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
 
-  const { data: contracts } = useQuery<ContractWithDetails[]>({
-    queryKey: ["/api/contracts"],
+  // Fetch contracts for dropdown
+  const { data: contracts } = useQuery<Contract[]>({
+    queryKey: ["contracts", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return contractService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
 
+  // Fetch customers for name lookup
+  const { data: customers } = useQuery<Customer[]>({
+    queryKey: ["customers", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return customerService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
+  });
+
+  // Create lookup maps
+  const contractMap = useMemo(() => {
+    const map = new Map<string, Contract>();
+    contracts?.forEach((contract) => {
+      map.set(contract.id, contract);
+    });
+    return map;
+  }, [contracts]);
+
+  const customerMap = useMemo(() => {
+    const map = new Map<string, string>();
+    customers?.forEach((customer) => {
+      map.set(customer.id, customer.name);
+    });
+    return map;
+  }, [customers]);
+
+  // Transform ledger entries with details
+  const entriesWithDetails: LedgerEntryWithDetails[] = useMemo(() => {
+    return (ledgerEntries || []).map((entry) => {
+      const contract = contractMap.get(entry.contractId);
+      const customerName = contract ? customerMap.get(contract.customerId) || "Unknown" : "Unknown";
+      
+      return {
+        id: entry.id,
+        tenantId: entry.tenantId,
+        contractId: entry.contractId,
+        performanceObligationId: entry.performanceObligationId || null,
+        billingScheduleId: entry.billingScheduleId || null,
+        entryDate: toISOString(entry.entryDate),
+        periodStart: toISOString(entry.periodStart),
+        periodEnd: toISOString(entry.periodEnd),
+        entryType: entry.entryType as any,
+        debitAccount: entry.debitAccount,
+        creditAccount: entry.creditAccount,
+        amount: entry.amount?.toString() || "0",
+        currency: entry.currency,
+        exchangeRate: entry.exchangeRate?.toString() || null,
+        functionalAmount: entry.functionalAmount?.toString() || null,
+        description: entry.description || null,
+        referenceNumber: entry.referenceNumber || null,
+        isPosted: entry.isPosted,
+        postedAt: toISOString(entry.postedAt) || null,
+        postedBy: entry.postedBy || null,
+        isReversed: entry.isReversed || false,
+        reversedEntryId: entry.reversedEntryId || null,
+        createdAt: toISOString(entry.createdAt),
+        contractNumber: contract?.contractNumber || "Unknown",
+        contractTitle: contract?.title || "Unknown",
+        customerName,
+      };
+    });
+  }, [ledgerEntries, contractMap, customerMap]);
+
+  // Unposted entries with details
+  const unpostedEntriesWithDetails: LedgerEntryWithDetails[] = useMemo(() => {
+    return (unpostedEntries || []).map((entry) => {
+      const contract = contractMap.get(entry.contractId);
+      const customerName = contract ? customerMap.get(contract.customerId) || "Unknown" : "Unknown";
+      
+      return {
+        id: entry.id,
+        tenantId: entry.tenantId,
+        contractId: entry.contractId,
+        performanceObligationId: entry.performanceObligationId || null,
+        billingScheduleId: entry.billingScheduleId || null,
+        entryDate: toISOString(entry.entryDate),
+        periodStart: toISOString(entry.periodStart),
+        periodEnd: toISOString(entry.periodEnd),
+        entryType: entry.entryType as any,
+        debitAccount: entry.debitAccount,
+        creditAccount: entry.creditAccount,
+        amount: entry.amount?.toString() || "0",
+        currency: entry.currency,
+        exchangeRate: entry.exchangeRate?.toString() || null,
+        functionalAmount: entry.functionalAmount?.toString() || null,
+        description: entry.description || null,
+        referenceNumber: entry.referenceNumber || null,
+        isPosted: entry.isPosted,
+        postedAt: toISOString(entry.postedAt) || null,
+        postedBy: entry.postedBy || null,
+        isReversed: entry.isReversed || false,
+        reversedEntryId: entry.reversedEntryId || null,
+        createdAt: toISOString(entry.createdAt),
+        contractNumber: contract?.contractNumber || "Unknown",
+        contractTitle: contract?.title || "Unknown",
+        customerName,
+      };
+    });
+  }, [unpostedEntries, contractMap, customerMap]);
+
+  // Contracts with details for dropdown
+  const contractsWithDetails: ContractWithDetails[] = useMemo(() => {
+    return (contracts || []).map((contract) => ({
+      id: contract.id,
+      contractNumber: contract.contractNumber,
+      title: contract.title,
+      status: contract.status,
+      customerName: customerMap.get(contract.customerId) || "Unknown",
+      totalValue: contract.totalValue?.toString() || "0",
+      currency: contract.currency,
+      startDate: toISOString(contract.startDate),
+      endDate: toISOString(contract.endDate) || null,
+      recognizedRevenue: "0",
+      deferredRevenue: contract.totalValue?.toString() || "0",
+    }));
+  }, [contracts, customerMap]);
+
+  // Create entry via Cloud Function API
   const createEntryMutation = useMutation({
     mutationFn: async (data: LedgerFormValues) => {
       return apiRequest("POST", "/api/ledger-entries", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-entries/unposted"] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries-unposted", user?.tenantId] });
+      refetchLedger();
       setDialogOpen(false);
       form.reset();
       toast({
@@ -129,8 +271,9 @@ export default function RevenueLedger() {
       return apiRequest("POST", `/api/ledger-entries/${id}/post`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-entries/unposted"] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries-unposted", user?.tenantId] });
+      refetchLedger();
       toast({
         title: "Entry posted",
         description: "The journal entry has been posted to the general ledger.",
@@ -150,8 +293,9 @@ export default function RevenueLedger() {
       return apiRequest("POST", "/api/ledger-entries/post-all", {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-entries/unposted"] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries-unposted", user?.tenantId] });
+      refetchLedger();
       toast({
         title: "All entries posted",
         description: "All unposted journal entries have been posted to the general ledger.",
@@ -166,7 +310,7 @@ export default function RevenueLedger() {
     },
   });
 
-  const filteredEntries = ledgerEntries?.filter((entry) => {
+  const filteredEntries = entriesWithDetails.filter((entry) => {
     const matchesSearch =
       entry.contractNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       entry.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -181,9 +325,9 @@ export default function RevenueLedger() {
     return matchesSearch && matchesType && matchesPosted;
   });
 
-  const totalPosted = ledgerEntries?.filter(e => e.isPosted).length || 0;
-  const totalUnposted = unpostedEntries?.length || 0;
-  const totalAmount = ledgerEntries?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+  const totalPosted = entriesWithDetails.filter(e => e.isPosted).length;
+  const totalUnposted = unpostedEntriesWithDetails.length;
+  const totalAmount = entriesWithDetails.reduce((sum, e) => sum + Number(e.amount), 0);
 
   const columns = [
     {
@@ -342,7 +486,7 @@ export default function RevenueLedger() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {contracts?.map((contract) => (
+                              {contractsWithDetails.map((contract) => (
                                 <SelectItem key={contract.id} value={contract.id}>
                                   {contract.contractNumber} - {contract.customerName}
                                 </SelectItem>
@@ -625,13 +769,13 @@ export default function RevenueLedger() {
 
       <DataTable
         columns={columns}
-        data={filteredEntries ?? []}
+        data={filteredEntries}
         isLoading={isLoading}
         emptyMessage="No journal entries found. Create your first entry to get started."
         testIdPrefix="ledger"
       />
 
-      {unpostedEntries && unpostedEntries.length > 0 && (
+      {unpostedEntriesWithDetails.length > 0 && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2">
             <div>
@@ -652,7 +796,7 @@ export default function RevenueLedger() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {unpostedEntries.map((entry) => (
+              {unpostedEntriesWithDetails.map((entry) => (
                 <div
                   key={entry.id}
                   className="flex items-center justify-between p-3 rounded-md bg-muted/50"

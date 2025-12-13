@@ -1,29 +1,31 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { DataTable } from "@/components/data-table";
+import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Search, Building2, Mail, Phone, Globe } from "lucide-react";
-import type { Customer } from "@shared/schema";
+import { useAuth } from "@/lib/auth-firebase";
+import { contractService, customerService } from "@/lib/firestore-service";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Customer } from "@shared/firestore-types";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Building2, Globe, Mail, Plus, Search } from "lucide-react";
+import { useMemo, useState } from "react";
 
 interface CustomerWithContracts extends Customer {
   contractCount: number;
@@ -32,6 +34,7 @@ interface CustomerWithContracts extends Customer {
 
 export default function Customers() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -46,16 +49,54 @@ export default function Customers() {
     billingAddress: "",
   });
 
-  const { data: customers, isLoading } = useQuery<CustomerWithContracts[]>({
-    queryKey: ["/api/customers"],
+  // Fetch customers directly from Firestore
+  const { data: customers, isLoading: customersLoading, refetch: refetchCustomers } = useQuery<Customer[]>({
+    queryKey: ["customers", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return customerService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
 
+  // Fetch contracts for aggregation
+  const { data: contracts } = useQuery({
+    queryKey: ["contracts", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return contractService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
+  });
+
+  // Enrich customers with contract data
+  const customersWithContracts: CustomerWithContracts[] = useMemo(() => {
+    if (!customers) return [];
+
+    return customers.map((customer) => {
+      const customerContracts = contracts?.filter((c) => c.customerId === customer.id) || [];
+      const contractCount = customerContracts.length;
+      const totalContractValue = customerContracts.reduce(
+        (sum, c) => sum + (parseFloat(c.totalValue?.toString() || "0") || 0),
+        0
+      );
+
+      return {
+        ...customer,
+        contractCount,
+        totalContractValue: totalContractValue.toFixed(2),
+      };
+    });
+  }, [customers, contracts]);
+
+  // Create customer via Cloud Function API
   const createCustomerMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       return apiRequest("POST", "/api/customers", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["customers", user?.tenantId] });
+      refetchCustomers();
       setDialogOpen(false);
       setFormData({
         name: "",
@@ -81,7 +122,7 @@ export default function Customers() {
     },
   });
 
-  const filteredCustomers = customers?.filter((customer) =>
+  const filteredCustomers = customersWithContracts.filter((customer) =>
     customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     customer.country.toLowerCase().includes(searchQuery.toLowerCase()) ||
     customer.contactEmail?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -352,8 +393,8 @@ export default function Customers() {
 
       <DataTable
         columns={columns}
-        data={filteredCustomers ?? []}
-        isLoading={isLoading}
+        data={filteredCustomers}
+        isLoading={customersLoading}
         emptyMessage="No customers found. Add your first customer to get started."
         testIdPrefix="customer"
       />

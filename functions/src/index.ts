@@ -248,6 +248,132 @@ export const processEmailQueue = functions.pubsub
     }
   });
 
+// Initialize system with admin user (run once, then remove or disable)
+export const initializeSystem = functions.https.onRequest(async (req, res) => {
+  // Security: Check for secret key
+  const secretKey = req.query.key || req.body?.key;
+  if (secretKey !== "INIT_SECRET_2024") {
+    res.status(403).json({ error: "Invalid key" });
+    return;
+  }
+
+  const db = admin.firestore();
+  const auth = admin.auth();
+
+  const ADMIN_EMAIL = "fernandocostaxavier@gmail.com";
+  const ADMIN_PASSWORD = "Admin@123!";
+  const TENANT_ID = "default";
+  
+  // Option to skip mustChangePassword
+  const skipPasswordChange = req.query.skipPassword === "true";
+
+  try {
+    // 1. Create tenant
+    const tenantRef = db.collection("tenants").doc(TENANT_ID);
+    await tenantRef.set({
+      id: TENANT_ID,
+      name: "Default Organization",
+      slug: "default",
+      plan: "enterprise",
+      status: "active",
+      settings: {
+        defaultCurrency: "BRL",
+        fiscalYearEnd: "12-31",
+        timezone: "America/Sao_Paulo",
+      },
+      createdAt: admin.firestore.Timestamp.now(),
+    });
+
+    // 2. Create or get admin user in Firebase Auth
+    let userRecord;
+    try {
+      userRecord = await auth.getUserByEmail(ADMIN_EMAIL);
+    } catch (error: any) {
+      if (error.code === "auth/user-not-found") {
+        userRecord = await auth.createUser({
+          email: ADMIN_EMAIL,
+          password: ADMIN_PASSWORD,
+          displayName: "Fernando Costa Xavier",
+          emailVerified: true,
+        });
+      } else {
+        throw error;
+      }
+    }
+
+    // 3. Set admin custom claims
+    await auth.setCustomUserClaims(userRecord.uid, {
+      tenantId: TENANT_ID,
+      role: "admin",
+      systemAdmin: true,
+    });
+
+    // 4. Create user document
+    const userData = {
+      id: userRecord.uid,
+      email: ADMIN_EMAIL,
+      fullName: "Fernando Costa Xavier",
+      username: "fernando",
+      tenantId: TENANT_ID,
+      role: "admin",
+      isActive: true,
+      mustChangePassword: !skipPasswordChange,
+      createdAt: admin.firestore.Timestamp.now(),
+    };
+
+    await db.collection("users").doc(userRecord.uid).set(userData);
+    await db.collection(`tenants/${TENANT_ID}/users`).doc(userRecord.uid).set(userData);
+
+    // 5. Create license
+    const licenseKey = `LIC-ADMIN-${Date.now()}`;
+    await db.collection(`tenants/${TENANT_ID}/licenses`).add({
+      tenantId: TENANT_ID,
+      licenseKey,
+      status: "active",
+      plan: "enterprise",
+      maxUsers: 999,
+      activatedAt: admin.firestore.Timestamp.now(),
+      activatedByUserId: userRecord.uid,
+      currentUserId: userRecord.uid,
+      isActive: true,
+      createdAt: admin.firestore.Timestamp.now(),
+    });
+
+    await db.collection("users").doc(userRecord.uid).update({
+      licenseKey,
+      licenseActivatedAt: admin.firestore.Timestamp.now(),
+    });
+
+    // 6. Create subscription plans
+    const plans = [
+      { id: "starter", name: "Starter", price: 299, currency: "BRL", interval: "month", maxContracts: 10, maxUsers: 1, features: ["basic_reports", "email_support"], isActive: true },
+      { id: "professional", name: "Professional", price: 699, currency: "BRL", interval: "month", maxContracts: 30, maxUsers: 3, features: ["full_ifrs15", "priority_support", "api_access"], isActive: true, popular: true },
+      { id: "enterprise", name: "Enterprise", price: 1499, currency: "BRL", interval: "month", maxContracts: -1, maxUsers: -1, features: ["full_ifrs15", "audit_trail", "dedicated_manager", "custom_integrations"], isActive: true },
+    ];
+
+    for (const plan of plans) {
+      await db.collection("subscriptionPlans").doc(plan.id).set({
+        ...plan,
+        createdAt: admin.firestore.Timestamp.now(),
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "System initialized successfully",
+      admin: {
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
+        note: "Change password on first login!",
+      },
+      tenant: TENANT_ID,
+    });
+  } catch (error: any) {
+    console.error("Initialization error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Heartbeat function to keep user license active
 export const licenseHeartbeat = functions.https.onCall(async (data, context) => {
   if (!context.auth) {

@@ -45,11 +45,6 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.token.systemAdmin == true;
     }
     
-    // Validate timestamp fields
-    function validTimestamp(field) {
-      return field is timestamp;
-    }
-    
     // ==================== TENANTS ====================
     
     match /tenants/{tenantId} {
@@ -247,8 +242,11 @@ service cloud.firestore {
     match /users/{userId} {
       // Users can read their own profile
       allow read: if isAuthenticated() && request.auth.uid == userId;
-      // Only Cloud Functions can create/update users
-      allow create, update: if false;
+      // Only Cloud Functions can create users
+      allow create: if false;
+      // Users can update their own mustChangePassword field
+      allow update: if isAuthenticated() && request.auth.uid == userId 
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mustChangePassword']);
       allow delete: if isSystemAdmin();
     }
   }

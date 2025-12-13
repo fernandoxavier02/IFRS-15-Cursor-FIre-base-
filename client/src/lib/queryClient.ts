@@ -1,4 +1,61 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { auth } from "./firebase";
+
+// Helper para obter token Firebase Auth
+async function getAuthToken(): Promise<string | null> {
+  const user = auth.currentUser;
+  if (!user) return null;
+  try {
+    return await user.getIdToken();
+  } catch {
+    return null;
+  }
+}
+
+// Helper para construir URL de Cloud Functions
+export function getCloudFunctionUrl(functionName: string): string {
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "ifrs15-revenue-manager";
+  const region = "us-central1";
+  const useEmulators = import.meta.env.VITE_USE_EMULATORS === "true";
+  
+  if (useEmulators) {
+    return `http://localhost:5001/${projectId}/${region}/${functionName}`;
+  }
+  
+  return `https://${region}-${projectId}.cloudfunctions.net/${functionName}`;
+}
+
+// Converte URLs de API antigos para Cloud Functions
+function convertApiUrl(url: string): string {
+  // Se já é uma URL completa, retorna como está
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  
+  // Mapeia endpoints antigos para Cloud Functions
+  const apiMappings: Record<string, string> = {
+    "/api/contracts": getCloudFunctionUrl("contractsApi"),
+    "/api/customers": getCloudFunctionUrl("customersApi"),
+    "/api/dashboard": getCloudFunctionUrl("dashboardApi"),
+  };
+  
+  // Verifica mapeamento exato
+  if (apiMappings[url]) {
+    return apiMappings[url];
+  }
+  
+  // Verifica mapeamento com prefixo (ex: /api/contracts/123)
+  for (const [prefix, cfUrl] of Object.entries(apiMappings)) {
+    if (url.startsWith(prefix + "/")) {
+      const suffix = url.slice(prefix.length);
+      return cfUrl + suffix;
+    }
+  }
+  
+  // Se não encontrou mapeamento, retorna URL original
+  // (pode ser uma URL local ou ainda não migrada)
+  return url;
+}
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -12,9 +69,20 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const token = await getAuthToken();
+  const finalUrl = convertApiUrl(url);
+  
+  const headers: Record<string, string> = {};
+  if (data) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  
+  const res = await fetch(finalUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -29,7 +97,17 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const token = await getAuthToken();
+    const url = queryKey.join("/") as string;
+    const finalUrl = convertApiUrl(url);
+    
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
+    const res = await fetch(finalUrl, {
+      headers,
       credentials: "include",
     });
 
@@ -47,7 +125,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 5 * 60 * 1000, // 5 minutos
       retry: false,
     },
     mutations: {

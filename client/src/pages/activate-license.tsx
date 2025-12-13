@@ -1,13 +1,13 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/auth-firebase";
 import { useI18n } from "@/lib/i18n";
-import { Shield, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle, Loader2, Shield } from "lucide-react";
+import { useState } from "react";
+import { useLocation } from "wouter";
 
 export default function ActivateLicense() {
   const { toast } = useToast();

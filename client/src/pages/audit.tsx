@@ -1,37 +1,36 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Search,
-  Filter,
-  ChevronDown,
-  FileText,
-  KeyRound,
-  Calculator,
-  User,
-  Calendar,
-  Clock,
-  ArrowRight,
-} from "lucide-react";
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { AuditLog } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
+import {
+    Calculator,
+    Calendar,
+    ChevronDown,
+    Clock,
+    FileText,
+    Filter,
+    KeyRound,
+    Search,
+    User
+} from "lucide-react";
+import { useState } from "react";
 
 interface AuditLogWithDetails extends AuditLog {
   userName?: string;
@@ -254,9 +253,9 @@ export default function AuditTrail() {
                                   </div>
                                 )}
 
-                                {(log.previousValue || log.newValue) && (
+                                {(log.previousValue !== undefined || log.newValue !== undefined) && (
                                   <div className="grid grid-cols-2 gap-3">
-                                    {log.previousValue && (
+                                    {log.previousValue !== undefined && (
                                       <div className="rounded-md bg-muted/50 p-3">
                                         <p className="text-xs font-medium text-muted-foreground mb-1">
                                           Previous Value
@@ -266,7 +265,7 @@ export default function AuditTrail() {
                                         </pre>
                                       </div>
                                     )}
-                                    {log.newValue && (
+                                    {log.newValue !== undefined && (
                                       <div className="rounded-md bg-muted/50 p-3">
                                         <p className="text-xs font-medium text-muted-foreground mb-1">
                                           New Value

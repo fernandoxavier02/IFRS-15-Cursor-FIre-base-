@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/auth-firebase";
 import { usePlan } from "@/hooks/use-plan";
 import { cn } from "@/lib/utils";
 
