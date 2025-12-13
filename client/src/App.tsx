@@ -1,44 +1,44 @@
-import { Switch, Route, useLocation, Redirect } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { AppSidebar } from "@/components/app-sidebar";
+import { LanguageSelector } from "@/components/language-selector";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LanguageSelector } from "@/components/language-selector";
-import { I18nProvider } from "@/lib/i18n";
-import { AuthProvider, useAuth } from "@/lib/auth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { Loader2 } from "lucide-react";
-import NotFound from "@/pages/not-found";
-import Dashboard from "@/pages/dashboard";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/lib/auth-firebase";
+import { I18nProvider } from "@/lib/i18n";
+import ActivateLicense from "@/pages/activate-license";
+import AdminLicenses from "@/pages/admin-licenses";
+import AiSettings from "@/pages/ai-settings";
+import AuditTrail from "@/pages/audit";
+import BillingSchedules from "@/pages/billing-schedules";
+import ChangePassword from "@/pages/change-password";
+import ConsolidatedBalances from "@/pages/consolidated-balances";
+import ContractCosts from "@/pages/contract-costs";
+import ContractDetails from "@/pages/contract-details";
+import ContractIngestion from "@/pages/contract-ingestion";
 import Contracts from "@/pages/contracts";
 import Customers from "@/pages/customers";
-import Licenses from "@/pages/licenses";
-import Reports from "@/pages/reports";
-import IFRS15Engine from "@/pages/ifrs15";
-import AuditTrail from "@/pages/audit";
-import Settings from "@/pages/settings";
-import Subscribe from "@/pages/subscribe";
-import AdminLicenses from "@/pages/admin-licenses";
-import Login from "@/pages/login";
-import Landing from "@/pages/landing";
-import Showcase from "@/pages/showcase";
-import ChangePassword from "@/pages/change-password";
-import ActivateLicense from "@/pages/activate-license";
-import AiSettings from "@/pages/ai-settings";
-import ContractIngestion from "@/pages/contract-ingestion";
-import BillingSchedules from "@/pages/billing-schedules";
-import RevenueLedger from "@/pages/revenue-ledger";
-import ConsolidatedBalances from "@/pages/consolidated-balances";
-import RevenueWaterfall from "@/pages/revenue-waterfall";
-import ContractCosts from "@/pages/contract-costs";
+import Dashboard from "@/pages/dashboard";
 import ExchangeRates from "@/pages/exchange-rates";
-import FinancingComponents from "@/pages/financing-components";
 import ExecutiveDashboard from "@/pages/executive-dashboard";
-import ContractDetails from "@/pages/contract-details";
+import FinancingComponents from "@/pages/financing-components";
+import IFRS15Engine from "@/pages/ifrs15";
 import IFRS15AccountingControl from "@/pages/ifrs15-accounting-control";
+import Landing from "@/pages/landing";
+import Licenses from "@/pages/licenses";
+import Login from "@/pages/login";
+import NotFound from "@/pages/not-found";
+import Reports from "@/pages/reports";
+import RevenueLedger from "@/pages/revenue-ledger";
+import RevenueWaterfall from "@/pages/revenue-waterfall";
+import Settings from "@/pages/settings";
+import Showcase from "@/pages/showcase";
+import Subscribe from "@/pages/subscribe";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
+import { Redirect, Route, Switch, useLocation } from "wouter";
+import { queryClient } from "./lib/queryClient";
 
 function LoadingSpinner() {
   return (
@@ -52,33 +52,30 @@ function MainRouter() {
   const [location] = useLocation();
   const { isLoading, isAuthenticated, needsPasswordChange, needsLicenseActivation, user } = useAuth();
 
-  // Public routes without sidebar
-  if (location === "/" && !isAuthenticated) {
-    return <Showcase />;
+  // Public routes that don't require auth check (static pages)
+  const publicRoutes = ["/landing", "/showcase", "/subscribe"];
+  
+  if (publicRoutes.includes(location)) {
+    if (location === "/landing") return <Landing />;
+    if (location === "/showcase") return <Showcase />;
+    if (location === "/subscribe") return <Subscribe />;
   }
 
-  if (location === "/landing") {
-    return <Landing />;
-  }
-
-  if (location === "/showcase") {
-    return <Showcase />;
-  }
-
-  if (location === "/subscribe") {
-    return <Subscribe />;
-  }
-
+  // Login page - redirect if already authenticated
   if (location === "/login") {
-    if (isAuthenticated) {
-      return <Redirect to="/" />;
-    }
+    if (isLoading) return <LoadingSpinner />;
+    if (isAuthenticated) return <Redirect to="/" />;
     return <Login />;
   }
 
-  // Show loading while checking auth
+  // Show loading while checking auth for protected routes
   if (isLoading) {
     return <LoadingSpinner />;
+  }
+
+  // Root path - show showcase if not authenticated
+  if (location === "/" && !isAuthenticated) {
+    return <Showcase />;
   }
 
   // Not authenticated - redirect to login

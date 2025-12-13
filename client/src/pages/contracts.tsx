@@ -1,39 +1,43 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth-firebase";
+import { contractService, customerService } from "@/lib/firestore-service";
 import { useI18n } from "@/lib/i18n";
-import { Plus, Search, FileText, Calendar } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ContractWithDetails } from "@/lib/types";
-import type { Customer } from "@shared/schema";
+import type { Contract, Customer } from "@shared/firestore-types";
+import { toISOString } from "@shared/firestore-types";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Calendar, FileText, Plus, Search } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 
 export default function Contracts() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { t } = useI18n();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -49,20 +53,64 @@ export default function Contracts() {
     paymentTerms: "",
   });
 
-  const { data: contracts, isLoading } = useQuery<ContractWithDetails[]>({
-    queryKey: ["/api/contracts"],
+  // Fetch contracts directly from Firestore
+  const { data: contracts, isLoading: contractsLoading, refetch: refetchContracts } = useQuery<Contract[]>({
+    queryKey: ["contracts", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return contractService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
 
+  // Fetch customers directly from Firestore for the form dropdown
   const { data: customers } = useQuery<Customer[]>({
-    queryKey: ["/api/customers"],
+    queryKey: ["customers", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return customerService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
 
+  // Create a lookup map for customer names
+  const customerMap = useMemo(() => {
+    const map = new Map<string, string>();
+    customers?.forEach((customer) => {
+      map.set(customer.id, customer.name);
+    });
+    return map;
+  }, [customers]);
+
+  // Transform contracts to ContractWithDetails format
+  const contractsWithDetails: ContractWithDetails[] = useMemo(() => {
+    return (contracts || []).map((contract) => ({
+      id: contract.id,
+      contractNumber: contract.contractNumber,
+      title: contract.title,
+      status: contract.status,
+      customerName: customerMap.get(contract.customerId) || "Unknown",
+      totalValue: contract.totalValue?.toString() || "0",
+      currency: contract.currency,
+      startDate: toISOString(contract.startDate),
+      endDate: toISOString(contract.endDate) || null,
+      recognizedRevenue: "0", // Will be calculated separately
+      deferredRevenue: contract.totalValue?.toString() || "0",
+    }));
+  }, [contracts, customerMap]);
+
+  // Create contract via Cloud Function API
   const createContractMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return apiRequest("POST", "/api/contracts", data);
+      return apiRequest("POST", "/api/contracts", {
+        ...data,
+        totalValue: parseFloat(data.totalValue) || 0,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
+      // Invalidate query to refetch from Firestore
+      queryClient.invalidateQueries({ queryKey: ["contracts", user?.tenantId] });
+      refetchContracts();
       setDialogOpen(false);
       setFormData({
         customerId: "",
@@ -88,7 +136,7 @@ export default function Contracts() {
     },
   });
 
-  const filteredContracts = contracts?.filter((contract) => {
+  const filteredContracts = contractsWithDetails.filter((contract) => {
     const matchesSearch =
       contract.contractNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contract.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -161,7 +209,7 @@ export default function Contracts() {
         <div className="flex items-center gap-1.5 text-muted-foreground">
           <Calendar className="h-3 w-3" />
           <span className="text-sm">
-            {new Date(row.startDate).toLocaleDateString()}
+            {row.startDate ? new Date(row.startDate).toLocaleDateString() : "-"}
           </span>
         </div>
       ),
@@ -376,8 +424,8 @@ export default function Contracts() {
 
       <DataTable
         columns={columns}
-        data={filteredContracts ?? []}
-        isLoading={isLoading}
+        data={filteredContracts}
+        isLoading={contractsLoading}
         emptyMessage="No contracts found. Create your first contract to get started."
         onRowClick={(row) => setLocation(`/contracts/${row.id}`)}
         testIdPrefix="contract"

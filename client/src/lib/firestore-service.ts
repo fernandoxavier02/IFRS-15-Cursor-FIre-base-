@@ -1,4 +1,18 @@
 // Firestore Service Layer for IFRS 15 Revenue Manager
+import type {
+    AiIngestionJob,
+    AiProviderConfig,
+    AiReviewTask,
+    AuditLog,
+    BillingSchedule,
+    Contract,
+    ContractLineItem,
+    ContractVersion,
+    Customer,
+    License,
+    PerformanceObligation,
+    RevenueLedgerEntry
+} from "@shared/firestore-types";
 import {
     addDoc,
     collection,
@@ -15,20 +29,6 @@ import {
     where
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import type {
-    AiIngestionJob,
-    AiProviderConfig,
-    AiReviewTask,
-    AuditLog,
-    BillingSchedule,
-    Contract,
-    ContractLineItem,
-    ContractVersion,
-    Customer,
-    License,
-    PerformanceObligation,
-    RevenueLedgerEntry
-} from "../../shared/firestore-types";
 import { db, functions } from "./firebase";
 
 // Collection paths helper

@@ -1,5 +1,5 @@
-import * as cors from "cors";
-import * as express from "express";
+import cors from "cors";
+import express from "express";
 import * as functions from "firebase-functions";
 import { db, Timestamp } from "../utils/admin";
 import {
@@ -20,9 +20,9 @@ app.use(verifyAuth as any);
 app.use(requireTenant as any);
 
 // Get all contracts
-app.get("/", async (req: AuthenticatedRequest, res) => {
+app.get("/", async (req: any, res: any) => {
   try {
-    const { tenantId } = req.user!;
+    const { tenantId } = (req as AuthenticatedRequest).user!;
     
     const contractsSnapshot = await db
       .collection(tenantCollection(tenantId, COLLECTIONS.CONTRACTS))
@@ -42,9 +42,9 @@ app.get("/", async (req: AuthenticatedRequest, res) => {
 });
 
 // Get single contract with details
-app.get("/:id", async (req: AuthenticatedRequest, res) => {
+app.get("/:id", async (req: any, res: any) => {
   try {
-    const { tenantId } = req.user!;
+    const { tenantId } = (req as AuthenticatedRequest).user!;
     const { id } = req.params;
 
     const contractDoc = await db
@@ -116,9 +116,9 @@ app.get("/:id", async (req: AuthenticatedRequest, res) => {
 });
 
 // Create contract
-app.post("/", async (req: AuthenticatedRequest, res) => {
+app.post("/", async (req: any, res: any) => {
   try {
-    const { tenantId, role, uid } = req.user!;
+    const { tenantId, role, uid } = (req as AuthenticatedRequest).user!;
 
     if (!canWrite(role)) {
       return res.status(403).json({ message: "Insufficient permissions" });
@@ -236,9 +236,9 @@ app.post("/", async (req: AuthenticatedRequest, res) => {
 });
 
 // Update contract
-app.put("/:id", async (req: AuthenticatedRequest, res) => {
+app.put("/:id", async (req: any, res: any) => {
   try {
-    const { tenantId, role, uid } = req.user!;
+    const { tenantId, role, uid } = (req as AuthenticatedRequest).user!;
     const { id } = req.params;
 
     if (!canWrite(role)) {
@@ -285,9 +285,9 @@ app.put("/:id", async (req: AuthenticatedRequest, res) => {
 });
 
 // Delete contract (admin only)
-app.delete("/:id", requireRole("admin") as any, async (req: AuthenticatedRequest, res) => {
+app.delete("/:id", requireRole("admin") as any, async (req: any, res: any) => {
   try {
-    const { tenantId, uid } = req.user!;
+    const { tenantId, uid } = (req as AuthenticatedRequest).user!;
     const { id } = req.params;
 
     const contractRef = db
@@ -349,9 +349,9 @@ app.delete("/:id", requireRole("admin") as any, async (req: AuthenticatedRequest
 // Update performance obligation
 app.put(
   "/:contractId/versions/:versionId/pos/:poId",
-  async (req: AuthenticatedRequest, res) => {
+  async (req: any, res: any) => {
     try {
-      const { tenantId, role, uid } = req.user!;
+      const { tenantId, role, uid } = (req as AuthenticatedRequest).user!;
       const { contractId, versionId, poId } = req.params;
 
       if (!canWrite(role)) {

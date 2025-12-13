@@ -1,55 +1,57 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { 
-  Plus, 
-  Search, 
-  Calendar, 
-  DollarSign, 
-  AlertTriangle,
-  Clock,
-  CheckCircle,
-  FileText,
-  ChevronLeft,
-  ChevronRight
+import { useAuth } from "@/lib/auth-firebase";
+import { billingScheduleService, contractService, customerService } from "@/lib/firestore-service";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { BillingScheduleWithDetails, ContractWithDetails } from "@/lib/types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { BillingSchedule, Contract, Customer } from "@shared/firestore-types";
+import { toDate, toISOString } from "@shared/firestore-types";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { addMonths, eachDayOfInterval, endOfMonth, format, isSameDay, startOfMonth, subMonths } from "date-fns";
+import {
+    AlertTriangle,
+    Calendar,
+    ChevronLeft,
+    ChevronRight,
+    Clock,
+    DollarSign,
+    FileText,
+    Plus,
+    Search
 } from "lucide-react";
-import type { BillingScheduleWithDetails } from "@/lib/types";
-import type { ContractWithDetails } from "@/lib/types";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isAfter, isBefore } from "date-fns";
+import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 const billingFormSchema = z.object({
   contractId: z.string().min(1, "Contract is required"),
@@ -65,6 +67,7 @@ type BillingFormValues = z.infer<typeof billingFormSchema>;
 
 export default function BillingSchedules() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -84,30 +87,128 @@ export default function BillingSchedules() {
     },
   });
 
-  const { data: billingSchedules, isLoading } = useQuery<BillingScheduleWithDetails[]>({
-    queryKey: ["/api/billing-schedules"],
+  // Fetch billing schedules from Firestore
+  const { data: billingSchedules, isLoading, refetch: refetchBillings } = useQuery<BillingSchedule[]>({
+    queryKey: ["billing-schedules", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return billingScheduleService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
 
-  const { data: upcomingBillings } = useQuery<BillingScheduleWithDetails[]>({
-    queryKey: ["/api/billing-schedules/upcoming"],
+  // Fetch upcoming billings
+  const { data: upcomingBillings } = useQuery<BillingSchedule[]>({
+    queryKey: ["billing-schedules-upcoming", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return billingScheduleService.getUpcoming(user.tenantId, 30);
+    },
+    enabled: !!user?.tenantId,
   });
 
-  const { data: overdueBillings } = useQuery<BillingScheduleWithDetails[]>({
-    queryKey: ["/api/billing-schedules/overdue"],
+  // Fetch contracts for dropdown
+  const { data: contracts } = useQuery<Contract[]>({
+    queryKey: ["contracts", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return contractService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
 
-  const { data: contracts } = useQuery<ContractWithDetails[]>({
-    queryKey: ["/api/contracts"],
+  // Fetch customers for name lookup
+  const { data: customers } = useQuery<Customer[]>({
+    queryKey: ["customers", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return customerService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
 
+  // Create lookup maps
+  const contractMap = useMemo(() => {
+    const map = new Map<string, Contract>();
+    contracts?.forEach((contract) => {
+      map.set(contract.id, contract);
+    });
+    return map;
+  }, [contracts]);
+
+  const customerMap = useMemo(() => {
+    const map = new Map<string, string>();
+    customers?.forEach((customer) => {
+      map.set(customer.id, customer.name);
+    });
+    return map;
+  }, [customers]);
+
+  // Calculate overdue billings
+  const overdueBillings = useMemo(() => {
+    const now = new Date();
+    return billingSchedules?.filter((billing) => {
+      const dueDate = toDate(billing.dueDate) || new Date();
+      return billing.status === "scheduled" && dueDate < now;
+    }) || [];
+  }, [billingSchedules]);
+
+  // Transform billing schedules with details
+  const billingsWithDetails: BillingScheduleWithDetails[] = useMemo(() => {
+    return (billingSchedules || []).map((billing) => {
+      const contract = contractMap.get(billing.contractId);
+      const customerName = contract ? customerMap.get(contract.customerId) || "Unknown" : "Unknown";
+      
+      return {
+        id: billing.id,
+        tenantId: billing.tenantId,
+        contractId: billing.contractId,
+        performanceObligationId: billing.performanceObligationId || null,
+        billingDate: toISOString(billing.billingDate),
+        dueDate: toISOString(billing.dueDate),
+        amount: billing.amount?.toString() || "0",
+        currency: billing.currency,
+        frequency: billing.frequency as any,
+        status: billing.status as any,
+        invoiceNumber: billing.invoiceNumber || null,
+        invoicedAt: toISOString(billing.invoicedAt) || null,
+        paidAt: toISOString(billing.paidAt) || null,
+        paidAmount: billing.paidAmount?.toString() || null,
+        notes: billing.notes || null,
+        createdAt: toISOString(billing.createdAt),
+        contractNumber: contract?.contractNumber || "Unknown",
+        contractTitle: contract?.title || "Unknown",
+        customerName,
+      };
+    });
+  }, [billingSchedules, contractMap, customerMap]);
+
+  // Contracts with details for dropdown
+  const contractsWithDetails: ContractWithDetails[] = useMemo(() => {
+    return (contracts || []).map((contract) => ({
+      id: contract.id,
+      contractNumber: contract.contractNumber,
+      title: contract.title,
+      status: contract.status,
+      customerName: customerMap.get(contract.customerId) || "Unknown",
+      totalValue: contract.totalValue?.toString() || "0",
+      currency: contract.currency,
+      startDate: toISOString(contract.startDate),
+      endDate: toISOString(contract.endDate) || null,
+      recognizedRevenue: "0",
+      deferredRevenue: contract.totalValue?.toString() || "0",
+    }));
+  }, [contracts, customerMap]);
+
+  // Create billing via Cloud Function API
   const createBillingMutation = useMutation({
     mutationFn: async (data: BillingFormValues) => {
       return apiRequest("POST", "/api/billing-schedules", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/billing-schedules"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/billing-schedules/upcoming"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/billing-schedules/overdue"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-schedules", user?.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["billing-schedules-upcoming", user?.tenantId] });
+      refetchBillings();
       setDialogOpen(false);
       form.reset();
       toast({
@@ -136,9 +237,9 @@ export default function BillingSchedules() {
       return apiRequest("PATCH", `/api/billing-schedules/${id}`, updateData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/billing-schedules"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/billing-schedules/upcoming"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/billing-schedules/overdue"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-schedules", user?.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["billing-schedules-upcoming", user?.tenantId] });
+      refetchBillings();
       toast({
         title: "Status updated",
         description: "The billing status has been updated.",
@@ -153,7 +254,7 @@ export default function BillingSchedules() {
     },
   });
 
-  const filteredBillings = billingSchedules?.filter((billing) => {
+  const filteredBillings = billingsWithDetails.filter((billing) => {
     const matchesSearch =
       billing.contractNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       billing.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -167,10 +268,10 @@ export default function BillingSchedules() {
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   const getBillingsForDate = (date: Date) => {
-    return billingSchedules?.filter((billing) => {
+    return billingsWithDetails.filter((billing) => {
       const billingDate = new Date(billing.billingDate);
       return isSameDay(billingDate, date);
-    }) || [];
+    });
   };
 
   const columns = [
@@ -273,8 +374,8 @@ export default function BillingSchedules() {
     createBillingMutation.mutate(data);
   };
 
-  const totalUpcoming = upcomingBillings?.reduce((sum, b) => sum + Number(b.amount), 0) || 0;
-  const totalOverdue = overdueBillings?.reduce((sum, b) => sum + Number(b.amount), 0) || 0;
+  const totalUpcoming = upcomingBillings?.reduce((sum, b) => sum + Number(b.amount || 0), 0) || 0;
+  const totalOverdue = overdueBillings.reduce((sum, b) => sum + Number(b.amount || 0), 0);
 
   return (
     <div className="p-6 space-y-6">
@@ -317,7 +418,7 @@ export default function BillingSchedules() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {contracts?.map((contract) => (
+                            {contractsWithDetails.map((contract) => (
                               <SelectItem key={contract.id} value={contract.id}>
                                 {contract.contractNumber} - {contract.customerName}
                               </SelectItem>
@@ -494,7 +595,7 @@ export default function BillingSchedules() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive" data-testid="text-overdue-count">
-              {overdueBillings?.length || 0}
+              {overdueBillings.length}
             </div>
             <p className="text-xs text-muted-foreground">
               BRL {totalOverdue.toLocaleString()} outstanding
@@ -640,14 +741,14 @@ export default function BillingSchedules() {
       ) : (
         <DataTable
           columns={columns}
-          data={filteredBillings ?? []}
+          data={filteredBillings}
           isLoading={isLoading}
           emptyMessage="No billing schedules found. Create your first billing schedule to get started."
           testIdPrefix="billing"
         />
       )}
 
-      {overdueBillings && overdueBillings.length > 0 && (
+      {overdueBillings.length > 0 && (
         <Card className="border-destructive/50">
           <CardHeader className="flex flex-row items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-destructive" />
@@ -655,35 +756,41 @@ export default function BillingSchedules() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {overdueBillings.map((billing) => (
-                <div
-                  key={billing.id}
-                  className="flex items-center justify-between gap-4 p-3 rounded-md bg-destructive/5"
-                  data-testid={`overdue-billing-${billing.id}`}
-                >
-                  <div>
-                    <p className="font-medium">{billing.contractNumber}</p>
-                    <p className="text-sm text-muted-foreground">{billing.customerName}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium tabular-nums">
-                      {billing.currency} {Number(billing.amount).toLocaleString()}
-                    </p>
-                    <p className="text-sm text-destructive">
-                      Due: {format(new Date(billing.dueDate), "MMM dd, yyyy")}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => updateStatusMutation.mutate({ id: billing.id, status: "paid" })}
-                    disabled={updateStatusMutation.isPending}
-                    data-testid={`button-mark-paid-overdue-${billing.id}`}
+              {overdueBillings.map((billing) => {
+                const contract = contractMap.get(billing.contractId);
+                const customerName = contract ? customerMap.get(contract.customerId) || "Unknown" : "Unknown";
+                const dueDate = toDate(billing.dueDate) || new Date();
+                
+                return (
+                  <div
+                    key={billing.id}
+                    className="flex items-center justify-between gap-4 p-3 rounded-md bg-destructive/5"
+                    data-testid={`overdue-billing-${billing.id}`}
                   >
-                    Mark Paid
-                  </Button>
-                </div>
-              ))}
+                    <div>
+                      <p className="font-medium">{contract?.contractNumber || "Unknown"}</p>
+                      <p className="text-sm text-muted-foreground">{customerName}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium tabular-nums">
+                        {billing.currency} {Number(billing.amount || 0).toLocaleString()}
+                      </p>
+                      <p className="text-sm text-destructive">
+                        Due: {format(dueDate, "MMM dd, yyyy")}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => updateStatusMutation.mutate({ id: billing.id, status: "paid" })}
+                      disabled={updateStatusMutation.isPending}
+                      data-testid={`button-mark-paid-overdue-${billing.id}`}
+                    >
+                      Mark Paid
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

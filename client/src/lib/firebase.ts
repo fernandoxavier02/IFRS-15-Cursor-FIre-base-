@@ -4,14 +4,14 @@ import { Auth, connectAuthEmulator, getAuth } from "firebase/auth";
 import { connectFirestoreEmulator, Firestore, getFirestore } from "firebase/firestore";
 import { connectFunctionsEmulator, Functions, getFunctions } from "firebase/functions";
 
-// Firebase configuration - replace with your actual config
+// Firebase configuration
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "your-api-key",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "your-project.firebaseapp.com",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAR-mXBKfDyFGV5JCCBl6WrReBmlDo2wS0",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "ifrs15-revenue-manager.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "ifrs15-revenue-manager",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "your-project.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "123456789",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "your-app-id",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "ifrs15-revenue-manager.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1065024526212",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1065024526212:web:e1de7ccb1cbb7c93f26fd1",
 };
 
 // Initialize Firebase
@@ -28,7 +28,7 @@ if (!getApps().length) {
 
 auth = getAuth(app);
 db = getFirestore(app);
-functions = getFunctions(app, "southamerica-east1"); // São Paulo region
+functions = getFunctions(app, "us-central1"); // Cloud Functions region
 
 // Connect to emulators in development
 if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true") {
