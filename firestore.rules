@@ -1,0 +1,255 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==================== HELPER FUNCTIONS ====================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Get user's tenant ID from custom claims
+    function getUserTenantId() {
+      return request.auth.token.tenantId;
+    }
+    
+    // Get user's role from custom claims
+    function getUserRole() {
+      return request.auth.token.role;
+    }
+    
+    // Check if user belongs to specific tenant
+    function belongsToTenant(tenantId) {
+      return isAuthenticated() && getUserTenantId() == tenantId;
+    }
+    
+    // Check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+    
+    // Check if user is admin or finance
+    function isAdminOrFinance() {
+      return isAuthenticated() && (getUserRole() == 'admin' || getUserRole() == 'finance');
+    }
+    
+    // Check if user can write (not readonly)
+    function canWrite() {
+      return isAuthenticated() && getUserRole() != 'readonly';
+    }
+    
+    // Check if user is system admin (super admin)
+    function isSystemAdmin() {
+      return isAuthenticated() && request.auth.token.systemAdmin == true;
+    }
+    
+    // Validate timestamp fields
+    function validTimestamp(field) {
+      return field is timestamp;
+    }
+    
+    // ==================== TENANTS ====================
+    
+    match /tenants/{tenantId} {
+      // Only system admin can create tenants, users can read their own tenant
+      allow read: if belongsToTenant(tenantId) || isSystemAdmin();
+      allow create: if isSystemAdmin();
+      allow update: if (belongsToTenant(tenantId) && isAdmin()) || isSystemAdmin();
+      allow delete: if isSystemAdmin();
+      
+      // ==================== USERS (subcollection) ====================
+      match /users/{userId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create: if belongsToTenant(tenantId) && isAdmin();
+        allow update: if belongsToTenant(tenantId) && (isAdmin() || request.auth.uid == userId);
+        allow delete: if belongsToTenant(tenantId) && isAdmin();
+      }
+      
+      // ==================== CUSTOMERS ====================
+      match /customers/{customerId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create: if belongsToTenant(tenantId) && canWrite();
+        allow update: if belongsToTenant(tenantId) && canWrite();
+        allow delete: if belongsToTenant(tenantId) && isAdmin();
+      }
+      
+      // ==================== CONTRACTS ====================
+      match /contracts/{contractId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create: if belongsToTenant(tenantId) && canWrite();
+        allow update: if belongsToTenant(tenantId) && canWrite();
+        allow delete: if belongsToTenant(tenantId) && isAdmin();
+        
+        // Contract Versions
+        match /versions/{versionId} {
+          allow read: if belongsToTenant(tenantId);
+          allow create: if belongsToTenant(tenantId) && canWrite();
+          allow update: if belongsToTenant(tenantId) && isAdminOrFinance();
+          allow delete: if belongsToTenant(tenantId) && isAdmin();
+          
+          // Line Items
+          match /lineItems/{itemId} {
+            allow read: if belongsToTenant(tenantId);
+            allow write: if belongsToTenant(tenantId) && canWrite();
+          }
+          
+          // Performance Obligations
+          match /performanceObligations/{poId} {
+            allow read: if belongsToTenant(tenantId);
+            allow write: if belongsToTenant(tenantId) && canWrite();
+            
+            // Revenue Schedules
+            match /revenueSchedules/{scheduleId} {
+              allow read: if belongsToTenant(tenantId);
+              allow write: if belongsToTenant(tenantId) && isAdminOrFinance();
+            }
+          }
+          
+          // Variable Considerations
+          match /variableConsiderations/{vcId} {
+            allow read: if belongsToTenant(tenantId);
+            allow write: if belongsToTenant(tenantId) && canWrite();
+          }
+        }
+        
+        // Contract Balances
+        match /balances/{balanceId} {
+          allow read: if belongsToTenant(tenantId);
+          allow write: if belongsToTenant(tenantId) && isAdminOrFinance();
+        }
+      }
+      
+      // ==================== LICENSES ====================
+      match /licenses/{licenseId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create: if isSystemAdmin();
+        allow update: if belongsToTenant(tenantId) && isAdmin();
+        allow delete: if isSystemAdmin();
+        
+        // License Sessions
+        match /sessions/{sessionId} {
+          allow read: if belongsToTenant(tenantId);
+          allow write: if belongsToTenant(tenantId);
+        }
+      }
+      
+      // ==================== AUDIT LOGS ====================
+      match /auditLogs/{logId} {
+        // Everyone can read audit logs, only system can write
+        allow read: if belongsToTenant(tenantId);
+        allow create: if belongsToTenant(tenantId) && isAuthenticated();
+        allow update, delete: if false; // Audit logs are immutable
+      }
+      
+      // ==================== BILLING SCHEDULES ====================
+      match /billingSchedules/{scheduleId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create: if belongsToTenant(tenantId) && canWrite();
+        allow update: if belongsToTenant(tenantId) && isAdminOrFinance();
+        allow delete: if belongsToTenant(tenantId) && isAdmin();
+      }
+      
+      // ==================== REVENUE LEDGER ENTRIES ====================
+      match /revenueLedgerEntries/{entryId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create: if belongsToTenant(tenantId) && isAdminOrFinance();
+        allow update: if belongsToTenant(tenantId) && isAdminOrFinance();
+        allow delete: if belongsToTenant(tenantId) && isAdmin();
+      }
+      
+      // ==================== CONTRACT COSTS ====================
+      match /contractCosts/{costId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if belongsToTenant(tenantId) && isAdminOrFinance();
+      }
+      
+      // ==================== EXCHANGE RATES ====================
+      match /exchangeRates/{rateId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if belongsToTenant(tenantId) && isAdminOrFinance();
+      }
+      
+      // ==================== FINANCING COMPONENTS ====================
+      match /financingComponents/{componentId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if belongsToTenant(tenantId) && isAdminOrFinance();
+      }
+      
+      // ==================== CONSOLIDATED BALANCES ====================
+      match /consolidatedBalances/{balanceId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if belongsToTenant(tenantId) && isAdminOrFinance();
+      }
+      
+      // ==================== AI PROVIDER CONFIGS ====================
+      match /aiProviderConfigs/{configId} {
+        allow read: if belongsToTenant(tenantId) && isAdmin();
+        allow write: if belongsToTenant(tenantId) && isAdmin();
+      }
+      
+      // ==================== AI INGESTION JOBS ====================
+      match /aiIngestionJobs/{jobId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create: if belongsToTenant(tenantId) && canWrite();
+        allow update: if belongsToTenant(tenantId) && canWrite();
+        allow delete: if belongsToTenant(tenantId) && isAdmin();
+      }
+      
+      // ==================== AI EXTRACTION RESULTS ====================
+      match /aiExtractionResults/{resultId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if false; // Only Cloud Functions can write
+      }
+      
+      // ==================== AI REVIEW TASKS ====================
+      match /aiReviewTasks/{taskId} {
+        allow read: if belongsToTenant(tenantId);
+        allow update: if belongsToTenant(tenantId) && canWrite();
+        allow create, delete: if false; // Only Cloud Functions
+      }
+    }
+    
+    // ==================== GLOBAL COLLECTIONS ====================
+    
+    // Subscription Plans (readable by all authenticated, writable by system admin)
+    match /subscriptionPlans/{planId} {
+      allow read: if isAuthenticated();
+      allow write: if isSystemAdmin();
+    }
+    
+    // Checkout Sessions (readable by owner, writable by system)
+    match /checkoutSessions/{sessionId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.email == request.auth.token.email || isSystemAdmin());
+      allow write: if false; // Only Cloud Functions
+    }
+    
+    // Stripe Events (only Cloud Functions)
+    match /stripeEvents/{eventId} {
+      allow read, write: if false;
+    }
+    
+    // Email Queue (only Cloud Functions via Trigger Email extension)
+    match /mail/{mailId} {
+      allow read: if false;
+      allow create: if isAuthenticated(); // Users can trigger emails
+      allow update, delete: if false;
+    }
+    
+    // Email Queue legacy collection
+    match /emailQueue/{emailId} {
+      allow read, write: if false; // Only Cloud Functions
+    }
+    
+    // ==================== USERS TOP-LEVEL (for Firebase Auth sync) ====================
+    match /users/{userId} {
+      // Users can read their own profile
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      // Only Cloud Functions can create/update users
+      allow create, update: if false;
+      allow delete: if isSystemAdmin();
+    }
+  }
+}

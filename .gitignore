@@ -4,3 +4,31 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Firebase
+.firebase/
+.firebaserc.local
+firebase-debug.log
+firebase-debug.*.log
+.firestore/
+ui-debug.log
+functions/lib/
+functions/node_modules/
+functions/.env
+functions/*.log
+
+# Local files
+.local/
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
