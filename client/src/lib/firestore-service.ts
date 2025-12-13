@@ -1,0 +1,608 @@
+// Firestore Service Layer for IFRS 15 Revenue Manager
+import {
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    limit,
+    orderBy,
+    query,
+    QueryConstraint,
+    Timestamp,
+    updateDoc,
+    where
+} from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import type {
+    AiIngestionJob,
+    AiProviderConfig,
+    AiReviewTask,
+    AuditLog,
+    BillingSchedule,
+    Contract,
+    ContractLineItem,
+    ContractVersion,
+    Customer,
+    License,
+    PerformanceObligation,
+    RevenueLedgerEntry
+} from "../../shared/firestore-types";
+import { db, functions } from "./firebase";
+
+// Collection paths helper
+const tenantPath = (tenantId: string) => `tenants/${tenantId}`;
+const tenantCollection = (tenantId: string, collectionName: string) =>
+  `${tenantPath(tenantId)}/${collectionName}`;
+
+// ==================== GENERIC HELPERS ====================
+
+async function getDocById<T>(path: string, id: string): Promise<T | null> {
+  const docRef = doc(db, path, id);
+  const docSnap = await getDoc(docRef);
+  if (!docSnap.exists()) return null;
+  return { id: docSnap.id, ...docSnap.data() } as T;
+}
+
+async function getCollection<T>(
+  path: string,
+  ...constraints: QueryConstraint[]
+): Promise<T[]> {
+  const q = query(collection(db, path), ...constraints);
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as T);
+}
+
+async function addDocument<T>(path: string, data: Omit<T, "id" | "createdAt">): Promise<string> {
+  const docRef = await addDoc(collection(db, path), {
+    ...data,
+    createdAt: Timestamp.now(),
+  });
+  return docRef.id;
+}
+
+async function updateDocument(path: string, id: string, data: Record<string, any>): Promise<void> {
+  await updateDoc(doc(db, path, id), {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+async function deleteDocument(path: string, id: string): Promise<void> {
+  await deleteDoc(doc(db, path, id));
+}
+
+// ==================== CUSTOMERS ====================
+
+export const customerService = {
+  async getAll(tenantId: string): Promise<Customer[]> {
+    return getCollection<Customer>(
+      tenantCollection(tenantId, "customers"),
+      orderBy("name")
+    );
+  },
+
+  async getById(tenantId: string, id: string): Promise<Customer | null> {
+    return getDocById<Customer>(tenantCollection(tenantId, "customers"), id);
+  },
+
+  async create(tenantId: string, data: Omit<Customer, "id" | "createdAt" | "tenantId">): Promise<string> {
+    return addDocument<Customer>(tenantCollection(tenantId, "customers"), {
+      ...data,
+      tenantId,
+    } as any);
+  },
+
+  async update(tenantId: string, id: string, data: Partial<Customer>): Promise<void> {
+    await updateDocument(tenantCollection(tenantId, "customers"), id, data);
+  },
+
+  async delete(tenantId: string, id: string): Promise<void> {
+    await deleteDocument(tenantCollection(tenantId, "customers"), id);
+  },
+};
+
+// ==================== CONTRACTS ====================
+
+export const contractService = {
+  async getAll(tenantId: string): Promise<Contract[]> {
+    return getCollection<Contract>(
+      tenantCollection(tenantId, "contracts"),
+      orderBy("createdAt", "desc")
+    );
+  },
+
+  async getRecent(tenantId: string, count = 5): Promise<Contract[]> {
+    return getCollection<Contract>(
+      tenantCollection(tenantId, "contracts"),
+      orderBy("createdAt", "desc"),
+      limit(count)
+    );
+  },
+
+  async getById(tenantId: string, id: string): Promise<Contract | null> {
+    return getDocById<Contract>(tenantCollection(tenantId, "contracts"), id);
+  },
+
+  async getByStatus(tenantId: string, status: string): Promise<Contract[]> {
+    return getCollection<Contract>(
+      tenantCollection(tenantId, "contracts"),
+      where("status", "==", status),
+      orderBy("createdAt", "desc")
+    );
+  },
+
+  async create(
+    tenantId: string,
+    data: Omit<Contract, "id" | "createdAt" | "updatedAt" | "tenantId">
+  ): Promise<string> {
+    return addDocument<Contract>(tenantCollection(tenantId, "contracts"), {
+      ...data,
+      tenantId,
+      updatedAt: Timestamp.now(),
+    } as any);
+  },
+
+  async update(tenantId: string, id: string, data: Partial<Contract>): Promise<void> {
+    await updateDocument(tenantCollection(tenantId, "contracts"), id, data);
+  },
+
+  async delete(tenantId: string, id: string): Promise<void> {
+    await deleteDocument(tenantCollection(tenantId, "contracts"), id);
+  },
+
+  // Get full contract with versions and POs
+  async getWithDetails(tenantId: string, id: string) {
+    const contract = await this.getById(tenantId, id);
+    if (!contract) return null;
+
+    const versions = await contractVersionService.getAll(tenantId, id);
+    
+    // Get details for each version
+    const versionsWithDetails = await Promise.all(
+      versions.map(async (version) => {
+        const lineItems = await lineItemService.getAll(tenantId, id, version.id);
+        const performanceObligations = await performanceObligationService.getAll(
+          tenantId,
+          id,
+          version.id
+        );
+        return { ...version, lineItems, performanceObligations };
+      })
+    );
+
+    return { ...contract, versions: versionsWithDetails };
+  },
+};
+
+// ==================== CONTRACT VERSIONS ====================
+
+export const contractVersionService = {
+  async getAll(tenantId: string, contractId: string): Promise<ContractVersion[]> {
+    return getCollection<ContractVersion>(
+      `${tenantCollection(tenantId, "contracts")}/${contractId}/versions`,
+      orderBy("versionNumber", "desc")
+    );
+  },
+
+  async getById(
+    tenantId: string,
+    contractId: string,
+    id: string
+  ): Promise<ContractVersion | null> {
+    return getDocById<ContractVersion>(
+      `${tenantCollection(tenantId, "contracts")}/${contractId}/versions`,
+      id
+    );
+  },
+
+  async create(
+    tenantId: string,
+    contractId: string,
+    data: Omit<ContractVersion, "id" | "createdAt">
+  ): Promise<string> {
+    return addDocument<ContractVersion>(
+      `${tenantCollection(tenantId, "contracts")}/${contractId}/versions`,
+      data as any
+    );
+  },
+};
+
+// ==================== LINE ITEMS ====================
+
+export const lineItemService = {
+  async getAll(
+    tenantId: string,
+    contractId: string,
+    versionId: string
+  ): Promise<ContractLineItem[]> {
+    return getCollection<ContractLineItem>(
+      `${tenantCollection(tenantId, "contracts")}/${contractId}/versions/${versionId}/lineItems`
+    );
+  },
+
+  async create(
+    tenantId: string,
+    contractId: string,
+    versionId: string,
+    data: Omit<ContractLineItem, "id" | "createdAt">
+  ): Promise<string> {
+    return addDocument<ContractLineItem>(
+      `${tenantCollection(tenantId, "contracts")}/${contractId}/versions/${versionId}/lineItems`,
+      data as any
+    );
+  },
+};
+
+// ==================== PERFORMANCE OBLIGATIONS ====================
+
+export const performanceObligationService = {
+  async getAll(
+    tenantId: string,
+    contractId: string,
+    versionId: string
+  ): Promise<PerformanceObligation[]> {
+    return getCollection<PerformanceObligation>(
+      `${tenantCollection(tenantId, "contracts")}/${contractId}/versions/${versionId}/performanceObligations`
+    );
+  },
+
+  async getById(
+    tenantId: string,
+    contractId: string,
+    versionId: string,
+    id: string
+  ): Promise<PerformanceObligation | null> {
+    return getDocById<PerformanceObligation>(
+      `${tenantCollection(tenantId, "contracts")}/${contractId}/versions/${versionId}/performanceObligations`,
+      id
+    );
+  },
+
+  async create(
+    tenantId: string,
+    contractId: string,
+    versionId: string,
+    data: Omit<PerformanceObligation, "id" | "createdAt">
+  ): Promise<string> {
+    return addDocument<PerformanceObligation>(
+      `${tenantCollection(tenantId, "contracts")}/${contractId}/versions/${versionId}/performanceObligations`,
+      data as any
+    );
+  },
+
+  async update(
+    tenantId: string,
+    contractId: string,
+    versionId: string,
+    id: string,
+    data: Partial<PerformanceObligation>
+  ): Promise<void> {
+    await updateDocument(
+      `${tenantCollection(tenantId, "contracts")}/${contractId}/versions/${versionId}/performanceObligations`,
+      id,
+      data
+    );
+  },
+};
+
+// ==================== LICENSES ====================
+
+export const licenseService = {
+  async getAll(tenantId: string): Promise<License[]> {
+    return getCollection<License>(
+      tenantCollection(tenantId, "licenses"),
+      orderBy("createdAt", "desc")
+    );
+  },
+
+  async getActive(tenantId: string): Promise<License[]> {
+    return getCollection<License>(
+      tenantCollection(tenantId, "licenses"),
+      where("status", "==", "active")
+    );
+  },
+
+  async getById(tenantId: string, id: string): Promise<License | null> {
+    return getDocById<License>(tenantCollection(tenantId, "licenses"), id);
+  },
+};
+
+// ==================== AUDIT LOGS ====================
+
+export const auditLogService = {
+  async getAll(tenantId: string, limitCount = 100): Promise<AuditLog[]> {
+    return getCollection<AuditLog>(
+      tenantCollection(tenantId, "auditLogs"),
+      orderBy("createdAt", "desc"),
+      limit(limitCount)
+    );
+  },
+
+  async getByEntity(tenantId: string, entityType: string, entityId: string): Promise<AuditLog[]> {
+    return getCollection<AuditLog>(
+      tenantCollection(tenantId, "auditLogs"),
+      where("entityType", "==", entityType),
+      where("entityId", "==", entityId),
+      orderBy("createdAt", "desc")
+    );
+  },
+
+  async create(tenantId: string, data: Omit<AuditLog, "id" | "createdAt">): Promise<string> {
+    return addDocument<AuditLog>(tenantCollection(tenantId, "auditLogs"), data as any);
+  },
+};
+
+// ==================== BILLING SCHEDULES ====================
+
+export const billingScheduleService = {
+  async getAll(tenantId: string): Promise<BillingSchedule[]> {
+    return getCollection<BillingSchedule>(
+      tenantCollection(tenantId, "billingSchedules"),
+      orderBy("billingDate", "desc")
+    );
+  },
+
+  async getByContract(tenantId: string, contractId: string): Promise<BillingSchedule[]> {
+    return getCollection<BillingSchedule>(
+      tenantCollection(tenantId, "billingSchedules"),
+      where("contractId", "==", contractId),
+      orderBy("billingDate")
+    );
+  },
+
+  async getUpcoming(tenantId: string, days = 30): Promise<BillingSchedule[]> {
+    const now = Timestamp.now();
+    const future = Timestamp.fromDate(new Date(Date.now() + days * 24 * 60 * 60 * 1000));
+    
+    return getCollection<BillingSchedule>(
+      tenantCollection(tenantId, "billingSchedules"),
+      where("status", "==", "scheduled"),
+      where("billingDate", ">=", now),
+      where("billingDate", "<=", future),
+      orderBy("billingDate")
+    );
+  },
+
+  async create(tenantId: string, data: Omit<BillingSchedule, "id" | "createdAt">): Promise<string> {
+    return addDocument<BillingSchedule>(
+      tenantCollection(tenantId, "billingSchedules"),
+      data as any
+    );
+  },
+
+  async update(tenantId: string, id: string, data: Partial<BillingSchedule>): Promise<void> {
+    await updateDocument(tenantCollection(tenantId, "billingSchedules"), id, data);
+  },
+};
+
+// ==================== REVENUE LEDGER ====================
+
+export const revenueLedgerService = {
+  async getAll(tenantId: string): Promise<RevenueLedgerEntry[]> {
+    return getCollection<RevenueLedgerEntry>(
+      tenantCollection(tenantId, "revenueLedgerEntries"),
+      orderBy("entryDate", "desc")
+    );
+  },
+
+  async getByContract(tenantId: string, contractId: string): Promise<RevenueLedgerEntry[]> {
+    return getCollection<RevenueLedgerEntry>(
+      tenantCollection(tenantId, "revenueLedgerEntries"),
+      where("contractId", "==", contractId),
+      orderBy("entryDate", "desc")
+    );
+  },
+
+  async getUnposted(tenantId: string): Promise<RevenueLedgerEntry[]> {
+    return getCollection<RevenueLedgerEntry>(
+      tenantCollection(tenantId, "revenueLedgerEntries"),
+      where("isPosted", "==", false),
+      orderBy("entryDate")
+    );
+  },
+
+  async create(tenantId: string, data: Omit<RevenueLedgerEntry, "id" | "createdAt">): Promise<string> {
+    return addDocument<RevenueLedgerEntry>(
+      tenantCollection(tenantId, "revenueLedgerEntries"),
+      data as any
+    );
+  },
+
+  async update(tenantId: string, id: string, data: Partial<RevenueLedgerEntry>): Promise<void> {
+    await updateDocument(tenantCollection(tenantId, "revenueLedgerEntries"), id, data);
+  },
+};
+
+// ==================== AI PROVIDER CONFIGS ====================
+
+export const aiProviderConfigService = {
+  async getAll(tenantId: string): Promise<AiProviderConfig[]> {
+    return getCollection<AiProviderConfig>(
+      tenantCollection(tenantId, "aiProviderConfigs"),
+      orderBy("createdAt", "desc")
+    );
+  },
+
+  async getDefault(tenantId: string): Promise<AiProviderConfig | null> {
+    const configs = await getCollection<AiProviderConfig>(
+      tenantCollection(tenantId, "aiProviderConfigs"),
+      where("isDefault", "==", true),
+      limit(1)
+    );
+    return configs[0] || null;
+  },
+
+  async create(tenantId: string, data: Omit<AiProviderConfig, "id" | "createdAt" | "updatedAt">): Promise<string> {
+    return addDocument<AiProviderConfig>(
+      tenantCollection(tenantId, "aiProviderConfigs"),
+      {
+        ...data,
+        updatedAt: Timestamp.now(),
+      } as any
+    );
+  },
+
+  async update(tenantId: string, id: string, data: Partial<AiProviderConfig>): Promise<void> {
+    await updateDocument(tenantCollection(tenantId, "aiProviderConfigs"), id, data);
+  },
+
+  async delete(tenantId: string, id: string): Promise<void> {
+    await deleteDocument(tenantCollection(tenantId, "aiProviderConfigs"), id);
+  },
+};
+
+// ==================== AI INGESTION JOBS ====================
+
+export const aiIngestionJobService = {
+  async getAll(tenantId: string): Promise<AiIngestionJob[]> {
+    return getCollection<AiIngestionJob>(
+      tenantCollection(tenantId, "aiIngestionJobs"),
+      orderBy("createdAt", "desc")
+    );
+  },
+
+  async getById(tenantId: string, id: string): Promise<AiIngestionJob | null> {
+    return getDocById<AiIngestionJob>(tenantCollection(tenantId, "aiIngestionJobs"), id);
+  },
+
+  async create(tenantId: string, data: Omit<AiIngestionJob, "id" | "createdAt">): Promise<string> {
+    return addDocument<AiIngestionJob>(
+      tenantCollection(tenantId, "aiIngestionJobs"),
+      data as any
+    );
+  },
+};
+
+// ==================== AI REVIEW TASKS ====================
+
+export const aiReviewTaskService = {
+  async getAll(tenantId: string): Promise<AiReviewTask[]> {
+    return getCollection<AiReviewTask>(
+      tenantCollection(tenantId, "aiReviewTasks"),
+      orderBy("createdAt", "desc")
+    );
+  },
+
+  async getPending(tenantId: string): Promise<AiReviewTask[]> {
+    return getCollection<AiReviewTask>(
+      tenantCollection(tenantId, "aiReviewTasks"),
+      where("status", "==", "pending"),
+      orderBy("createdAt")
+    );
+  },
+
+  async approve(reviewTaskId: string, reviewedData: any, customerId: string) {
+    const approveReview = httpsCallable(functions, "approveReviewAndCreateContract");
+    const result = await approveReview({ reviewTaskId, reviewedData, customerId });
+    return result.data as { success: boolean; contractId?: string; error?: string };
+  },
+};
+
+// ==================== DASHBOARD ====================
+
+export const dashboardService = {
+  async getStats(tenantId: string) {
+    // Get contracts
+    const contracts = await contractService.getAll(tenantId);
+    const totalContracts = contracts.length;
+    const activeContracts = contracts.filter((c) => c.status === "active").length;
+    const totalRevenue = contracts.reduce((sum, c) => sum + Number(c.totalValue || 0), 0);
+
+    // Get licenses
+    const licenses = await licenseService.getAll(tenantId);
+    const activeLicenses = licenses.filter((l) => l.status === "active").length;
+    const licensesInUse = licenses.filter((l) => l.currentIp).length;
+
+    // Calculate recognized revenue (simplified)
+    let recognizedRevenue = 0;
+    for (const contract of contracts) {
+      const versions = await contractVersionService.getAll(tenantId, contract.id);
+      if (versions.length > 0) {
+        const latestVersion = versions[0];
+        const pos = await performanceObligationService.getAll(
+          tenantId,
+          contract.id,
+          latestVersion.id
+        );
+        for (const po of pos) {
+          recognizedRevenue += Number(po.recognizedAmount || 0);
+        }
+      }
+    }
+
+    const deferredRevenue = totalRevenue - recognizedRevenue;
+
+    return {
+      totalContracts,
+      activeContracts,
+      totalRevenue: totalRevenue.toFixed(2),
+      recognizedRevenue: recognizedRevenue.toFixed(2),
+      deferredRevenue: deferredRevenue.toFixed(2),
+      activeLicenses,
+      licensesInUse,
+      contractAssets: "0.00",
+      contractLiabilities: "0.00",
+    };
+  },
+};
+
+// ==================== STRIPE FUNCTIONS ====================
+
+export const stripeService = {
+  async createCheckoutSession(priceId: string, email: string) {
+    const createSession = httpsCallable(functions, "createCheckoutSession");
+    const result = await createSession({
+      priceId,
+      email,
+      successUrl: `${window.location.origin}/subscribe?success=true`,
+      cancelUrl: `${window.location.origin}/subscribe?canceled=true`,
+    });
+    return result.data as { sessionId: string; url: string };
+  },
+
+  async createPortalSession() {
+    const createPortal = httpsCallable(functions, "createPortalSession");
+    const result = await createPortal({
+      returnUrl: window.location.origin,
+    });
+    return result.data as { url: string };
+  },
+
+  async getSubscriptionPlans() {
+    const getPlans = httpsCallable(functions, "getSubscriptionPlans");
+    const result = await getPlans({});
+    return result.data as { plans: any[] };
+  },
+
+  async cancelSubscription() {
+    const cancel = httpsCallable(functions, "cancelSubscription");
+    const result = await cancel({});
+    return result.data as { success: boolean };
+  },
+
+  async resumeSubscription() {
+    const resume = httpsCallable(functions, "resumeSubscription");
+    const result = await resume({});
+    return result.data as { success: boolean };
+  },
+};
+
+// Export all services
+export default {
+  customers: customerService,
+  contracts: contractService,
+  contractVersions: contractVersionService,
+  lineItems: lineItemService,
+  performanceObligations: performanceObligationService,
+  licenses: licenseService,
+  auditLogs: auditLogService,
+  billingSchedules: billingScheduleService,
+  revenueLedger: revenueLedgerService,
+  aiProviderConfigs: aiProviderConfigService,
+  aiIngestionJobs: aiIngestionJobService,
+  aiReviewTasks: aiReviewTaskService,
+  dashboard: dashboardService,
+  stripe: stripeService,
+};
