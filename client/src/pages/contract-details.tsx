@@ -137,7 +137,9 @@ export default function ContractDetails() {
 
   const createPOMutation = useMutation({
     mutationFn: async (data: POFormValues) => {
-      if (!user?.tenantId || !id || !currentVersionId) throw new Error("Missing data");
+      if (!user?.tenantId || !id) throw new Error("Dados do contrato ausentes");
+      if (!currentVersionId) throw new Error("É necessário criar uma versão do contrato antes de adicionar obrigações de performance");
+      
       const percentValue = data.percentComplete?.trim() || "0";
       const parsedPercent = parseFloat(percentValue);
       const { performanceObligationService } = await import("@/lib/firestore-service");
@@ -501,7 +503,12 @@ export default function ContractDetails() {
                 </Badge>
                 <Dialog open={poDialogOpen} onOpenChange={setPoDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button size="sm" data-testid="button-add-po">
+                    <Button 
+                      size="sm" 
+                      data-testid="button-add-po"
+                      disabled={!currentVersionId}
+                      title={!currentVersionId ? "Crie uma versão do contrato antes de adicionar obrigações" : ""}
+                    >
                       <Plus className="h-4 w-4 mr-1" />
                       Add
                     </Button>
@@ -631,6 +638,12 @@ export default function ContractDetails() {
                   {[1, 2, 3].map((i) => (
                     <Skeleton key={i} className="h-16 w-full" />
                   ))}
+                </div>
+              ) : !currentVersionId ? (
+                <div className="h-32 flex flex-col items-center justify-center text-muted-foreground gap-2">
+                  <Target weight="duotone" className="h-10 w-10 text-muted-foreground/30" />
+                  <p className="text-sm font-medium">Nenhuma versão do contrato encontrada</p>
+                  <p className="text-xs text-muted-foreground">Crie uma versão do contrato antes de adicionar obrigações de performance</p>
                 </div>
               ) : performanceObligations && performanceObligations.length > 0 ? (
                 <DataTable columns={poColumns} data={performanceObligations} />
