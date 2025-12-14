@@ -1,54 +1,56 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Progress } from "@/components/ui/progress";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { 
-  Plus, 
-  Search, 
-  DollarSign, 
-  TrendingDown,
-  FileText,
-  Calendar,
-  Percent,
-  AlertCircle
-} from "lucide-react";
+import { useAuth } from "@/lib/auth-firebase";
+import { contractCostService, contractService } from "@/lib/firestore-service";
+import { queryClient } from "@/lib/queryClient";
 import type { ContractCostWithDetails, ContractWithDetails } from "@/lib/types";
-import { format, differenceInMonths } from "date-fns";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { differenceInMonths, format } from "date-fns";
+import {
+    AlertCircle,
+    Calendar,
+    DollarSign,
+    FileText,
+    Percent,
+    Plus,
+    Search,
+    TrendingDown
+} from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 const costFormSchema = z.object({
   contractId: z.string().min(1, "Contract is required"),
@@ -93,25 +95,49 @@ export default function ContractCosts() {
     },
   });
 
+  const { user } = useAuth();
   const { data: contractCosts, isLoading } = useQuery<ContractCostWithDetails[]>({
-    queryKey: ["/api/contract-costs"],
+    queryKey: ["contract-costs", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return contractCostService.getAll(user.tenantId) as any;
+    },
+    enabled: !!user?.tenantId,
   });
 
   const { data: contracts } = useQuery<ContractWithDetails[]>({
-    queryKey: ["/api/contracts"],
+    queryKey: ["contracts", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return contractService.getAll(user.tenantId) as any;
+    },
+    enabled: !!user?.tenantId,
   });
 
   const createCostMutation = useMutation({
     mutationFn: async (data: CostFormValues) => {
-      return apiRequest("POST", "/api/contract-costs", data);
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      return contractCostService.create(user.tenantId, {
+        contractId: data.contractId,
+        costType: data.costType,
+        description: data.description,
+        amount: data.amount.toString(),
+        currency: data.currency,
+        incurredDate: data.incurredDate,
+        amortizationStartDate: data.amortizationStartDate,
+        amortizationEndDate: data.amortizationEndDate,
+        amortizationMethod: data.amortizationMethod,
+        totalAmortized: "0",
+        remainingBalance: data.amount.toString(),
+      } as any);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contract-costs"] });
+      queryClient.invalidateQueries({ queryKey: ["contract-costs", user?.tenantId] });
       setDialogOpen(false);
       form.reset();
       toast({
-        title: "Cost recorded",
-        description: "The contract cost has been recorded successfully.",
+        title: "Custo registrado",
+        description: "O custo do contrato foi registrado com sucesso.",
       });
     },
     onError: (error: Error) => {

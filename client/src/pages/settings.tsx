@@ -1,47 +1,59 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useI18n, Language, languageNames } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth-firebase";
+import { tenantService, userService } from "@/lib/firestore-service";
+import { Language, useI18n } from "@/lib/i18n";
+import { queryClient } from "@/lib/queryClient";
+import type { Tenant, User } from "@shared/firestore-types";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Building2,
-  CreditCard,
-  Users,
-  Shield,
-  Bell,
-  Palette,
-  Globe,
-  ExternalLink,
-  Check,
+    Bell,
+    Building2,
+    Check,
+    CreditCard,
+    ExternalLink,
+    Globe,
+    Shield,
+    Users
 } from "lucide-react";
-import type { Tenant, User } from "@shared/schema";
+import { useState } from "react";
 
 export default function Settings() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { t, language, setLanguage } = useI18n();
 
   const { data: tenant, isLoading: tenantLoading } = useQuery<Tenant>({
-    queryKey: ["/api/tenant"],
+    queryKey: ["tenant", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return null;
+      return tenantService.get(user.tenantId) as any;
+    },
+    enabled: !!user?.tenantId,
   });
 
   const { data: users, isLoading: usersLoading } = useQuery<User[]>({
-    queryKey: ["/api/users"],
+    queryKey: ["users", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return userService.getAll(user.tenantId) as any;
+    },
+    enabled: !!user?.tenantId,
   });
 
   const [tenantForm, setTenantForm] = useState({
@@ -60,18 +72,19 @@ export default function Settings() {
 
   const updateTenantMutation = useMutation({
     mutationFn: async (data: typeof tenantForm) => {
-      return apiRequest("PATCH", "/api/tenant", data);
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      return tenantService.update(user.tenantId, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tenant"] });
+      queryClient.invalidateQueries({ queryKey: ["tenant", user?.tenantId] });
       toast({
-        title: "Settings updated",
-        description: "Organization settings have been saved.",
+        title: "Configurações atualizadas",
+        description: "As configurações da organização foram salvas.",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: "Erro",
         description: error.message,
         variant: "destructive",
       });
@@ -373,37 +386,39 @@ export default function Settings() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4 text-sm">
-                <div className="grid grid-cols-5 gap-2 font-medium text-muted-foreground pb-2 border-b">
-                  <span>Role</span>
-                  <span className="text-center">View</span>
-                  <span className="text-center">Create</span>
-                  <span className="text-center">Edit</span>
-                  <span className="text-center">Admin</span>
-                </div>
-                {[
-                  { role: "Admin", view: true, create: true, edit: true, admin: true },
-                  { role: "Finance", view: true, create: true, edit: true, admin: false },
-                  { role: "Auditor", view: true, create: false, edit: false, admin: false },
-                  { role: "Operations", view: true, create: true, edit: false, admin: false },
-                  { role: "Read-only", view: true, create: false, edit: false, admin: false },
-                ].map((perm) => (
-                  <div key={perm.role} className="grid grid-cols-5 gap-2 items-center">
-                    <span>{perm.role}</span>
-                    <div className="flex justify-center">
-                      {perm.view && <Check className="h-4 w-4 text-chart-2" />}
-                    </div>
-                    <div className="flex justify-center">
-                      {perm.create && <Check className="h-4 w-4 text-chart-2" />}
-                    </div>
-                    <div className="flex justify-center">
-                      {perm.edit && <Check className="h-4 w-4 text-chart-2" />}
-                    </div>
-                    <div className="flex justify-center">
-                      {perm.admin && <Check className="h-4 w-4 text-chart-2" />}
-                    </div>
+              <div className="overflow-x-auto">
+                <div className="space-y-4 text-sm min-w-[400px]">
+                  <div className="grid grid-cols-5 gap-2 font-medium text-muted-foreground pb-2 border-b">
+                    <span>Role</span>
+                    <span className="text-center">View</span>
+                    <span className="text-center">Create</span>
+                    <span className="text-center">Edit</span>
+                    <span className="text-center">Admin</span>
                   </div>
-                ))}
+                  {[
+                    { role: "Admin", view: true, create: true, edit: true, admin: true },
+                    { role: "Finance", view: true, create: true, edit: true, admin: false },
+                    { role: "Auditor", view: true, create: false, edit: false, admin: false },
+                    { role: "Operations", view: true, create: true, edit: false, admin: false },
+                    { role: "Read-only", view: true, create: false, edit: false, admin: false },
+                  ].map((perm) => (
+                    <div key={perm.role} className="grid grid-cols-5 gap-2 items-center">
+                      <span>{perm.role}</span>
+                      <div className="flex justify-center">
+                        {perm.view && <Check className="h-4 w-4 text-chart-2" />}
+                      </div>
+                      <div className="flex justify-center">
+                        {perm.create && <Check className="h-4 w-4 text-chart-2" />}
+                      </div>
+                      <div className="flex justify-center">
+                        {perm.edit && <Check className="h-4 w-4 text-chart-2" />}
+                      </div>
+                      <div className="flex justify-center">
+                        {perm.admin && <Check className="h-4 w-4 text-chart-2" />}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>

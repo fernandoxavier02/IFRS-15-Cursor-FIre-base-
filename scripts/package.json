@@ -1,9 +1,21 @@
-﻿{
+{
   "name": "ifrs15-scripts",
   "type": "module",
+  "scripts": {
+    "migrate": "npx tsx migrate-to-firestore.ts",
+    "validate": "npx tsx validate-migration.ts",
+    "init-admin": "npx tsx init-admin.ts",
+    "test": "npx tsx test-firebase-integration.ts",
+    "check": "npx tsx check-firebase-setup.ts"
+  },
   "dependencies": {
     "firebase-admin": "^12.0.0",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
     "typescript": "^5.0.0",
-    "ts-node": "^10.9.2"
+    "tsx": "^4.20.5",
+    "@types/node": "^20.16.11",
+    "@types/pg": "^8.11.6"
   }
 }

@@ -16,12 +16,20 @@ export const authScenarios: TestScenario[] = [
       { type: 'fill', target: '[data-testid="input-login-email"]', value: appConfig.testAdminEmail, description: 'Fill email' },
       { type: 'fill', target: '[data-testid="input-login-password"]', value: appConfig.testAdminPassword, description: 'Fill password' },
       { type: 'click', target: '[data-testid="button-login-submit"]', description: 'Click login button' },
-      { type: 'wait', value: 2000, description: 'Wait for authentication' },
-      { type: 'waitForNavigation', target: '/', description: 'Wait for redirect to dashboard' },
+      { type: 'wait', value: 3000, description: 'Wait for authentication and redirect' },
+      // Handle potential redirects to change-password or activate-license
+      { type: 'waitForNavigation', target: ['/', '/change-password', '/activate-license'], description: 'Wait for redirect after login' },
+      { type: 'wait', value: 2000, description: 'Wait for page to fully load' },
     ],
     validations: [
-      ResultValidator.createRules.urlIs('/'),
-      ResultValidator.createRules.elementVisible('[data-testid="button-sidebar-toggle"]'),
+      // Accept any of these URLs as valid login result
+      {
+        type: 'url',
+        expected: ['/', '/change-password', '/activate-license'],
+        description: 'Should be redirected to dashboard, change password, or activate license',
+      },
+      // Note: Sidebar toggle validation removed - it's only visible on dashboard,
+      // but login may redirect to change-password or activate-license first
       ResultValidator.createRules.noConsoleErrors(),
     ],
   },

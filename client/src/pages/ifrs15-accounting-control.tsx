@@ -1,25 +1,24 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  TrendingUp,
-  TrendingDown,
-  Calendar,
-  FileText,
-  ArrowUpRight,
-  ArrowDownRight,
-  DollarSign
+import { useAuth } from "@/lib/auth-firebase";
+import { useQuery } from "@tanstack/react-query";
+import {
+    ArrowDownRight,
+    ArrowUpRight,
+    DollarSign,
+    FileText,
+    TrendingDown,
+    TrendingUp
 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { useState } from "react";
 
 interface AccountingControlRow {
   id: string;
@@ -56,8 +55,65 @@ export default function IFRS15AccountingControl() {
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState((currentDate.getMonth() + 1).toString().padStart(2, "0"));
 
+  const { user } = useAuth();
   const { data, isLoading } = useQuery<AccountingControlData>({
-    queryKey: ["/api/ifrs15-accounting-control", selectedYear, selectedMonth],
+    queryKey: ["ifrs15-accounting-control", user?.tenantId, selectedYear, selectedMonth],
+    queryFn: async () => {
+      if (!user?.tenantId) return null;
+      // Generate accounting control data from contract balances
+      const { reportsService } = await import("@/lib/firestore-service");
+      const periodEnd = `${selectedYear}-${selectedMonth}-${new Date(parseInt(selectedYear), parseInt(selectedMonth), 0).getDate()}`;
+      const balances = await reportsService.generateContractBalances(periodEnd);
+      // Transform to accounting control format
+      const contracts = (balances as any)?.contracts || [];
+      const assets = contracts
+        .filter((c: any) => Number(c.contractAsset || 0) > 0)
+        .map((c: any) => ({
+          id: c.contractId,
+          contractId: c.contractId,
+          contractNumber: c.contractNumber,
+          customerName: c.customerName,
+          openingBalance: 0,
+          debits: Number(c.contractAsset || 0),
+          credits: 0,
+          movement: Number(c.contractAsset || 0),
+          closingBalance: Number(c.contractAsset || 0),
+          currency: "BRL",
+          type: "asset" as const,
+        }));
+      const liabilities = contracts
+        .filter((c: any) => Number(c.contractLiability || 0) > 0)
+        .map((c: any) => ({
+          id: c.contractId,
+          contractId: c.contractId,
+          contractNumber: c.contractNumber,
+          customerName: c.customerName,
+          openingBalance: 0,
+          debits: 0,
+          credits: Number(c.contractLiability || 0),
+          movement: -Number(c.contractLiability || 0),
+          closingBalance: Number(c.contractLiability || 0),
+          currency: "BRL",
+          type: "liability" as const,
+        }));
+      
+      return {
+        period: `${selectedYear}-${selectedMonth}`,
+        contractAssets: assets,
+        contractLiabilities: liabilities,
+        totalAssetOpening: 0,
+        totalAssetDebits: assets.reduce((sum: number, a: any) => sum + a.debits, 0),
+        totalAssetCredits: 0,
+        totalAssetMovement: assets.reduce((sum: number, a: any) => sum + a.movement, 0),
+        totalAssetClosing: assets.reduce((sum: number, a: any) => sum + a.closingBalance, 0),
+        totalLiabilityOpening: 0,
+        totalLiabilityDebits: 0,
+        totalLiabilityCredits: liabilities.reduce((sum: number, l: any) => sum + l.credits, 0),
+        totalLiabilityMovement: liabilities.reduce((sum: number, l: any) => sum + l.movement, 0),
+        totalLiabilityClosing: liabilities.reduce((sum: number, l: any) => sum + l.closingBalance, 0),
+      } as any;
+    },
+    enabled: !!user?.tenantId,
   });
 
   const months = [
@@ -347,8 +403,8 @@ export default function IFRS15AccountingControl() {
                 columns={assetColumns}
                 
               />
-              <div className="mt-4 pt-4 border-t">
-                <div className="grid grid-cols-7 gap-4 text-sm font-semibold">
+              <div className="mt-4 pt-4 border-t overflow-x-auto">
+                <div className="grid grid-cols-7 gap-4 text-sm font-semibold min-w-[600px]">
                   <div className="col-span-2">Total</div>
                   <div className="text-right tabular-nums">BRL {(data.totalAssetOpening || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                   <div className="text-right tabular-nums text-green-600 dark:text-green-400">BRL {(data.totalAssetDebits || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
@@ -385,8 +441,8 @@ export default function IFRS15AccountingControl() {
                 columns={liabilityColumns}
                 
               />
-              <div className="mt-4 pt-4 border-t">
-                <div className="grid grid-cols-7 gap-4 text-sm font-semibold">
+              <div className="mt-4 pt-4 border-t overflow-x-auto">
+                <div className="grid grid-cols-7 gap-4 text-sm font-semibold min-w-[600px]">
                   <div className="col-span-2">Total</div>
                   <div className="text-right tabular-nums">BRL {(data.totalLiabilityOpening || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                   <div className="text-right tabular-nums text-red-600 dark:text-red-400">(BRL {(data.totalLiabilityDebits || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })})</div>

@@ -17,7 +17,9 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { AuditLog } from "@shared/schema";
+import { useAuth } from "@/lib/auth-firebase";
+import { auditLogService } from "@/lib/firestore-service";
+import type { AuditLog } from "@shared/firestore-types";
 import { useQuery } from "@tanstack/react-query";
 import {
     Calculator,
@@ -54,13 +56,24 @@ const entityIcons: Record<string, React.ReactNode> = {
 };
 
 export default function AuditTrail() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [entityFilter, setEntityFilter] = useState<string>("all");
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
 
   const { data: auditLogs, isLoading } = useQuery<AuditLogWithDetails[]>({
-    queryKey: ["/api/audit-logs"],
+    queryKey: ["audit-logs", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      const logs = await auditLogService.getAll(user.tenantId);
+      // Convert Firestore timestamps to Date objects
+      return logs.map(log => ({
+        ...log,
+        createdAt: log.createdAt instanceof Date ? log.createdAt : (log.createdAt as any)?.toDate?.() || new Date(),
+      })) as AuditLogWithDetails[];
+    },
+    enabled: !!user?.tenantId,
   });
 
   const filteredLogs = auditLogs?.filter((log) => {

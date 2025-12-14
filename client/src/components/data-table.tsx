@@ -1,12 +1,12 @@
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 interface Column<T> {
@@ -37,7 +37,7 @@ export function DataTable<T extends { id: string }>({
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
-      <div className={cn("rounded-md border", className)}>
+      <div className={cn("w-full overflow-x-auto rounded-md border", className)}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -66,7 +66,7 @@ export function DataTable<T extends { id: string }>({
 
   if (data.length === 0) {
     return (
-      <div className={cn("rounded-md border", className)}>
+      <div className={cn("w-full overflow-x-auto rounded-md border", className)}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -93,7 +93,7 @@ export function DataTable<T extends { id: string }>({
   }
 
   return (
-    <div className={cn("rounded-md border", className)}>
+    <div className={cn("w-full overflow-x-auto rounded-md border", className)}>
       <Table>
         <TableHeader>
           <TableRow>

@@ -1,22 +1,24 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { format } from "date-fns";
-import { Plus, ArrowsLeftRight, TrendUp, Calendar } from "@phosphor-icons/react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth-firebase";
+import { exchangeRateService } from "@/lib/firestore-service";
 import { useI18n } from "@/lib/i18n";
+import { queryClient } from "@/lib/queryClient";
 import type { ExchangeRate } from "@/lib/types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { ArrowsLeftRight, Calendar, Plus, TrendUp } from "@phosphor-icons/react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 const currencies = [
   { code: "USD", name: "US Dollar", symbol: "$" },
@@ -46,8 +48,14 @@ export default function ExchangeRatesPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  const { user } = useAuth();
   const { data: exchangeRates, isLoading } = useQuery<ExchangeRate[]>({
-    queryKey: ["/api/exchange-rates"],
+    queryKey: ["exchange-rates", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return exchangeRateService.getAll(user.tenantId) as any;
+    },
+    enabled: !!user?.tenantId,
   });
 
   const form = useForm<ExchangeRateFormData>({
@@ -63,18 +71,22 @@ export default function ExchangeRatesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: ExchangeRateFormData) => {
-      return apiRequest("POST", "/api/exchange-rates", {
-        ...data,
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      return exchangeRateService.create(user.tenantId, {
+        fromCurrency: data.fromCurrency,
+        toCurrency: data.toCurrency,
+        rate: data.rate.toString(),
         effectiveDate: new Date(data.effectiveDate).toISOString(),
-      });
+        source: data.source,
+      } as any);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
+      queryClient.invalidateQueries({ queryKey: ["exchange-rates", user?.tenantId] });
       setIsDialogOpen(false);
       form.reset();
       toast({
         title: t("common.success"),
-        description: "Exchange rate added successfully",
+        description: "Taxa de câmbio adicionada com sucesso",
       });
     },
     onError: () => {

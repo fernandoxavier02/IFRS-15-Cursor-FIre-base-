@@ -1,49 +1,52 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams, useLocation } from "wouter";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table";
-import { useI18n } from "@/lib/i18n";
+import { StatusBadge } from "@/components/status-badge";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth-firebase";
+import { useI18n } from "@/lib/i18n";
+import { queryClient } from "@/lib/queryClient";
+import type { BillingScheduleWithDetails, ContractWithDetails, LedgerEntryWithDetails, PerformanceObligationSummary } from "@/lib/types";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  ArrowLeft,
-  FileText,
-  Calendar,
-  CurrencyDollar,
-  TrendUp,
-  ClockCounterClockwise,
-  Receipt,
-  Target,
-  ChartLineUp,
-  Plus,
+    ArrowLeft,
+    Calendar,
+    ChartLineUp,
+    ClockCounterClockwise,
+    CurrencyDollar,
+    FileText,
+    Plus,
+    Receipt,
+    Target,
+    TrendUp,
 } from "@phosphor-icons/react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import type { ContractWithDetails, PerformanceObligationSummary, BillingScheduleWithDetails, LedgerEntryWithDetails } from "@/lib/types";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { useLocation, useParams } from "wouter";
+import { z } from "zod";
 
 interface ContractFullDetails extends ContractWithDetails {
   customerId: string;
   paymentTerms: string | null;
   createdAt: string;
   updatedAt: string;
+  currentVersionId?: string;
+  versions?: any[];
 }
 
 export default function ContractDetails() {
@@ -51,24 +54,61 @@ export default function ContractDetails() {
   const [, setLocation] = useLocation();
   const { t } = useI18n();
 
+  const { user } = useAuth();
   const { data: contract, isLoading: contractLoading } = useQuery<ContractFullDetails>({
-    queryKey: [`/api/contracts/${id}`],
-    enabled: !!id,
+    queryKey: ["contract", user?.tenantId, id],
+    queryFn: async () => {
+      if (!user?.tenantId || !id) return null;
+      const { contractService, contractVersionService, customerService } = await import("@/lib/firestore-service");
+      const contractData = await contractService.getById(user.tenantId, id);
+      if (!contractData) return null;
+      
+      const versions = await contractVersionService.getAll(user.tenantId, id);
+      const customer = contractData.customerId 
+        ? await customerService.getById(user.tenantId, contractData.customerId)
+        : null;
+      
+      const currentVersionId = versions.length > 0 ? versions[0].id : undefined;
+      return {
+        ...contractData,
+        customerName: customer?.name || "",
+        versions,
+        currentVersionId,
+      } as any;
+    },
+    enabled: !!id && !!user?.tenantId,
   });
 
+  const currentVersionId = contract?.currentVersionId || (contract?.versions && contract.versions.length > 0 ? contract.versions[0].id : undefined);
+  
   const { data: performanceObligations, isLoading: poLoading } = useQuery<PerformanceObligationSummary[]>({
-    queryKey: [`/api/contracts/${id}/performance-obligations`],
-    enabled: !!id,
+    queryKey: ["performance-obligations", user?.tenantId, id, currentVersionId],
+    queryFn: async () => {
+      if (!user?.tenantId || !id || !currentVersionId) return [];
+      const { performanceObligationService } = await import("@/lib/firestore-service");
+      return performanceObligationService.getAll(user.tenantId, id, currentVersionId) as any;
+    },
+    enabled: !!id && !!user?.tenantId && !!currentVersionId,
   });
 
   const { data: billingSchedules, isLoading: billingLoading } = useQuery<BillingScheduleWithDetails[]>({
-    queryKey: [`/api/contracts/${id}/billing-schedules`],
-    enabled: !!id,
+    queryKey: ["billing-schedules", user?.tenantId, id],
+    queryFn: async () => {
+      if (!user?.tenantId || !id) return [];
+      const { billingScheduleService } = await import("@/lib/firestore-service");
+      return billingScheduleService.getByContract(user.tenantId, id) as any;
+    },
+    enabled: !!id && !!user?.tenantId,
   });
 
   const { data: ledgerEntries, isLoading: ledgerLoading } = useQuery<LedgerEntryWithDetails[]>({
-    queryKey: [`/api/contracts/${id}/ledger-entries`],
-    enabled: !!id,
+    queryKey: ["ledger-entries", user?.tenantId, id],
+    queryFn: async () => {
+      if (!user?.tenantId || !id) return [];
+      const { revenueLedgerService } = await import("@/lib/firestore-service");
+      return revenueLedgerService.getByContract(user.tenantId, id) as any;
+    },
+    enabled: !!id && !!user?.tenantId,
   });
 
   const { toast } = useToast();
@@ -97,31 +137,36 @@ export default function ContractDetails() {
 
   const createPOMutation = useMutation({
     mutationFn: async (data: POFormValues) => {
+      if (!user?.tenantId || !id || !currentVersionId) throw new Error("Missing data");
       const percentValue = data.percentComplete?.trim() || "0";
       const parsedPercent = parseFloat(percentValue);
+      const { performanceObligationService } = await import("@/lib/firestore-service");
       
-      return apiRequest("POST", `/api/contracts/${id}/performance-obligations`, {
+      return performanceObligationService.create(user.tenantId, id, currentVersionId, {
         description: data.description,
         allocatedPrice: data.allocatedPrice,
         recognitionMethod: data.recognitionMethod,
         measurementMethod: data.measurementMethod || null,
         percentComplete: isNaN(parsedPercent) ? "0" : percentValue,
-      });
+        recognizedAmount: "0",
+        deferredAmount: data.allocatedPrice,
+        isSatisfied: false,
+      } as any);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/contracts/${id}/performance-obligations`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/contracts/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["performance-obligations", user?.tenantId, id] });
+      queryClient.invalidateQueries({ queryKey: ["contract", user?.tenantId, id] });
       setPoDialogOpen(false);
       poForm.reset();
       toast({
-        title: "Success",
-        description: "Performance obligation created successfully",
+        title: "Sucesso",
+        description: "Obrigação de performance criada com sucesso",
       });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: "Failed to create performance obligation",
+        title: "Erro",
+        description: error.message || "Falha ao criar obrigação de performance",
         variant: "destructive",
       });
     },

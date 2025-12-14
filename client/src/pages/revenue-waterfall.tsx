@@ -1,37 +1,66 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  TrendingUp,
-  DollarSign,
-  ArrowRight,
-  FileText,
-  CreditCard,
-  Clock,
-  CheckCircle
+import { useAuth } from "@/lib/auth-firebase";
+import type { ConsolidatedBalanceData } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { endOfMonth, endOfQuarter, endOfYear, format, isWithinInterval, parseISO, startOfMonth, startOfQuarter, startOfYear } from "date-fns";
+import {
+    ArrowRight,
+    CheckCircle,
+    Clock,
+    CreditCard,
+    DollarSign,
+    FileText,
+    TrendingUp
 } from "lucide-react";
-import type { ConsolidatedBalanceData, ContractWithDetails } from "@/lib/types";
-import { format, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, isWithinInterval, parseISO } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, AreaChart, Area, ComposedChart, ReferenceLine } from "recharts";
+import { useMemo, useState } from "react";
+import { Area, AreaChart, Bar, CartesianGrid, Cell, ComposedChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function RevenueWaterfall() {
   const [periodFilter, setPeriodFilter] = useState<string>("all_time");
 
-  const { data: balances, isLoading: balancesLoading } = useQuery<ConsolidatedBalanceData[]>({
-    queryKey: ["/api/consolidated-balances"],
+  const { user } = useAuth();
+  const { data: stats } = useQuery({
+    queryKey: ["dashboard/stats", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return null;
+      const { dashboardService } = await import("@/lib/firestore-service");
+      return dashboardService.getStats(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
 
-  const { data: contracts, isLoading: contractsLoading } = useQuery<ContractWithDetails[]>({
-    queryKey: ["/api/contracts"],
+  const { data: contracts, isLoading: contractsLoading } = useQuery({
+    queryKey: ["contracts", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      const { contractService } = await import("@/lib/firestore-service");
+      return contractService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
+
+  // Generate mock balance data from stats
+  const balances: ConsolidatedBalanceData[] = stats ? [{
+    id: "latest",
+    tenantId: user?.tenantId || "",
+    periodDate: new Date().toISOString(),
+    periodType: "monthly",
+    totalContractAssets: stats.contractAssets || "0",
+    totalContractLiabilities: stats.contractLiabilities || "0",
+    totalRecognizedRevenue: stats.recognizedRevenue || "0",
+    totalDeferredRevenue: stats.deferredRevenue || "0",
+    totalReceivables: "0",
+    createdAt: new Date().toISOString(),
+  }] : [];
+  const balancesLoading = !stats;
 
   const isLoading = balancesLoading || contractsLoading;
 

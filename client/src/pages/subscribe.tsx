@@ -1,24 +1,23 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 import { useI18n } from "@/lib/i18n";
 import {
-  Check,
-  Rocket,
-  Lightning,
-  Buildings,
-  Star,
-  SpinnerGap,
-  ArrowRight,
-  CurrencyDollar,
+    ArrowRight,
+    Buildings,
+    Check,
+    CurrencyDollar,
+    Lightning,
+    Rocket,
+    SpinnerGap,
+    Star,
 } from "@phosphor-icons/react";
+import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { useLocation } from "wouter";
 
 const plans = [
   {
@@ -91,8 +90,15 @@ export default function Subscribe() {
 
   const checkoutMutation = useMutation({
     mutationFn: async (data: { email: string; planId: string }) => {
-      const response = await apiRequest("POST", "/api/subscribe/checkout", data);
-      return response.json();
+      const { stripeService } = await import("@/lib/firestore-service");
+      // Get subscription plans to find priceId for planId
+      const plansResult = await stripeService.getSubscriptionPlans();
+      const plan = plansResult.plans?.find((p: any) => p.id === data.planId || p.name?.toLowerCase() === data.planId.toLowerCase());
+      if (!plan || !plan.priceId) {
+        throw new Error("Plano não encontrado");
+      }
+      const result = await stripeService.createCheckoutSession(plan.priceId, data.email);
+      return result;
     },
     onSuccess: (data) => {
       if (data.url) {

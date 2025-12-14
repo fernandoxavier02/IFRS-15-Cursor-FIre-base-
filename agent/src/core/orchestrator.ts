@@ -118,6 +118,19 @@ export class TestOrchestrator {
   async authenticate(email?: string, password?: string): Promise<boolean> {
     this.ensureInitialized();
 
+    // Check if already authenticated
+    if (this.stateManager.getState().isAuthenticated) {
+      // Verify authentication is still valid by checking current URL
+      const currentUrl = this.controller.getCurrentUrl();
+      // If we're on login page, we're not actually authenticated
+      if (!currentUrl.includes('/login')) {
+        return true; // Already authenticated and session is valid
+      } else {
+        // On login page but marked as authenticated - clear state
+        this.stateManager.clearAuthentication();
+      }
+    }
+
     const credentials = {
       email: email || appConfig.testAdminEmail,
       password: password || appConfig.testAdminPassword,
@@ -184,6 +197,19 @@ export class TestOrchestrator {
 
     // Execute steps
     const stepResults = await this.actionPlanner.executeActions(scenario.steps, {}, true);
+    
+    // If this was a login scenario and it succeeded, mark as authenticated
+    if (scenario.name.toLowerCase().includes('login') && stepResults.every(s => s.success)) {
+      const currentUrl = this.controller.getCurrentUrl();
+      // If we're not on login page anymore, login was successful
+      if (!currentUrl.includes('/login')) {
+        this.stateManager.setAuthenticated({
+          email: appConfig.testAdminEmail,
+          tenantId: 'default',
+          role: 'admin',
+        });
+      }
+    }
     
     // Take screenshot after steps
     try {

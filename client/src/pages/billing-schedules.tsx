@@ -31,7 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-firebase";
 import { billingScheduleService, contractService, customerService } from "@/lib/firestore-service";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import type { BillingScheduleWithDetails, ContractWithDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { BillingSchedule, Contract, Customer } from "@shared/firestore-types";
@@ -200,10 +200,18 @@ export default function BillingSchedules() {
     }));
   }, [contracts, customerMap]);
 
-  // Create billing via Cloud Function API
+  // Create billing via Firestore service
   const createBillingMutation = useMutation({
     mutationFn: async (data: BillingFormValues) => {
-      return apiRequest("POST", "/api/billing-schedules", data);
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      return billingScheduleService.create(user.tenantId, {
+        contractId: data.contractId,
+        billingDate: data.billingDate,
+        amount: data.amount.toString(),
+        currency: data.currency,
+        dueDate: data.dueDate,
+        status: "scheduled",
+      } as any);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["billing-schedules", user?.tenantId] });
@@ -227,6 +235,7 @@ export default function BillingSchedules() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status, invoiceNumber }: { id: string; status: string; invoiceNumber?: string }) => {
+      if (!user?.tenantId) throw new Error("No tenant ID");
       const updateData: Record<string, unknown> = { status };
       if (status === "invoiced") {
         updateData.invoicedAt = new Date().toISOString();
@@ -234,7 +243,7 @@ export default function BillingSchedules() {
       } else if (status === "paid") {
         updateData.paidAt = new Date().toISOString();
       }
-      return apiRequest("PATCH", `/api/billing-schedules/${id}`, updateData);
+      return billingScheduleService.update(user.tenantId, id, updateData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["billing-schedules", user?.tenantId] });

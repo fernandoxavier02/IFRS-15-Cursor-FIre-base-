@@ -31,11 +31,16 @@ db = getFirestore(app);
 functions = getFunctions(app, "us-central1"); // Cloud Functions region
 
 // Connect to emulators in development
-if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true") {
+if (import.meta.env.DEV && (import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true" || import.meta.env.VITE_USE_EMULATORS === "true")) {
   console.log("Connecting to Firebase emulators...");
-  connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
-  connectFirestoreEmulator(db, "localhost", 8080);
-  connectFunctionsEmulator(functions, "localhost", 5001);
+  try {
+    connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
+    connectFirestoreEmulator(db, "localhost", 8080);
+    connectFunctionsEmulator(functions, "localhost", 5001);
+  } catch (error) {
+    // Emulators already connected
+    console.warn("Firebase emulators may already be connected:", error);
+  }
 }
 
 export { app, auth, db, functions };
