@@ -38,14 +38,14 @@ import {
 interface ExecutiveKPIs {
   mrr: number;
   arr: number;
-  nrr: number;
-  grossRetention: number;
-  churnRate: number;
+  nrr: number | null; // null when data not available
+  grossRetention: number | null; // null when data not available
+  churnRate: number | null; // null when data not available
   avgContractValue: number;
   totalCustomers: number;
   newCustomersThisMonth: number;
-  expansionRevenue: number;
-  contractionRevenue: number;
+  expansionRevenue: number | null; // null when data not available
+  contractionRevenue: number | null; // null when data not available
 }
 
 interface KPICardProps {
@@ -183,19 +183,34 @@ export default function ExecutiveDashboard() {
     enabled: !!user?.tenantId,
   });
 
+  // Calculate new customers this month from contracts
+  const newCustomersThisMonth = useMemo(() => {
+    if (!contracts) return 0;
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return contracts.filter((c) => {
+      const createdDate = c.createdAt instanceof Date 
+        ? c.createdAt 
+        : (c.createdAt as any)?.toDate?.() || new Date(c.createdAt);
+      return createdDate >= firstDayOfMonth;
+    }).length;
+  }, [contracts]);
+
   const kpis: ExecutiveKPIs = {
     mrr: Number(stats?.recognizedRevenue ?? 0) / 12,
     arr: Number(stats?.recognizedRevenue ?? 0),
-    nrr: 112,
-    grossRetention: 95,
-    churnRate: 2.5,
+    // NRR, GRR, Churn: not available without backend calculation - will show "Sem dados"
+    nrr: null as any,
+    grossRetention: null as any,
+    churnRate: null as any,
     avgContractValue: contracts?.length 
       ? Number(stats?.totalRevenue ?? 0) / contracts.length 
       : 0,
     totalCustomers: stats?.totalContracts ?? 0,
-    newCustomersThisMonth: 3,
-    expansionRevenue: Number(stats?.recognizedRevenue ?? 0) * 0.15,
-    contractionRevenue: Number(stats?.recognizedRevenue ?? 0) * 0.03,
+    newCustomersThisMonth,
+    // Expansion/Contraction: not available without backend calculation
+    expansionRevenue: null as any,
+    contractionRevenue: null as any,
   };
 
   const revenueBreakdown = [
@@ -203,21 +218,13 @@ export default function ExecutiveDashboard() {
     { name: t("executiveDashboard.deferred"), value: Number(stats?.deferredRevenue ?? 0), color: "hsl(220 85% 55%)" },
   ];
 
-  const retentionData = [
-    { month: t("executiveDashboard.jul"), nrr: 108, grr: 94 },
-    { month: t("executiveDashboard.aug"), nrr: 110, grr: 95 },
-    { month: t("executiveDashboard.sep"), nrr: 111, grr: 94 },
-    { month: t("executiveDashboard.oct"), nrr: 109, grr: 96 },
-    { month: t("executiveDashboard.nov"), nrr: 112, grr: 95 },
-    { month: t("executiveDashboard.dec"), nrr: 114, grr: 96 },
-  ];
+  // Retention data: not available without backend calculation
+  // Will show empty state when no data
+  const retentionData: Array<{ month: string; nrr: number; grr: number }> = [];
 
-  const cohortData = [
-    { cohort: `${t("executiveDashboard.q1")} 2024`, retention30: 98, retention60: 95, retention90: 92 },
-    { cohort: `${t("executiveDashboard.q2")} 2024`, retention30: 97, retention60: 94, retention90: 91 },
-    { cohort: `${t("executiveDashboard.q3")} 2024`, retention30: 99, retention60: 96, retention90: 93 },
-    { cohort: `${t("executiveDashboard.q4")} 2024`, retention30: 98, retention60: 95, retention90: 0 },
-  ];
+  // Cohort data: not available without backend calculation
+  // Will show empty state when no data
+  const cohortData: Array<{ cohort: string; retention30: number; retention60: number; retention90: number }> = [];
 
   const isLoading = statsLoading || revenueLoading;
 
@@ -266,23 +273,44 @@ export default function ExecutiveDashboard() {
           gradient="from-blue-500 to-blue-600 shadow-blue-500/20"
           isLoading={isLoading}
         />
-        <KPICard
-          title={t("executiveDashboard.nrr")}
-          value={`${kpis.nrr}%`}
-          subtitle={t("executiveDashboard.nrrSubtitle")}
-          trend={{ value: 2.1, direction: "up" }}
-          icon={<ArrowsClockwise weight="fill" className="h-6 w-6 text-white" />}
-          gradient="from-purple-500 to-purple-600 shadow-purple-500/20"
-          isLoading={isLoading}
-        />
-        <KPICard
-          title={t("executiveDashboard.grr")}
-          value={`${kpis.grossRetention}%`}
-          subtitle={t("executiveDashboard.grrSubtitle")}
-          icon={<Target weight="fill" className="h-6 w-6 text-white" />}
-          gradient="from-amber-500 to-orange-500 shadow-amber-500/20"
-          isLoading={isLoading}
-        />
+        {kpis.nrr !== null ? (
+          <KPICard
+            title={t("executiveDashboard.nrr")}
+            value={`${kpis.nrr}%`}
+            subtitle={t("executiveDashboard.nrrSubtitle")}
+            icon={<ArrowsClockwise weight="fill" className="h-6 w-6 text-white" />}
+            gradient="from-purple-500 to-purple-600 shadow-purple-500/20"
+            isLoading={isLoading}
+          />
+        ) : (
+          <KPICard
+            title={t("executiveDashboard.nrr")}
+            value="Sem dados"
+            subtitle={t("executiveDashboard.nrrSubtitle")}
+            icon={<ArrowsClockwise weight="fill" className="h-6 w-6 text-white" />}
+            gradient="from-purple-500 to-purple-600 shadow-purple-500/20"
+            isLoading={false}
+          />
+        )}
+        {kpis.grossRetention !== null ? (
+          <KPICard
+            title={t("executiveDashboard.grr")}
+            value={`${kpis.grossRetention}%`}
+            subtitle={t("executiveDashboard.grrSubtitle")}
+            icon={<Target weight="fill" className="h-6 w-6 text-white" />}
+            gradient="from-amber-500 to-orange-500 shadow-amber-500/20"
+            isLoading={isLoading}
+          />
+        ) : (
+          <KPICard
+            title={t("executiveDashboard.grr")}
+            value="Sem dados"
+            subtitle={t("executiveDashboard.grrSubtitle")}
+            icon={<Target weight="fill" className="h-6 w-6 text-white" />}
+            gradient="from-amber-500 to-orange-500 shadow-amber-500/20"
+            isLoading={false}
+          />
+        )}
       </div>
 
       <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
@@ -297,30 +325,52 @@ export default function ExecutiveDashboard() {
         <KPICard
           title={t("executiveDashboard.totalCustomers")}
           value={kpis.totalCustomers}
-          subtitle={`+${kpis.newCustomersThisMonth} ${t("executiveDashboard.newThisMonth")}`}
-          trend={{ value: 5, direction: "up" }}
+          subtitle={kpis.newCustomersThisMonth > 0 
+            ? `+${kpis.newCustomersThisMonth} ${t("executiveDashboard.newThisMonth")}`
+            : t("executiveDashboard.newThisMonth")
+          }
           icon={<UsersThree weight="fill" className="h-6 w-6 text-white" />}
           gradient="from-indigo-500 to-violet-500 shadow-indigo-500/20"
           isLoading={isLoading}
         />
-        <KPICard
-          title={t("executiveDashboard.expansion")}
-          value={formatCurrency(kpis.expansionRevenue)}
-          subtitle={t("executiveDashboard.expansionSubtitle")}
-          trend={{ value: 15, direction: "up" }}
-          icon={<TrendUp weight="fill" className="h-6 w-6 text-white" />}
-          gradient="from-green-500 to-emerald-500 shadow-green-500/20"
-          isLoading={isLoading}
-        />
-        <KPICard
-          title={t("executiveDashboard.churn")}
-          value={`${kpis.churnRate}%`}
-          subtitle={t("executiveDashboard.churnSubtitle")}
-          trend={{ value: 0.5, direction: "down" }}
-          icon={<Percent weight="fill" className="h-6 w-6 text-white" />}
-          gradient="from-red-500 to-rose-500 shadow-red-500/20"
-          isLoading={isLoading}
-        />
+        {kpis.expansionRevenue !== null ? (
+          <KPICard
+            title={t("executiveDashboard.expansion")}
+            value={formatCurrency(kpis.expansionRevenue)}
+            subtitle={t("executiveDashboard.expansionSubtitle")}
+            icon={<TrendUp weight="fill" className="h-6 w-6 text-white" />}
+            gradient="from-green-500 to-emerald-500 shadow-green-500/20"
+            isLoading={isLoading}
+          />
+        ) : (
+          <KPICard
+            title={t("executiveDashboard.expansion")}
+            value="Sem dados"
+            subtitle={t("executiveDashboard.expansionSubtitle")}
+            icon={<TrendUp weight="fill" className="h-6 w-6 text-white" />}
+            gradient="from-green-500 to-emerald-500 shadow-green-500/20"
+            isLoading={false}
+          />
+        )}
+        {kpis.churnRate !== null ? (
+          <KPICard
+            title={t("executiveDashboard.churn")}
+            value={`${kpis.churnRate}%`}
+            subtitle={t("executiveDashboard.churnSubtitle")}
+            icon={<Percent weight="fill" className="h-6 w-6 text-white" />}
+            gradient="from-red-500 to-rose-500 shadow-red-500/20"
+            isLoading={isLoading}
+          />
+        ) : (
+          <KPICard
+            title={t("executiveDashboard.churn")}
+            value="Sem dados"
+            subtitle={t("executiveDashboard.churnSubtitle")}
+            icon={<Percent weight="fill" className="h-6 w-6 text-white" />}
+            gradient="from-red-500 to-rose-500 shadow-red-500/20"
+            isLoading={false}
+          />
+        )}
       </div>
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
@@ -341,7 +391,7 @@ export default function ExecutiveDashboard() {
           <CardContent className="pt-2">
             {isLoading ? (
               <Skeleton className="h-64 w-full rounded-xl" />
-            ) : (
+            ) : retentionData.length > 0 ? (
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={retentionData}>
                   <defs>
@@ -399,6 +449,12 @@ export default function ExecutiveDashboard() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+            ) : (
+              <div className="h-64 flex flex-col items-center justify-center text-muted-foreground gap-3">
+                <ChartLineUp weight="duotone" className="h-12 w-12 text-muted-foreground/30" />
+                <p>Dados de retenção não disponíveis</p>
+                <p className="text-xs">Cálculo de NRR e GRR requer backend adicional</p>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -477,36 +533,46 @@ export default function ExecutiveDashboard() {
             </div>
           </CardHeader>
           <CardContent className="pt-2">
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={cohortData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} />
-                <XAxis
-                  dataKey="cohort"
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  domain={[0, 100]}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `${value}%`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "12px",
-                  }}
-                  formatter={(value: number, name: string) => [`${value}%`, name]}
-                />
-                <Legend />
-                <Bar dataKey="retention30" name={t("executiveDashboard.days30")} fill="hsl(152 76% 45%)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="retention60" name={t("executiveDashboard.days60")} fill="hsl(220 85% 55%)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="retention90" name={t("executiveDashboard.days90")} fill="hsl(270 75% 55%)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {isLoading ? (
+              <Skeleton className="h-64 w-full rounded-xl" />
+            ) : cohortData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={cohortData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} />
+                  <XAxis
+                    dataKey="cohort"
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `${value}%`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "12px",
+                    }}
+                    formatter={(value: number, name: string) => [`${value}%`, name]}
+                  />
+                  <Legend />
+                  <Bar dataKey="retention30" name={t("executiveDashboard.days30")} fill="hsl(152 76% 45%)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="retention60" name={t("executiveDashboard.days60")} fill="hsl(220 85% 55%)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="retention90" name={t("executiveDashboard.days90")} fill="hsl(270 75% 55%)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-64 flex flex-col items-center justify-center text-muted-foreground gap-3">
+                <UsersThree weight="duotone" className="h-12 w-12 text-muted-foreground/30" />
+                <p>Dados de retenção por coorte não disponíveis</p>
+                <p className="text-xs">Cálculo de retenção por coorte requer backend adicional</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

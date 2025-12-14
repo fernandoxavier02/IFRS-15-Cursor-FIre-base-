@@ -23,7 +23,6 @@ import { useAuth } from "@/lib/auth-firebase";
 import { contractService, customerService } from "@/lib/firestore-service";
 import { queryClient } from "@/lib/queryClient";
 import type { Customer } from "@shared/firestore-types";
-import { Timestamp } from "firebase/firestore";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Building2, Globe, Mail, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
