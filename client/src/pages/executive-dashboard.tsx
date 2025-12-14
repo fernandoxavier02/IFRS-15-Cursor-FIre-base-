@@ -149,23 +149,64 @@ export default function ExecutiveDashboard() {
     enabled: !!user?.tenantId,
   });
 
+  // Fetch real revenue trend from revenue ledger entries
+  // Group by month to build time series
   const { data: revenueData, isLoading: revenueLoading } = useQuery<RevenueByPeriod[]>({
     queryKey: ["dashboard/revenue-trend", user?.tenantId],
     queryFn: async () => {
-      // Use stats data to generate trend (simplified)
-      if (!stats) return [];
-      const baseRecognized = Number(stats.recognizedRevenue || 0);
-      const baseDeferred = Number(stats.deferredRevenue || 0);
-      return [
-        { period: "Jan", recognized: baseRecognized * 0.8, deferred: baseDeferred * 1.2 },
-        { period: "Feb", recognized: baseRecognized * 0.85, deferred: baseDeferred * 1.15 },
-        { period: "Mar", recognized: baseRecognized * 0.9, deferred: baseDeferred * 1.1 },
-        { period: "Apr", recognized: baseRecognized * 0.95, deferred: baseDeferred * 1.05 },
-        { period: "May", recognized: baseRecognized, deferred: baseDeferred },
-        { period: "Jun", recognized: baseRecognized * 1.05, deferred: baseDeferred * 0.95 },
-      ];
+      if (!user?.tenantId) return [];
+      try {
+        const { revenueLedgerService } = await import("@/lib/firestore-service");
+        const entries = await revenueLedgerService.getAll(user.tenantId);
+        
+        if (entries.length === 0) return [];
+        
+        // Group entries by month
+        const monthlyData = new Map<string, { recognized: number; deferred: number }>();
+        
+        entries.forEach((entry) => {
+          // Handle Firestore Timestamp
+          const entryDate = entry.entryDate instanceof Date 
+            ? entry.entryDate 
+            : (entry.entryDate as any)?.toDate?.() || new Date(entry.entryDate as any);
+          
+          const monthKey = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, "0")}`;
+          const monthLabel = entryDate.toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
+          
+          if (!monthlyData.has(monthKey)) {
+            monthlyData.set(monthKey, { recognized: 0, deferred: 0 });
+          }
+          
+          const data = monthlyData.get(monthKey)!;
+          
+          // Sum recognized and deferred based on entry type
+          if (entry.entryType === "revenue_recognition") {
+            data.recognized += Number(entry.amount || 0);
+          } else if (entry.entryType === "deferred_revenue") {
+            data.deferred += Number(entry.amount || 0);
+          }
+        });
+        
+        // Convert to array and sort by date
+        return Array.from(monthlyData.entries())
+          .map(([key, data]) => ({
+            period: key,
+            recognized: data.recognized,
+            deferred: data.deferred,
+          }))
+          .sort((a, b) => a.period.localeCompare(b.period))
+          .slice(-12) // Last 12 months
+          .map((item) => ({
+            period: new Date(item.period + "-01").toLocaleDateString("pt-BR", { month: "short" }),
+            recognized: item.recognized,
+            deferred: item.deferred,
+          }));
+      } catch (error) {
+        console.warn("Failed to load revenue trend, returning empty:", error);
+        return [];
+      }
     },
-    enabled: !!stats,
+    enabled: !!user?.tenantId,
   });
 
   const { data: contracts } = useQuery<Contract[]>({
@@ -185,16 +226,24 @@ export default function ExecutiveDashboard() {
   });
 
   // Calculate new customers this month from contracts
+  // Note: Using contract creation date as proxy for new customers
   const newCustomersThisMonth = useMemo(() => {
-    if (!contracts) return 0;
+    if (!contracts || contracts.length === 0) return 0;
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    return contracts.filter((c) => {
-      const createdDate = c.createdAt instanceof Date 
-        ? c.createdAt 
-        : (c.createdAt as any)?.toDate?.() || new Date(c.createdAt);
-      return createdDate >= firstDayOfMonth;
-    }).length;
+    try {
+      return contracts.filter((c) => {
+        // Contract may have createdAt as Timestamp or Date
+        const createdDate = (c as any).createdAt 
+          ? ((c as any).createdAt instanceof Date 
+              ? (c as any).createdAt 
+              : (c as any).createdAt?.toDate?.() || new Date((c as any).createdAt))
+          : null;
+        return createdDate && createdDate >= firstDayOfMonth;
+      }).length;
+    } catch {
+      return 0;
+    }
   }, [contracts]);
 
   const kpis: ExecutiveKPIs = {

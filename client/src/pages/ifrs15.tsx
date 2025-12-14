@@ -120,10 +120,18 @@ export default function IFRS15Engine() {
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["consolidatedBalances"] });
+      
+      // Display results from engine
+      const recognized = result?.totalRecognizedRevenue || result?.recognizedRevenue || 0;
+      const deferred = result?.totalDeferredRevenue || result?.deferredRevenue || 0;
+      const message = recognized > 0 || deferred > 0
+        ? `IFRS 15 Engine processou o contrato. Receita reconhecida: R$ ${Number(recognized).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} | Receita diferida: R$ ${Number(deferred).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+        : "IFRS 15 Engine processou o contrato. Nenhum resultado disponível ainda - verifique as obrigações de performance.";
       
       toast({
         title: "Reconhecimento de receita completo",
-        description: `IFRS 15 Engine processou o contrato. Receita reconhecida: R$ ${result?.totalRecognizedRevenue?.toLocaleString() || 0}`,
+        description: message,
       });
 
       // Reload obligations

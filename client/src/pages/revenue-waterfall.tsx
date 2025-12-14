@@ -8,8 +8,8 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-firebase";
-import type { ConsolidatedBalanceData } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
+import type { ConsolidatedBalance } from "@shared/firestore-types";
 import { endOfMonth, endOfQuarter, endOfYear, format, isWithinInterval, parseISO, startOfMonth, startOfQuarter, startOfYear } from "date-fns";
 import {
     ArrowRight,
@@ -27,12 +27,42 @@ export default function RevenueWaterfall() {
   const [periodFilter, setPeriodFilter] = useState<string>("all_time");
 
   const { user } = useAuth();
-  const { data: stats } = useQuery({
-    queryKey: ["dashboard/stats", user?.tenantId],
+  
+  // Fetch real consolidated balances from Firestore
+  const { data: balances, isLoading: balancesLoading } = useQuery({
+    queryKey: ["consolidatedBalances", user?.tenantId, periodFilter],
     queryFn: async () => {
-      if (!user?.tenantId) return null;
-      const { dashboardService } = await import("@/lib/firestore-service");
-      return dashboardService.getStats(user.tenantId);
+      if (!user?.tenantId) return [];
+      const { consolidatedBalanceService } = await import("@/lib/firestore-service");
+      
+      // Get balances based on period filter
+      const now = new Date();
+      let startDate: Date | null = null;
+      let endDate: Date | null = null;
+      
+      switch (periodFilter) {
+        case "current_month":
+          startDate = startOfMonth(now);
+          endDate = endOfMonth(now);
+          break;
+        case "current_quarter":
+          startDate = startOfQuarter(now);
+          endDate = endOfQuarter(now);
+          break;
+        case "current_year":
+          startDate = startOfYear(now);
+          endDate = endOfYear(now);
+          break;
+        default:
+          // All time - get all balances
+          return consolidatedBalanceService.getAll(user.tenantId);
+      }
+      
+      if (startDate && endDate) {
+        return consolidatedBalanceService.getByPeriod(user.tenantId, startDate, endDate);
+      }
+      
+      return consolidatedBalanceService.getAll(user.tenantId);
     },
     enabled: !!user?.tenantId,
   });
@@ -46,21 +76,6 @@ export default function RevenueWaterfall() {
     },
     enabled: !!user?.tenantId,
   });
-
-  // Generate mock balance data from stats
-  const balances: ConsolidatedBalanceData[] = stats ? [{
-    id: "latest",
-    tenantId: user?.tenantId || "",
-    periodDate: new Date().toISOString(),
-    periodType: "monthly",
-    totalContractAssets: stats.contractAssets || "0",
-    totalContractLiabilities: stats.contractLiabilities || "0",
-    totalRecognizedRevenue: stats.recognizedRevenue || "0",
-    totalDeferredRevenue: stats.deferredRevenue || "0",
-    totalReceivables: "0",
-    createdAt: new Date().toISOString(),
-  }] : [];
-  const balancesLoading = !stats;
 
   const isLoading = balancesLoading || contractsLoading;
 
@@ -95,19 +110,22 @@ export default function RevenueWaterfall() {
       });
 
       balancesInRange = balances.filter(b => {
-        const periodDate = parseISO(b.periodDate);
+        // Handle Firestore Timestamp
+        const periodDate = b.periodDate instanceof Date 
+          ? b.periodDate 
+          : (b.periodDate as any)?.toDate?.() || parseISO(b.periodDate as any);
         return isWithinInterval(periodDate, { start: dateRange.start, end: dateRange.end });
       });
     }
 
     const aggregated = balancesInRange.length > 0 ? {
-      totalBilledAmount: balancesInRange.reduce((sum, b) => sum + Number(b.totalBilledAmount), 0),
-      totalDeferredRevenue: balancesInRange[0] ? Number(balancesInRange[0].totalDeferredRevenue) : 0,
-      totalRecognizedRevenue: balancesInRange.reduce((sum, b) => sum + Number(b.totalRecognizedRevenue), 0),
-      totalReceivables: balancesInRange[0] ? Number(balancesInRange[0].totalReceivables) : 0,
-      totalCashReceived: balancesInRange.reduce((sum, b) => sum + Number(b.totalCashReceived), 0),
-      totalContractAssets: balancesInRange[0] ? Number(balancesInRange[0].totalContractAssets) : 0,
-      totalContractLiabilities: balancesInRange[0] ? Number(balancesInRange[0].totalContractLiabilities) : 0,
+      totalBilledAmount: balancesInRange.reduce((sum, b) => sum + Number(b.totalBilledAmount || 0), 0),
+      totalDeferredRevenue: balancesInRange[0] ? Number(balancesInRange[0].totalDeferredRevenue || 0) : 0,
+      totalRecognizedRevenue: balancesInRange.reduce((sum, b) => sum + Number(b.totalRecognizedRevenue || 0), 0),
+      totalReceivables: balancesInRange[0] ? Number(balancesInRange[0].totalReceivables || 0) : 0,
+      totalCashReceived: balancesInRange.reduce((sum, b) => sum + Number(b.totalCashReceived || 0), 0),
+      totalContractAssets: balancesInRange[0] ? Number(balancesInRange[0].totalContractAssets || 0) : 0,
+      totalContractLiabilities: balancesInRange[0] ? Number(balancesInRange[0].totalContractLiabilities || 0) : 0,
     } : null;
 
     return { filteredContracts: contractsInRange, aggregatedBalance: aggregated };
@@ -192,16 +210,27 @@ export default function RevenueWaterfall() {
     },
   ];
 
-  const chartData = (balances || [])
-    .slice()
-    .reverse()
-    .map((balance) => ({
-      period: format(new Date(balance.periodDate), "MMM yyyy"),
-      billed: Number(balance.totalBilledAmount),
-      deferred: Number(balance.totalDeferredRevenue),
-      recognized: Number(balance.totalRecognizedRevenue),
-      cash: Number(balance.totalCashReceived),
-    }));
+  const chartData = useMemo(() => {
+    if (!balances || balances.length === 0) return [];
+    
+    return balances
+      .slice()
+      .reverse()
+      .map((balance) => {
+        // Handle Firestore Timestamp
+        const periodDate = balance.periodDate instanceof Date 
+          ? balance.periodDate 
+          : (balance.periodDate as any)?.toDate?.() || new Date(balance.periodDate as any);
+        
+        return {
+          period: format(periodDate, "MMM yyyy"),
+          billed: Number(balance.totalBilledAmount || 0),
+          deferred: Number(balance.totalDeferredRevenue || 0),
+          recognized: Number(balance.totalRecognizedRevenue || 0),
+          cash: Number(balance.totalCashReceived || 0),
+        };
+      });
+  }, [balances]);
 
   const formatCurrency = (value: number) => `BRL ${value.toLocaleString()}`;
 
@@ -526,7 +555,7 @@ export default function RevenueWaterfall() {
         </Card>
       </div>
 
-      {chartData.length > 0 && (
+      {chartData.length > 0 ? (
         <Card data-testid="card-revenue-over-time">
           <CardHeader>
             <CardTitle className="text-lg">Revenue Flow Over Time</CardTitle>
@@ -586,7 +615,20 @@ export default function RevenueWaterfall() {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : !isLoading && balances && balances.length === 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Revenue Flow Over Time</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80 flex flex-col items-center justify-center text-muted-foreground gap-3">
+              <TrendingUp className="h-12 w-12 text-muted-foreground/30" />
+              <p>Dados de receita consolidada não disponíveis</p>
+              <p className="text-xs">Execute o cálculo IFRS 15 para gerar dados consolidados</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card data-testid="card-balance-summary">
         <CardHeader>

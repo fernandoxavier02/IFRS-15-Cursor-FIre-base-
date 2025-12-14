@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-firebase";
 import { tenantService } from "@/lib/firestore-service";
+import { useQuery } from "@tanstack/react-query";
 
 export interface PlanInfo {
   planType: "starter" | "professional" | "enterprise";
