@@ -6,7 +6,6 @@ import { useAuth } from "@/lib/auth-firebase";
 import { useI18n } from "@/lib/i18n";
 import type { Contract, DashboardStats, RevenueByPeriod } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { LedgerEntryType } from "@shared/firestore-types";
 import {
     ArrowsClockwise,
     ChartBar,
@@ -19,6 +18,7 @@ import {
     TrendUp,
     UsersThree
 } from "@phosphor-icons/react";
+import { LedgerEntryType } from "@shared/firestore-types";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import {

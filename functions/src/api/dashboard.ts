@@ -1,7 +1,7 @@
+import { LedgerEntryType } from "@shared/firestore-types";
 import cors from "cors";
 import express from "express";
 import * as functions from "firebase-functions";
-import { LedgerEntryType } from "@shared/firestore-types";
 import { db } from "../utils/admin";
 import { AuthenticatedRequest, requireTenant, verifyAuth } from "../utils/auth-middleware";
 import { COLLECTIONS, tenantCollection } from "../utils/collections";
