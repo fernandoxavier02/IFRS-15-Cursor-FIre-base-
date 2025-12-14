@@ -24,10 +24,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-firebase";
 import { contractService, customerService } from "@/lib/firestore-service";
 import { useI18n } from "@/lib/i18n";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import type { ContractWithDetails } from "@/lib/types";
 import type { Contract, Customer } from "@shared/firestore-types";
-import { toISOString } from "@shared/firestore-types";
+import { ContractStatus, toISOString } from "@shared/firestore-types";
+import { Timestamp } from "firebase/firestore";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Calendar, FileText, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -99,12 +100,23 @@ export default function Contracts() {
     }));
   }, [contracts, customerMap]);
 
-  // Create contract via Cloud Function API
+  // Create contract via Firestore service
   const createContractMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return apiRequest("POST", "/api/contracts", {
-        ...data,
+      if (!user?.tenantId) throw new Error("User tenant ID is required");
+      if (!data.customerId) throw new Error("Customer is required");
+      if (!data.startDate) throw new Error("Start date is required");
+      
+      return contractService.create(user.tenantId, {
+        customerId: data.customerId,
+        contractNumber: data.contractNumber,
+        title: data.title,
+        status: ContractStatus.DRAFT,
+        startDate: Timestamp.fromDate(new Date(data.startDate)),
+        endDate: data.endDate ? Timestamp.fromDate(new Date(data.endDate)) : undefined,
         totalValue: parseFloat(data.totalValue) || 0,
+        currency: data.currency,
+        paymentTerms: data.paymentTerms || undefined,
       });
     },
     onSuccess: () => {
@@ -130,7 +142,7 @@ export default function Contracts() {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to create contract",
         variant: "destructive",
       });
     },

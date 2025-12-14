@@ -21,8 +21,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-firebase";
 import { contractService, customerService } from "@/lib/firestore-service";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import type { Customer } from "@shared/firestore-types";
+import { Timestamp } from "firebase/firestore";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Building2, Globe, Mail, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -89,10 +90,20 @@ export default function Customers() {
     });
   }, [customers, contracts]);
 
-  // Create customer via Cloud Function API
+  // Create customer via Firestore service
   const createCustomerMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return apiRequest("POST", "/api/customers", data);
+      if (!user?.tenantId) throw new Error("User tenant ID is required");
+      return customerService.create(user.tenantId, {
+        name: data.name,
+        country: data.country,
+        currency: data.currency,
+        taxId: data.taxId || undefined,
+        creditRating: data.creditRating || undefined,
+        contactEmail: data.contactEmail || undefined,
+        contactPhone: data.contactPhone || undefined,
+        billingAddress: data.billingAddress || undefined,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers", user?.tenantId] });
@@ -116,7 +127,7 @@ export default function Customers() {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to create customer",
         variant: "destructive",
       });
     },
