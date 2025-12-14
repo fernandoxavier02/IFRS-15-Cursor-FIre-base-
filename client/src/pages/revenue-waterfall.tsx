@@ -9,7 +9,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-firebase";
 import { useQuery } from "@tanstack/react-query";
-import type { ConsolidatedBalance } from "@shared/firestore-types";
 import { endOfMonth, endOfQuarter, endOfYear, format, isWithinInterval, parseISO, startOfMonth, startOfQuarter, startOfYear } from "date-fns";
 import {
     ArrowRight,

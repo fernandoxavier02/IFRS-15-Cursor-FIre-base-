@@ -67,6 +67,14 @@
       ]
     },
     {
+      "collectionGroup": "revenueLedgerEntries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "entryDate", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "licenses",
       "queryScope": "COLLECTION",
       "fields": [
@@ -96,6 +104,30 @@
       "fields": [
         { "fieldPath": "tenantId", "order": "ASCENDING" },
         { "fieldPath": "periodDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consolidatedBalances",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "periodDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "consolidatedBalances",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "periodDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "revenueLedgerEntries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "entryDate", "order": "ASCENDING" }
       ]
     },
     {
