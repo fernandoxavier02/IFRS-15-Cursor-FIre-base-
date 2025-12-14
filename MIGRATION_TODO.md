@@ -163,7 +163,7 @@
 | E | Segurança/onboarding | ✅ Completo |
 | F | UX mínima | ✅ Completo |
 | G | Segurança crítica | ✅ Completo |
-| H | Testes | ⏳ Pendente |
+| H | Testes | ✅ Executados |
 
 ---
 
@@ -194,6 +194,21 @@
 - ✅ Adicionado scroll horizontal em tabelas de permissões (`settings.tsx`)
 - ✅ Adicionado scroll horizontal em totais de contratos (`ifrs15-accounting-control.tsx`)
 - ✅ Adicionado responsividade em formulário de ledger (`revenue-ledger.tsx`)
+
+### Parte H - Testes Automatizados
+
+**Resultados (14 dez 2024):**
+- ✅ **9/14 testes passaram (64%)**
+- ✅ Login funciona corretamente
+- ✅ Navegação entre páginas funciona
+- ✅ Smoke tests de páginas IFRS15 (waterfall, costs, forex, financing) passaram
+- ⚠️ CRUD (customer/contract): Toast não aparece - verificar permissões Firestore
+- ⚠️ Algumas páginas têm erros de console (executive-dashboard, accounting-control, reports)
+
+**Próximos passos para 100%:**
+1. Verificar regras de segurança do Firestore para operações de escrita
+2. Investigar erros de console nas páginas afetadas
+3. Verificar se `dashboardService.getStats()` retorna dados corretamente
 
 ---
 
