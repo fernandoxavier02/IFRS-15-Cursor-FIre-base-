@@ -56,16 +56,17 @@ export default function IFRS15AccountingControl() {
   const [selectedMonth, setSelectedMonth] = useState((currentDate.getMonth() + 1).toString().padStart(2, "0"));
 
   const { user } = useAuth();
-  const { data, isLoading } = useQuery<AccountingControlData>({
+  const { data, isLoading } = useQuery<AccountingControlData | null>({
     queryKey: ["ifrs15-accounting-control", user?.tenantId, selectedYear, selectedMonth],
     queryFn: async () => {
       if (!user?.tenantId) return null;
-      // Generate accounting control data from contract balances
-      const { reportsService } = await import("@/lib/firestore-service");
-      const periodEnd = `${selectedYear}-${selectedMonth}-${new Date(parseInt(selectedYear), parseInt(selectedMonth), 0).getDate()}`;
-      const balances = await reportsService.generateContractBalances(periodEnd);
-      // Transform to accounting control format
-      const contracts = (balances as any)?.contracts || [];
+      try {
+        // Generate accounting control data from contract balances
+        const { reportsService } = await import("@/lib/firestore-service");
+        const periodEnd = `${selectedYear}-${selectedMonth}-${new Date(parseInt(selectedYear), parseInt(selectedMonth), 0).getDate()}`;
+        const balances = await reportsService.generateContractBalances(periodEnd);
+        // Transform to accounting control format
+        const contracts = (balances as any)?.contracts || [];
       const assets = contracts
         .filter((c: any) => Number(c.contractAsset || 0) > 0)
         .map((c: any) => ({
@@ -112,6 +113,24 @@ export default function IFRS15AccountingControl() {
         totalLiabilityMovement: liabilities.reduce((sum: number, l: any) => sum + l.movement, 0),
         totalLiabilityClosing: liabilities.reduce((sum: number, l: any) => sum + l.closingBalance, 0),
       } as any;
+      } catch (error) {
+        console.warn("Failed to load accounting control data:", error);
+        return {
+          period: `${selectedYear}-${selectedMonth}`,
+          contractAssets: [],
+          contractLiabilities: [],
+          totalAssetOpening: 0,
+          totalAssetDebits: 0,
+          totalAssetCredits: 0,
+          totalAssetMovement: 0,
+          totalAssetClosing: 0,
+          totalLiabilityOpening: 0,
+          totalLiabilityDebits: 0,
+          totalLiabilityCredits: 0,
+          totalLiabilityMovement: 0,
+          totalLiabilityClosing: 0,
+        };
+      }
     },
     enabled: !!user?.tenantId,
   });

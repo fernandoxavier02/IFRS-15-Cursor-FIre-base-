@@ -56,19 +56,40 @@ export default function Reports() {
 
   const { data: disaggregatedRevenue, isLoading: disaggLoading } = useQuery({
     queryKey: ["reports", "disaggregated", selectedPeriod],
-    queryFn: () => reportsService.generateDisaggregatedRevenue(periodStart, periodEnd),
+    queryFn: async () => {
+      try {
+        return await reportsService.generateDisaggregatedRevenue(periodStart, periodEnd);
+      } catch (error) {
+        console.warn("Failed to load disaggregated revenue:", error);
+        return { byCategory: [], byTiming: [] };
+      }
+    },
     enabled: !!user?.tenantId,
   });
 
   const { data: contractBalances, isLoading: balancesLoading } = useQuery({
     queryKey: ["reports", "balances", selectedPeriod],
-    queryFn: () => reportsService.generateContractBalances(periodEnd),
+    queryFn: async () => {
+      try {
+        return await reportsService.generateContractBalances(periodEnd);
+      } catch (error) {
+        console.warn("Failed to load contract balances:", error);
+        return { contracts: [], totals: {} };
+      }
+    },
     enabled: !!user?.tenantId,
   });
 
   const { data: remainingObligations, isLoading: obligationsLoading } = useQuery({
     queryKey: ["reports", "obligations"],
-    queryFn: () => reportsService.generateRemainingObligations(),
+    queryFn: async () => {
+      try {
+        return await reportsService.generateRemainingObligations();
+      } catch (error) {
+        console.warn("Failed to load remaining obligations:", error);
+        return { obligations: [], total: 0 };
+      }
+    },
     enabled: !!user?.tenantId,
   });
 

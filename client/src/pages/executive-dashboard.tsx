@@ -125,12 +125,25 @@ export default function ExecutiveDashboard() {
   const { t } = useI18n();
 
   const { user } = useAuth();
-  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats | null>({
     queryKey: ["dashboard/stats", user?.tenantId],
     queryFn: async () => {
       if (!user?.tenantId) return null;
-      const { dashboardService } = await import("@/lib/firestore-service");
-      return dashboardService.getStats(user.tenantId) as any;
+      try {
+        const { dashboardService } = await import("@/lib/firestore-service");
+        return await dashboardService.getStats(user.tenantId);
+      } catch (error) {
+        console.warn("Failed to load dashboard stats:", error);
+        return {
+          totalContracts: 0,
+          activeContracts: 0,
+          totalRevenue: 0,
+          recognizedRevenue: 0,
+          deferredRevenue: 0,
+          activeLicenses: 0,
+          licensesInUse: 0,
+        };
+      }
     },
     enabled: !!user?.tenantId,
   });
