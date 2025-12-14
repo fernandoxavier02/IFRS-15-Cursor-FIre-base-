@@ -16,8 +16,8 @@ export type ValidationType =
 
 export interface ValidationRule {
   type: ValidationType;
-  // For URL validation
-  expected?: string | RegExp;
+  // For URL validation - supports string, RegExp, or array of strings
+  expected?: string | RegExp | string[];
   // For element validation
   selector?: string;
   state?: 'visible' | 'hidden' | 'enabled' | 'disabled';
@@ -140,8 +140,13 @@ export class ResultValidator {
 
     if (rule.expected instanceof RegExp) {
       passed = rule.expected.test(currentUrl);
+    } else if (Array.isArray(rule.expected)) {
+      // Check if current URL matches any of the expected URLs
+      passed = rule.expected.some(expected => 
+        currentUrl.includes(expected) || currentUrl === expected || currentUrl.endsWith(expected)
+      );
     } else if (typeof rule.expected === 'string') {
-      passed = currentUrl.includes(rule.expected) || currentUrl === rule.expected;
+      passed = currentUrl.includes(rule.expected) || currentUrl === rule.expected || currentUrl.endsWith(rule.expected);
     }
 
     return {
@@ -151,7 +156,7 @@ export class ResultValidator {
       expected: rule.expected,
       message: passed 
         ? `URL matches expected pattern`
-        : `URL mismatch: expected "${rule.expected}", got "${currentUrl}"`,
+        : `URL mismatch: expected ${Array.isArray(rule.expected) ? `one of [${rule.expected.join(', ')}]` : `"${rule.expected}"`}, got "${currentUrl}"`,
       duration: Date.now() - startTime,
     };
   }

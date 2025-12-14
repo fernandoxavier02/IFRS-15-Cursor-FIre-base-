@@ -93,7 +93,25 @@ export class PlaywrightController {
   async navigate(url: string): Promise<void> {
     const page = this.getPage();
     const fullUrl = url.startsWith('http') ? url : `${appConfig.appUrl}${url}`;
-    await page.goto(fullUrl, { waitUntil: 'networkidle' });
+    // Use 'domcontentloaded' first, then wait for network idle separately
+    // This is more tolerant for Firebase hosting which may have many network requests
+    try {
+      await page.goto(fullUrl, { 
+        waitUntil: 'domcontentloaded',
+        timeout: testConfig.timeouts.navigation 
+      });
+      // Wait a bit for initial load, then check for network idle with shorter timeout
+      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+        // If networkidle times out, that's okay - page is likely loaded
+      });
+    } catch (error) {
+      // If domcontentloaded fails, try with load state
+      await page.goto(fullUrl, { 
+        waitUntil: 'load',
+        timeout: testConfig.timeouts.navigation 
+      });
+    }
   }
 
   /**
@@ -112,11 +130,53 @@ export class PlaywrightController {
 
   /**
    * Wait for navigation to complete
+   * Supports single URL string or array of possible URLs
    */
-  async waitForNavigation(url?: string): Promise<void> {
+  async waitForNavigation(url?: string | string[]): Promise<void> {
     const page = this.getPage();
     if (url) {
-      await page.waitForURL(url.startsWith('http') ? url : `${appConfig.appUrl}${url}`);
+      if (Array.isArray(url)) {
+        // Wait for any of the URLs - try each one with a shorter timeout
+        const urlPatterns = url.map(u => 
+          u.startsWith('http') ? u : `${appConfig.appUrl}${u}`
+        );
+        
+        // Wait a bit for navigation to start
+        await page.waitForTimeout(1000);
+        
+        // Check current URL against expected patterns
+        const currentUrl = this.getCurrentUrl();
+        const matches = urlPatterns.some(pattern => {
+          const patternPath = pattern.replace(appConfig.appUrl, '');
+          return currentUrl.includes(patternPath) || currentUrl.endsWith(patternPath) || currentUrl === pattern;
+        });
+        
+        if (!matches) {
+          // Wait a bit more and check again
+          await page.waitForTimeout(2000);
+          const finalUrl = this.getCurrentUrl();
+          const finalMatches = urlPatterns.some(pattern => {
+            const patternPath = pattern.replace(appConfig.appUrl, '');
+            return finalUrl.includes(patternPath) || finalUrl.endsWith(patternPath) || finalUrl === pattern;
+          });
+          
+          if (!finalMatches) {
+            // Try waiting for network idle and check one more time
+            await page.waitForLoadState('networkidle');
+            const lastUrl = this.getCurrentUrl();
+            const lastMatches = urlPatterns.some(pattern => {
+              const patternPath = pattern.replace(appConfig.appUrl, '');
+              return lastUrl.includes(patternPath) || lastUrl.endsWith(patternPath) || lastUrl === pattern;
+            });
+            
+            if (!lastMatches) {
+              throw new Error(`Navigation did not reach any expected URL. Current: ${lastUrl}, Expected: ${url.join(', ')}`);
+            }
+          }
+        }
+      } else {
+        await page.waitForURL(url.startsWith('http') ? url : `${appConfig.appUrl}${url}`);
+      }
     } else {
       await page.waitForLoadState('networkidle');
     }

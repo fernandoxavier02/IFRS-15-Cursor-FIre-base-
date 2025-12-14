@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-firebase";
 import { licenseService } from "@/lib/firestore-service";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import type { LicenseWithSession } from "@/lib/types";
 import type { License } from "@shared/firestore-types";
 import { toISOString } from "@shared/firestore-types";
@@ -75,7 +75,8 @@ export default function Licenses() {
 
   const releaseMutation = useMutation({
     mutationFn: async (licenseId: string) => {
-      return apiRequest("POST", `/api/licenses/${licenseId}/release`);
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      return licenseService.release(user.tenantId, licenseId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["licenses", user?.tenantId] });
@@ -98,7 +99,8 @@ export default function Licenses() {
 
   const suspendMutation = useMutation({
     mutationFn: async (licenseId: string) => {
-      return apiRequest("POST", `/api/licenses/${licenseId}/suspend`);
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      return licenseService.suspend(user.tenantId, licenseId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["licenses", user?.tenantId] });
@@ -121,7 +123,8 @@ export default function Licenses() {
 
   const revokeMutation = useMutation({
     mutationFn: async (licenseId: string) => {
-      return apiRequest("POST", `/api/licenses/${licenseId}/revoke`);
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      return licenseService.revoke(user.tenantId, licenseId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["licenses", user?.tenantId] });

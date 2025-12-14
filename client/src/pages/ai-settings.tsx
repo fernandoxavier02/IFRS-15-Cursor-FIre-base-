@@ -1,48 +1,46 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
-import {
-  Brain,
-  Plus,
-  Trash,
-  Check,
-  Key,
-  Sparkle,
-  Robot,
-  CircleNotch,
-  ShieldCheck,
-  Star,
-} from "@phosphor-icons/react";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
 import { usePlan } from "@/hooks/use-plan";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-firebase";
+import { aiProviderConfigService } from "@/lib/firestore-service";
+import { queryClient } from "@/lib/queryClient";
+import {
+    Brain,
+    Check,
+    CircleNotch,
+    Key,
+    Plus,
+    Robot,
+    ShieldCheck,
+    Sparkle,
+    Star,
+    Trash,
+} from "@phosphor-icons/react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
-async function jsonRequest(method: string, url: string, data?: unknown) {
-  const res = await apiRequest(method, url, data);
-  return res.json();
-}
 
 interface AiProviderConfig {
   id: string;
@@ -74,6 +72,7 @@ const providerLogos: Record<string, { icon: typeof Robot; color: string }> = {
 
 export default function AiSettings() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { planInfo, isLoading: planLoading, features } = usePlan();
   const hasAiIngestion = features.hasCustomIntegrations; // AI features require Enterprise (custom integrations)
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -87,22 +86,50 @@ export default function AiSettings() {
     isDefault: false,
   });
 
-  const { data: providers, isLoading: providersLoading } = useQuery<AiProviderConfig[]>({
-    queryKey: ["/api/ai/providers"],
-    enabled: hasAiIngestion,
+  const { data: providers, isLoading: providersLoading } = useQuery({
+    queryKey: ["ai-providers", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId || !hasAiIngestion) return [];
+      const configs = await aiProviderConfigService.getAll(user.tenantId);
+      // Convert baseUrl from null to undefined for compatibility
+      return configs.map(c => ({
+        ...c,
+        baseUrl: c.baseUrl === null ? undefined : c.baseUrl,
+      }));
+    },
+    enabled: hasAiIngestion && !!user?.tenantId,
   });
 
   const { data: availableModels } = useQuery<AiModel[]>({
-    queryKey: ["/api/ai/models"],
+    queryKey: ["ai-models"],
+    queryFn: async () => {
+      // Return static list of available models
+      return [
+        { id: "gpt-4", name: "GPT-4", provider: "openai", capabilities: ["text", "analysis"] },
+        { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", provider: "openai", capabilities: ["text"] },
+        { id: "claude-3-opus", name: "Claude 3 Opus", provider: "anthropic", capabilities: ["text", "analysis"] },
+        { id: "claude-3-sonnet", name: "Claude 3 Sonnet", provider: "anthropic", capabilities: ["text"] },
+        { id: "gemini-pro", name: "Gemini Pro", provider: "google", capabilities: ["text", "analysis"] },
+      ];
+    },
     enabled: hasAiIngestion,
   });
 
   const createProviderMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return jsonRequest("POST", "/api/ai/providers", data);
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      return aiProviderConfigService.create(user.tenantId, {
+        provider: data.provider as any,
+        name: data.name,
+        apiKey: data.apiKey,
+        model: data.model,
+        baseUrl: data.baseUrl || null,
+        isDefault: data.isDefault,
+        isActive: true,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ai/providers"] });
+      queryClient.invalidateQueries({ queryKey: ["ai-providers", user?.tenantId] });
       setDialogOpen(false);
       resetForm();
       toast({
@@ -121,10 +148,18 @@ export default function AiSettings() {
 
   const updateProviderMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<typeof formData> }) => {
-      return jsonRequest("PATCH", `/api/ai/providers/${id}`, data);
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      const updateData: any = {};
+      if (data.provider) updateData.provider = data.provider;
+      if (data.name) updateData.name = data.name;
+      if (data.apiKey) updateData.apiKey = data.apiKey;
+      if (data.model) updateData.model = data.model;
+      if (data.baseUrl !== undefined) updateData.baseUrl = data.baseUrl || null;
+      if (data.isDefault !== undefined) updateData.isDefault = data.isDefault;
+      return aiProviderConfigService.update(user.tenantId, id, updateData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ai/providers"] });
+      queryClient.invalidateQueries({ queryKey: ["ai-providers", user?.tenantId] });
       setDialogOpen(false);
       setEditingProvider(null);
       resetForm();
@@ -144,10 +179,11 @@ export default function AiSettings() {
 
   const deleteProviderMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/ai/providers/${id}`);
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      return aiProviderConfigService.delete(user.tenantId, id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ai/providers"] });
+      queryClient.invalidateQueries({ queryKey: ["ai-providers", user?.tenantId] });
       toast({
         title: "Provider Removed",
         description: "AI provider configuration deleted.",
@@ -164,10 +200,21 @@ export default function AiSettings() {
 
   const setDefaultMutation = useMutation({
     mutationFn: async (id: string) => {
-      return jsonRequest("PATCH", `/api/ai/providers/${id}`, { isDefault: true });
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      // Set all providers to not default first, then set this one as default
+      if (providers && Array.isArray(providers)) {
+        await Promise.all(
+          providers.map((p: any) => 
+            p.id !== id && p.isDefault 
+              ? aiProviderConfigService.update(user.tenantId!, p.id, { isDefault: false })
+              : Promise.resolve()
+          )
+        );
+      }
+      return aiProviderConfigService.update(user.tenantId, id, { isDefault: true });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ai/providers"] });
+      queryClient.invalidateQueries({ queryKey: ["ai-providers", user?.tenantId] });
       toast({
         title: "Default Updated",
         description: "Default AI provider set successfully.",
@@ -190,7 +237,7 @@ export default function AiSettings() {
     if (provider) {
       setEditingProvider(provider);
       setFormData({
-        provider: provider.provider,
+        provider: provider.provider as any,
         name: provider.name,
         apiKey: "",
         model: provider.model,

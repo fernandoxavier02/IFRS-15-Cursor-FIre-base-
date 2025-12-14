@@ -31,7 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-firebase";
 import { contractService, customerService, revenueLedgerService } from "@/lib/firestore-service";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import type { ContractWithDetails, LedgerEntryWithDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Contract, Customer, RevenueLedgerEntry } from "@shared/firestore-types";
@@ -241,10 +241,22 @@ export default function RevenueLedger() {
     }));
   }, [contracts, customerMap]);
 
-  // Create entry via Cloud Function API
+  // Create entry via Firestore service
   const createEntryMutation = useMutation({
     mutationFn: async (data: LedgerFormValues) => {
-      return apiRequest("POST", "/api/ledger-entries", data);
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      return revenueLedgerService.create(user.tenantId, {
+        contractId: data.contractId,
+        entryType: data.entryType,
+        entryDate: data.entryDate,
+        debitAccount: data.debitAccount,
+        creditAccount: data.creditAccount,
+        amount: data.amount.toString(),
+        currency: data.currency,
+        description: data.description,
+        referenceNumber: data.referenceNumber,
+        isPosted: false,
+      } as any);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId] });
@@ -268,7 +280,8 @@ export default function RevenueLedger() {
 
   const postEntryMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("POST", `/api/ledger-entries/${id}/post`, {});
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      return revenueLedgerService.update(user.tenantId, id, { isPosted: true, postedAt: new Date().toISOString() });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId] });
@@ -290,7 +303,17 @@ export default function RevenueLedger() {
 
   const postAllMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/ledger-entries/post-all", {});
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      const unposted = await revenueLedgerService.getUnposted(user.tenantId);
+      await Promise.all(
+        unposted.map(entry => 
+          revenueLedgerService.update(user.tenantId, entry.id, { 
+            isPosted: true, 
+            postedAt: new Date().toISOString() 
+          })
+        )
+      );
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId] });
@@ -522,7 +545,7 @@ export default function RevenueLedger() {
                       )}
                     />
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <FormField
                         control={form.control}
                         name="entryDate"

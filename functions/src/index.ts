@@ -9,27 +9,38 @@ admin.initializeApp();
 
 // ==================== AUTH TRIGGERS ====================
 export {
-    activateUserLicense, createUserWithTenant, onUserCreated,
-    onUserDeleted,
-    setUserClaims
+  activateUserLicense, createUserWithTenant, onUserCreated,
+  onUserDeleted,
+  setUserClaims
 } from "./auth/triggers";
 
 // ==================== STRIPE ====================
 export {
-    cancelSubscription, createCheckoutSession,
-    createPortalSession, getStripePublishableKey, getSubscriptionPlans, resumeSubscription
+  cancelSubscription, createCheckoutSession,
+  createPortalSession, getStripePublishableKey, getSubscriptionPlans, resumeSubscription
 } from "./stripe/checkout";
 export { stripeWebhook } from "./stripe/webhooks";
 
 // ==================== AI ====================
 export {
-    approveReviewAndCreateContract, processIngestionJob
+  approveReviewAndCreateContract, processIngestionJob
 } from "./ai/contract-extraction";
 
 // ==================== REST APIs ====================
 export { contractsApi } from "./api/contracts";
 export { customersApi } from "./api/customers";
 export { dashboardApi } from "./api/dashboard";
+
+// ==================== IFRS 15 ENGINE ====================
+export {
+  createContractVersion,
+  generateBillingSchedule, runIFRS15Engine
+} from "./ifrs15/engine";
+
+// ==================== REPORTS ====================
+export {
+  generateContractBalancesReport, generateDisaggregatedRevenueReport, generateRemainingObligationsReport
+} from "./reports/index";
 
 // ==================== SCHEDULED FUNCTIONS ====================
 
@@ -248,11 +259,21 @@ export const processEmailQueue = functions.pubsub
     }
   });
 
-// Initialize system with admin user (run once, then remove or disable)
+// Initialize system with admin user (run once via Firebase Console or CLI)
+// Security: Uses environment variables, no hardcoded credentials
+// To run: firebase functions:config:set init.secret="your-secret" init.admin_email="email@example.com"
+// Or use .env file with INIT_SECRET and INIT_ADMIN_EMAIL
 export const initializeSystem = functions.https.onRequest(async (req, res) => {
-  // Security: Check for secret key
+  // Security: Check for secret key from environment or config
   const secretKey = req.query.key || req.body?.key;
-  if (secretKey !== "INIT_SECRET_2024") {
+  const expectedSecret = process.env.INIT_SECRET || functions.config().init?.secret;
+  
+  if (!expectedSecret) {
+    res.status(500).json({ error: "INIT_SECRET not configured. Set via environment or Firebase config." });
+    return;
+  }
+  
+  if (secretKey !== expectedSecret) {
     res.status(403).json({ error: "Invalid key" });
     return;
   }
@@ -260,41 +281,65 @@ export const initializeSystem = functions.https.onRequest(async (req, res) => {
   const db = admin.firestore();
   const auth = admin.auth();
 
-  const ADMIN_EMAIL = "fernandocostaxavier@gmail.com";
-  const ADMIN_PASSWORD = "Admin@123!";
-  const TENANT_ID = "default";
+  // Get admin email from request, environment, or config
+  const adminEmail = req.body?.email || process.env.INIT_ADMIN_EMAIL || functions.config().init?.admin_email;
+  const adminName = req.body?.name || "System Administrator";
+  const tenantName = req.body?.tenantName || "Default Organization";
+  const tenantId = req.body?.tenantId || "default";
   
-  // Option to skip mustChangePassword
-  const skipPasswordChange = req.query.skipPassword === "true";
+  if (!adminEmail) {
+    res.status(400).json({ error: "Admin email required. Pass in request body or set INIT_ADMIN_EMAIL." });
+    return;
+  }
+
+  // Generate secure random password
+  const generatePassword = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
+    let password = "";
+    for (let i = 0; i < 16; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
 
   try {
     // 1. Create tenant
-    const tenantRef = db.collection("tenants").doc(TENANT_ID);
-    await tenantRef.set({
-      id: TENANT_ID,
-      name: "Default Organization",
-      slug: "default",
-      plan: "enterprise",
-      status: "active",
-      settings: {
-        defaultCurrency: "BRL",
-        fiscalYearEnd: "12-31",
-        timezone: "America/Sao_Paulo",
-      },
-      createdAt: admin.firestore.Timestamp.now(),
-    });
+    const tenantRef = db.collection("tenants").doc(tenantId);
+    const tenantExists = (await tenantRef.get()).exists;
+    
+    if (!tenantExists) {
+      await tenantRef.set({
+        id: tenantId,
+        name: tenantName,
+        slug: tenantId,
+        plan: "enterprise",
+        status: "active",
+        settings: {
+          defaultCurrency: "BRL",
+          fiscalYearEnd: "12-31",
+          timezone: "America/Sao_Paulo",
+        },
+        createdAt: admin.firestore.Timestamp.now(),
+      });
+    }
 
     // 2. Create or get admin user in Firebase Auth
     let userRecord;
+    let passwordGenerated = false;
+    let tempPassword = "";
+    
     try {
-      userRecord = await auth.getUserByEmail(ADMIN_EMAIL);
+      userRecord = await auth.getUserByEmail(adminEmail);
+      console.log(`User ${adminEmail} already exists`);
     } catch (error: any) {
       if (error.code === "auth/user-not-found") {
+        tempPassword = generatePassword();
+        passwordGenerated = true;
         userRecord = await auth.createUser({
-          email: ADMIN_EMAIL,
-          password: ADMIN_PASSWORD,
-          displayName: "Fernando Costa Xavier",
-          emailVerified: true,
+          email: adminEmail,
+          password: tempPassword,
+          displayName: adminName,
+          emailVerified: false, // User should verify their email
         });
       } else {
         throw error;
@@ -303,7 +348,7 @@ export const initializeSystem = functions.https.onRequest(async (req, res) => {
 
     // 3. Set admin custom claims
     await auth.setCustomUserClaims(userRecord.uid, {
-      tenantId: TENANT_ID,
+      tenantId: tenantId,
       role: "admin",
       systemAdmin: true,
     });
@@ -311,23 +356,23 @@ export const initializeSystem = functions.https.onRequest(async (req, res) => {
     // 4. Create user document
     const userData = {
       id: userRecord.uid,
-      email: ADMIN_EMAIL,
-      fullName: "Fernando Costa Xavier",
-      username: "fernando",
-      tenantId: TENANT_ID,
+      email: adminEmail,
+      fullName: adminName,
+      username: adminEmail.split("@")[0],
+      tenantId: tenantId,
       role: "admin",
       isActive: true,
-      mustChangePassword: !skipPasswordChange,
+      mustChangePassword: passwordGenerated, // Force password change for new users
       createdAt: admin.firestore.Timestamp.now(),
     };
 
-    await db.collection("users").doc(userRecord.uid).set(userData);
-    await db.collection(`tenants/${TENANT_ID}/users`).doc(userRecord.uid).set(userData);
+    await db.collection("users").doc(userRecord.uid).set(userData, { merge: true });
+    await db.collection(`tenants/${tenantId}/users`).doc(userRecord.uid).set(userData, { merge: true });
 
     // 5. Create license
-    const licenseKey = `LIC-ADMIN-${Date.now()}`;
-    await db.collection(`tenants/${TENANT_ID}/licenses`).add({
-      tenantId: TENANT_ID,
+    const licenseKey = `LIC-${tenantId.toUpperCase()}-${Date.now()}`;
+    await db.collection(`tenants/${tenantId}/licenses`).add({
+      tenantId: tenantId,
       licenseKey,
       status: "active",
       plan: "enterprise",
@@ -344,7 +389,7 @@ export const initializeSystem = functions.https.onRequest(async (req, res) => {
       licenseActivatedAt: admin.firestore.Timestamp.now(),
     });
 
-    // 6. Create subscription plans
+    // 6. Create subscription plans (if not exist)
     const plans = [
       { id: "starter", name: "Starter", price: 299, currency: "BRL", interval: "month", maxContracts: 10, maxUsers: 1, features: ["basic_reports", "email_support"], isActive: true },
       { id: "professional", name: "Professional", price: 699, currency: "BRL", interval: "month", maxContracts: 30, maxUsers: 3, features: ["full_ifrs15", "priority_support", "api_access"], isActive: true, popular: true },
@@ -352,22 +397,39 @@ export const initializeSystem = functions.https.onRequest(async (req, res) => {
     ];
 
     for (const plan of plans) {
-      await db.collection("subscriptionPlans").doc(plan.id).set({
-        ...plan,
-        createdAt: admin.firestore.Timestamp.now(),
-      });
+      const planRef = db.collection("subscriptionPlans").doc(plan.id);
+      const planExists = (await planRef.get()).exists;
+      if (!planExists) {
+        await planRef.set({
+          ...plan,
+          createdAt: admin.firestore.Timestamp.now(),
+        });
+      }
     }
 
-    res.json({
+    // Response - NEVER include password in logs or response for existing users
+    const response: any = {
       success: true,
-      message: "System initialized successfully",
+      message: passwordGenerated 
+        ? "System initialized. New user created with temporary password."
+        : "System initialized. User already existed - no password change.",
       admin: {
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-        note: "Change password on first login!",
+        email: adminEmail,
+        uid: userRecord.uid,
       },
-      tenant: TENANT_ID,
-    });
+      tenant: tenantId,
+    };
+
+    // Only include password for new users, and recommend using password reset
+    if (passwordGenerated) {
+      response.admin.tempPassword = tempPassword;
+      response.admin.note = "IMPORTANT: This password will only be shown once. User must change password on first login or use password reset.";
+    }
+
+    // Log without sensitive data
+    console.log(`System initialized for tenant ${tenantId}, admin ${adminEmail}`);
+    
+    res.json(response);
   } catch (error: any) {
     console.error("Initialization error:", error);
     res.status(500).json({ error: error.message });

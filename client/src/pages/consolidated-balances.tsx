@@ -1,57 +1,79 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/data-table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { 
-  TrendingUp,
-  TrendingDown,
-  ArrowDownUp,
-  Calendar,
-  FileText,
-  RefreshCw,
-  BarChart3
-} from "lucide-react";
+import { useAuth } from "@/lib/auth-firebase";
+import { dashboardService } from "@/lib/firestore-service";
+import { queryClient } from "@/lib/queryClient";
 import type { ConsolidatedBalanceData } from "@/lib/types";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import {
+    ArrowDownUp,
+    BarChart3,
+    Calendar,
+    FileText,
+    RefreshCw,
+    TrendingDown,
+    TrendingUp
+} from "lucide-react";
+import { useState } from "react";
+import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function ConsolidatedBalances() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [periodFilter, setPeriodFilter] = useState<string>("all");
 
-  const { data: balances, isLoading } = useQuery<ConsolidatedBalanceData[]>({
-    queryKey: ["/api/consolidated-balances"],
+  const { data: stats } = useQuery({
+    queryKey: ["dashboard/stats", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return null;
+      return dashboardService.getStats(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
 
-  const { data: latestBalance } = useQuery<ConsolidatedBalanceData>({
-    queryKey: ["/api/consolidated-balances/latest"],
-  });
+  // Generate mock balance data from stats
+  const balances: ConsolidatedBalanceData[] = stats ? [{
+    id: "latest",
+    tenantId: user?.tenantId || "",
+    periodDate: new Date().toISOString(),
+    periodType: "monthly",
+    totalContractAssets: stats.contractAssets || "0",
+    totalContractLiabilities: stats.contractLiabilities || "0",
+    totalRecognizedRevenue: stats.recognizedRevenue || "0",
+    totalDeferredRevenue: stats.deferredRevenue || "0",
+    totalReceivables: "0",
+    createdAt: new Date().toISOString(),
+  }] : [];
+
+  const latestBalance = balances[0];
+  const isLoading = !stats;
 
   const generateBalanceMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/consolidated-balances/generate", {});
+      // Refresh stats to generate new balance
+      queryClient.invalidateQueries({ queryKey: ["dashboard/stats", user?.tenantId] });
+      return { success: true };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/consolidated-balances"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/consolidated-balances/latest"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard/stats", user?.tenantId] });
       toast({
-        title: "Balance generated",
-        description: "A new consolidated balance snapshot has been created.",
+        title: "Balance atualizado",
+        description: "Os saldos consolidados foram atualizados.",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: "Erro",
         description: error.message,
         variant: "destructive",
       });

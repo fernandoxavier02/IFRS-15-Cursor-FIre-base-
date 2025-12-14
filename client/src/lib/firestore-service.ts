@@ -307,6 +307,37 @@ export const licenseService = {
   async getById(tenantId: string, id: string): Promise<License | null> {
     return getDocById<License>(tenantCollection(tenantId, "licenses"), id);
   },
+
+  async update(tenantId: string, id: string, data: Partial<License>): Promise<void> {
+    await updateDocument(tenantCollection(tenantId, "licenses"), id, data);
+  },
+
+  async release(tenantId: string, id: string): Promise<void> {
+    await updateDocument(tenantCollection(tenantId, "licenses"), id, {
+      currentIp: null,
+      currentUserName: null,
+      lockedAt: null,
+      lastSeenAt: Timestamp.now(),
+    });
+  },
+
+  async suspend(tenantId: string, id: string): Promise<void> {
+    await updateDocument(tenantCollection(tenantId, "licenses"), id, {
+      status: "suspended",
+      currentIp: null,
+      currentUserName: null,
+      lockedAt: null,
+    });
+  },
+
+  async revoke(tenantId: string, id: string): Promise<void> {
+    await updateDocument(tenantCollection(tenantId, "licenses"), id, {
+      status: "revoked",
+      currentIp: null,
+      currentUserName: null,
+      lockedAt: null,
+    });
+  },
 };
 
 // ==================== AUDIT LOGS ====================
@@ -548,6 +579,64 @@ export const dashboardService = {
   },
 };
 
+// ==================== IFRS 15 ENGINE ====================
+
+export const ifrs15Service = {
+  async runEngine(contractId: string, versionId?: string, options?: Record<string, any>) {
+    const runEngine = httpsCallable(functions, "runIFRS15Engine");
+    const result = await runEngine({ contractId, versionId, options });
+    return result.data;
+  },
+
+  async createContractVersion(
+    contractId: string,
+    modificationReason: string,
+    isProspective = true,
+    effectiveDate?: string
+  ) {
+    const createVersion = httpsCallable(functions, "createContractVersion");
+    const result = await createVersion({
+      contractId,
+      modificationReason,
+      isProspective,
+      effectiveDate,
+    });
+    return result.data as { success: boolean; versionId?: string; versionNumber?: number };
+  },
+
+  async generateBillingSchedule(
+    contractId: string,
+    frequency: "monthly" | "quarterly" | "semi_annual" | "annual" = "monthly",
+    startDate?: string
+  ) {
+    const generateSchedule = httpsCallable(functions, "generateBillingSchedule");
+    const result = await generateSchedule({ contractId, frequency, startDate });
+    return result.data as { success: boolean; schedules?: any[] };
+  },
+};
+
+// ==================== REPORTS ====================
+
+export const reportsService = {
+  async generateDisaggregatedRevenue(periodStart: string, periodEnd: string) {
+    const generateReport = httpsCallable(functions, "generateDisaggregatedRevenueReport");
+    const result = await generateReport({ periodStart, periodEnd });
+    return result.data;
+  },
+
+  async generateContractBalances(asOfDate?: string, comparePriorPeriod = false) {
+    const generateReport = httpsCallable(functions, "generateContractBalancesReport");
+    const result = await generateReport({ asOfDate, comparePriorPeriod });
+    return result.data;
+  },
+
+  async generateRemainingObligations(asOfDate?: string) {
+    const generateReport = httpsCallable(functions, "generateRemainingObligationsReport");
+    const result = await generateReport({ asOfDate });
+    return result.data;
+  },
+};
+
 // ==================== STRIPE FUNCTIONS ====================
 
 export const stripeService = {
@@ -589,6 +678,93 @@ export const stripeService = {
   },
 };
 
+// ==================== CONTRACT COSTS ====================
+
+export const contractCostService = {
+  async getAll(tenantId: string): Promise<any[]> {
+    return getCollection(
+      tenantCollection(tenantId, "contractCosts"),
+      orderBy("incurredDate", "desc")
+    );
+  },
+
+  async create(tenantId: string, data: any): Promise<string> {
+    return addDocument(tenantCollection(tenantId, "contractCosts"), data);
+  },
+
+  async update(tenantId: string, id: string, data: any): Promise<void> {
+    await updateDocument(tenantCollection(tenantId, "contractCosts"), id, data);
+  },
+};
+
+// ==================== EXCHANGE RATES ====================
+
+export const exchangeRateService = {
+  async getAll(tenantId: string): Promise<any[]> {
+    return getCollection(
+      tenantCollection(tenantId, "exchangeRates"),
+      orderBy("effectiveDate", "desc")
+    );
+  },
+
+  async create(tenantId: string, data: any): Promise<string> {
+    return addDocument(tenantCollection(tenantId, "exchangeRates"), data);
+  },
+
+  async update(tenantId: string, id: string, data: any): Promise<void> {
+    await updateDocument(tenantCollection(tenantId, "exchangeRates"), id, data);
+  },
+};
+
+// ==================== FINANCING COMPONENTS ====================
+
+export const financingComponentService = {
+  async getAll(tenantId: string): Promise<any[]> {
+    return getCollection(
+      tenantCollection(tenantId, "financingComponents"),
+      orderBy("createdAt", "desc")
+    );
+  },
+
+  async create(tenantId: string, data: any): Promise<string> {
+    return addDocument(tenantCollection(tenantId, "financingComponents"), data);
+  },
+
+  async update(tenantId: string, id: string, data: any): Promise<void> {
+    await updateDocument(tenantCollection(tenantId, "financingComponents"), id, data);
+  },
+};
+
+// ==================== TENANT ====================
+
+export const tenantService = {
+  async get(tenantId: string) {
+    const docRef = doc(db, `tenants/${tenantId}`);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return null;
+    return { id: docSnap.id, ...docSnap.data() };
+  },
+
+  async update(tenantId: string, data: Record<string, any>): Promise<void> {
+    await updateDocument(`tenants`, tenantId, data);
+  },
+};
+
+// ==================== USERS ====================
+
+export const userService = {
+  async getAll(tenantId: string) {
+    return getCollection(
+      tenantCollection(tenantId, "users"),
+      orderBy("createdAt", "desc")
+    );
+  },
+
+  async getById(tenantId: string, userId: string) {
+    return getDocById(tenantCollection(tenantId, "users"), userId);
+  },
+};
+
 // Export all services
 export default {
   customers: customerService,
@@ -605,4 +781,11 @@ export default {
   aiReviewTasks: aiReviewTaskService,
   dashboard: dashboardService,
   stripe: stripeService,
+  ifrs15: ifrs15Service,
+  reports: reportsService,
+  tenant: tenantService,
+  users: userService,
+  contractCosts: contractCostService,
+  exchangeRates: exchangeRateService,
+  financingComponents: financingComponentService,
 };

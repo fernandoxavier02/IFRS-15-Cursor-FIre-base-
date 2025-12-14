@@ -1,0 +1,445 @@
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:01"}
+{"level":"info","message":"IFRS 15 Test Agent","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:01"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:01"}
+{"level":"info","message":"Browser initialized","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:02"}
+{"level":"info","message":"Running smoke tests (default)","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:02"}
+{"level":"info","message":"Found 14 scenario(s) to run","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:02"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:02"}
+{"level":"info","message":"▶ Starting scenario: Login with valid credentials","scenario":"Login with valid credentials","service":"ifrs15-test-agent","tags":["auth","smoke","critical"],"timestamp":"2025-12-14 13:59:02","type":"scenario_start"}
+{"duration":2632,"level":"error","message":"✗ Scenario completed: Login with valid credentials (2632ms)","scenario":"Login with valid credentials","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 13:59:04","type":"scenario_end"}
+{"action":"navigate","level":"warn","message":"  ✗ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":false,"target":"/login","timestamp":"2025-12-14 13:59:04","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:04","type":"validation","validationType":"url"}
+{"level":"warn","message":"  ✗ Validation [element]: Element \"[data-testid=\"button-sidebar-toggle\"]\" expected to be visible, but was hidden Element \"[data-testid=\"button-sidebar-toggle\"]\" expected to be visible, but was hidden","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:04","type":"validation","validationType":"element"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:04","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:04"}
+{"level":"info","message":"▶ Starting scenario: Create a new customer","scenario":"Create a new customer","service":"ifrs15-test-agent","tags":["crud","customer","smoke"],"timestamp":"2025-12-14 13:59:04","type":"scenario_start"}
+{"error":"Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:5000/login\nCall log:\n  - navigating to \"http://localhost:5000/login\", waiting until \"networkidle\"\n","level":"error","message":"Test execution failed","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:07"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:57"}
+{"level":"info","message":"IFRS 15 Test Agent","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:57"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:57"}
+{"level":"info","message":"Browser initialized","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:57"}
+{"level":"info","message":"Running smoke tests","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:57"}
+{"level":"info","message":"Found 14 scenario(s) to run","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:57"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 13:59:57"}
+{"level":"info","message":"▶ Starting scenario: Login with valid credentials","scenario":"Login with valid credentials","service":"ifrs15-test-agent","tags":["auth","smoke","critical"],"timestamp":"2025-12-14 13:59:57","type":"scenario_start"}
+{"duration":2801,"level":"error","message":"✗ Scenario completed: Login with valid credentials (2801ms)","scenario":"Login with valid credentials","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:00:00","type":"scenario_end"}
+{"action":"navigate","level":"warn","message":"  ✗ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":false,"target":"/login","timestamp":"2025-12-14 14:00:00","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:00:00","type":"validation","validationType":"url"}
+{"level":"warn","message":"  ✗ Validation [element]: Element \"[data-testid=\"button-sidebar-toggle\"]\" expected to be visible, but was hidden Element \"[data-testid=\"button-sidebar-toggle\"]\" expected to be visible, but was hidden","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:00:00","type":"validation","validationType":"element"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:00:00","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:00:00"}
+{"level":"info","message":"▶ Starting scenario: Create a new customer","scenario":"Create a new customer","service":"ifrs15-test-agent","tags":["crud","customer","smoke"],"timestamp":"2025-12-14 14:00:00","type":"scenario_start"}
+{"error":"Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:5000/login\nCall log:\n  - navigating to \"http://localhost:5000/login\", waiting until \"networkidle\"\n","level":"error","message":"Test execution failed","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:00:02"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:00:30"}
+{"level":"info","message":"IFRS 15 Test Agent","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:00:30"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:00:30"}
+{"level":"info","message":"Browser initialized","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:00:31"}
+{"level":"info","message":"Running smoke tests","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:00:31"}
+{"level":"info","message":"Found 14 scenario(s) to run","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:00:31"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:00:31"}
+{"level":"info","message":"▶ Starting scenario: Login with valid credentials","scenario":"Login with valid credentials","service":"ifrs15-test-agent","tags":["auth","smoke","critical"],"timestamp":"2025-12-14 14:00:31","type":"scenario_start"}
+{"duration":34975,"level":"error","message":"✗ Scenario completed: Login with valid credentials (34975ms)","scenario":"Login with valid credentials","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:06","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/login","timestamp":"2025-12-14 14:01:06","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 14:01:06","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 3: fill ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":3,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 14:01:06","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 4: fill ([data-testid=\"input-login-password\"])","service":"ifrs15-test-agent","stepNumber":4,"success":true,"target":"[data-testid=\"input-login-password\"]","timestamp":"2025-12-14 14:01:06","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 5: click ([data-testid=\"button-login-submit\"])","service":"ifrs15-test-agent","stepNumber":5,"success":true,"target":"[data-testid=\"button-login-submit\"]","timestamp":"2025-12-14 14:01:06","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 6: wait","service":"ifrs15-test-agent","stepNumber":6,"success":true,"timestamp":"2025-12-14 14:01:06","type":"step"}
+{"action":"waitForNavigation","level":"warn","message":"  ✗ Step 7: waitForNavigation (/)","service":"ifrs15-test-agent","stepNumber":7,"success":false,"target":"/","timestamp":"2025-12-14 14:01:06","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:06","type":"validation","validationType":"url"}
+{"level":"warn","message":"  ✗ Validation [element]: Element \"[data-testid=\"button-sidebar-toggle\"]\" expected to be visible, but was hidden Element \"[data-testid=\"button-sidebar-toggle\"]\" expected to be visible, but was hidden","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:06","type":"validation","validationType":"element"}
+{"level":"warn","message":"  ✗ Validation [console]: Found 2 unexpected console errors Found 2 unexpected console errors","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:06","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:06"}
+{"level":"info","message":"▶ Starting scenario: Create a new customer","scenario":"Create a new customer","service":"ifrs15-test-agent","tags":["crud","customer","smoke"],"timestamp":"2025-12-14 14:01:06","type":"scenario_start"}
+{"duration":4272,"level":"error","message":"✗ Scenario completed: Create a new customer (4272ms)","scenario":"Create a new customer","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:10","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:10"}
+{"level":"info","message":"▶ Starting scenario: Create a new contract","scenario":"Create a new contract","service":"ifrs15-test-agent","tags":["crud","contract","smoke"],"timestamp":"2025-12-14 14:01:10","type":"scenario_start"}
+{"duration":4082,"level":"error","message":"✗ Scenario completed: Create a new contract (4082ms)","scenario":"Create a new contract","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:14","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:14"}
+{"level":"info","message":"▶ Starting scenario: Navigate to IFRS 15 Engine","scenario":"Navigate to IFRS 15 Engine","service":"ifrs15-test-agent","tags":["ifrs15","smoke","navigation"],"timestamp":"2025-12-14 14:01:14","type":"scenario_start"}
+{"duration":4142,"level":"error","message":"✗ Scenario completed: Navigate to IFRS 15 Engine (4142ms)","scenario":"Navigate to IFRS 15 Engine","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:18","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:18"}
+{"level":"info","message":"▶ Starting scenario: View Billing Schedules page","scenario":"View Billing Schedules page","service":"ifrs15-test-agent","tags":["ifrs15","billing","smoke"],"timestamp":"2025-12-14 14:01:18","type":"scenario_start"}
+{"duration":3994,"level":"error","message":"✗ Scenario completed: View Billing Schedules page (3994ms)","scenario":"View Billing Schedules page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:22","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:22"}
+{"level":"info","message":"▶ Starting scenario: View Revenue Ledger page","scenario":"View Revenue Ledger page","service":"ifrs15-test-agent","tags":["ifrs15","ledger","smoke"],"timestamp":"2025-12-14 14:01:22","type":"scenario_start"}
+{"duration":3995,"level":"error","message":"✗ Scenario completed: View Revenue Ledger page (3995ms)","scenario":"View Revenue Ledger page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:26","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:26"}
+{"level":"info","message":"▶ Starting scenario: View Consolidated Balances page","scenario":"View Consolidated Balances page","service":"ifrs15-test-agent","tags":["ifrs15","balances","smoke"],"timestamp":"2025-12-14 14:01:26","type":"scenario_start"}
+{"duration":4117,"level":"error","message":"✗ Scenario completed: View Consolidated Balances page (4117ms)","scenario":"View Consolidated Balances page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:30","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:30"}
+{"level":"info","message":"▶ Starting scenario: View Revenue Waterfall page","scenario":"View Revenue Waterfall page","service":"ifrs15-test-agent","tags":["ifrs15","waterfall","smoke"],"timestamp":"2025-12-14 14:01:30","type":"scenario_start"}
+{"duration":4081,"level":"error","message":"✗ Scenario completed: View Revenue Waterfall page (4081ms)","scenario":"View Revenue Waterfall page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:34","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:34"}
+{"level":"info","message":"▶ Starting scenario: View Contract Costs page","scenario":"View Contract Costs page","service":"ifrs15-test-agent","tags":["ifrs15","costs","smoke"],"timestamp":"2025-12-14 14:01:34","type":"scenario_start"}
+{"duration":4310,"level":"error","message":"✗ Scenario completed: View Contract Costs page (4310ms)","scenario":"View Contract Costs page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:39","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:39"}
+{"level":"info","message":"▶ Starting scenario: View Exchange Rates page","scenario":"View Exchange Rates page","service":"ifrs15-test-agent","tags":["ifrs15","forex","smoke"],"timestamp":"2025-12-14 14:01:39","type":"scenario_start"}
+{"duration":4128,"level":"error","message":"✗ Scenario completed: View Exchange Rates page (4128ms)","scenario":"View Exchange Rates page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:43","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:43"}
+{"level":"info","message":"▶ Starting scenario: View Financing Components page","scenario":"View Financing Components page","service":"ifrs15-test-agent","tags":["ifrs15","financing","smoke"],"timestamp":"2025-12-14 14:01:43","type":"scenario_start"}
+{"duration":3968,"level":"error","message":"✗ Scenario completed: View Financing Components page (3968ms)","scenario":"View Financing Components page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:47","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:47"}
+{"level":"info","message":"▶ Starting scenario: View Executive Dashboard","scenario":"View Executive Dashboard","service":"ifrs15-test-agent","tags":["ifrs15","dashboard","smoke"],"timestamp":"2025-12-14 14:01:47","type":"scenario_start"}
+{"duration":3833,"level":"error","message":"✗ Scenario completed: View Executive Dashboard (3833ms)","scenario":"View Executive Dashboard","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:50","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:50"}
+{"level":"info","message":"▶ Starting scenario: View IFRS 15 Accounting Control page","scenario":"View IFRS 15 Accounting Control page","service":"ifrs15-test-agent","tags":["ifrs15","accounting","smoke"],"timestamp":"2025-12-14 14:01:50","type":"scenario_start"}
+{"duration":3816,"level":"error","message":"✗ Scenario completed: View IFRS 15 Accounting Control page (3816ms)","scenario":"View IFRS 15 Accounting Control page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:54","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:54"}
+{"level":"info","message":"▶ Starting scenario: View Reports page","scenario":"View Reports page","service":"ifrs15-test-agent","tags":["ifrs15","reports","smoke"],"timestamp":"2025-12-14 14:01:54","type":"scenario_start"}
+{"duration":3955,"level":"error","message":"✗ Scenario completed: View Reports page (3955ms)","scenario":"View Reports page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:01:58","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:58"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:58"}
+{"level":"info","message":"Test Run Summary:","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:58"}
+{"level":"info","message":"  Total:    1","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:58"}
+{"level":"info","message":"  Passed:   0 (0%)","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:58"}
+{"level":"info","message":"  Failed:   1","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:58"}
+{"level":"info","message":"  Skipped:  0","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:58"}
+{"level":"info","message":"  Duration: 88s","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:58"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:58"}
+{"level":"info","message":"Report generated: reports\\test-report_2025-12-14_14-01-58.html","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:01:58"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:05:18"}
+{"level":"info","message":"IFRS 15 Test Agent","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:05:18"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:05:18"}
+{"level":"info","message":"Browser initialized","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:05:18"}
+{"level":"info","message":"Running smoke tests","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:05:18"}
+{"level":"info","message":"Found 14 scenario(s) to run","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:05:18"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:05:18"}
+{"level":"info","message":"▶ Starting scenario: Login with valid credentials","scenario":"Login with valid credentials","service":"ifrs15-test-agent","tags":["auth","smoke","critical"],"timestamp":"2025-12-14 14:05:18","type":"scenario_start"}
+{"duration":34606,"level":"error","message":"✗ Scenario completed: Login with valid credentials (34606ms)","scenario":"Login with valid credentials","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:05:53","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/login","timestamp":"2025-12-14 14:05:53","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 14:05:53","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 3: fill ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":3,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 14:05:53","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 4: fill ([data-testid=\"input-login-password\"])","service":"ifrs15-test-agent","stepNumber":4,"success":true,"target":"[data-testid=\"input-login-password\"]","timestamp":"2025-12-14 14:05:53","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 5: click ([data-testid=\"button-login-submit\"])","service":"ifrs15-test-agent","stepNumber":5,"success":true,"target":"[data-testid=\"button-login-submit\"]","timestamp":"2025-12-14 14:05:53","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 6: wait","service":"ifrs15-test-agent","stepNumber":6,"success":true,"timestamp":"2025-12-14 14:05:53","type":"step"}
+{"action":"waitForNavigation","level":"warn","message":"  ✗ Step 7: waitForNavigation (/)","service":"ifrs15-test-agent","stepNumber":7,"success":false,"target":"/","timestamp":"2025-12-14 14:05:53","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:05:53","type":"validation","validationType":"url"}
+{"level":"warn","message":"  ✗ Validation [element]: Element \"[data-testid=\"button-sidebar-toggle\"]\" expected to be visible, but was hidden Element \"[data-testid=\"button-sidebar-toggle\"]\" expected to be visible, but was hidden","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:05:53","type":"validation","validationType":"element"}
+{"level":"warn","message":"  ✗ Validation [console]: Found 2 unexpected console errors Found 2 unexpected console errors","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:05:53","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:05:53"}
+{"level":"info","message":"▶ Starting scenario: Create a new customer","scenario":"Create a new customer","service":"ifrs15-test-agent","tags":["crud","customer","smoke"],"timestamp":"2025-12-14 14:05:53","type":"scenario_start"}
+{"duration":4108,"level":"error","message":"✗ Scenario completed: Create a new customer (4108ms)","scenario":"Create a new customer","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:05:57","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:05:57"}
+{"level":"info","message":"▶ Starting scenario: Create a new contract","scenario":"Create a new contract","service":"ifrs15-test-agent","tags":["crud","contract","smoke"],"timestamp":"2025-12-14 14:05:57","type":"scenario_start"}
+{"duration":4022,"level":"error","message":"✗ Scenario completed: Create a new contract (4022ms)","scenario":"Create a new contract","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:06:01","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:01"}
+{"level":"info","message":"▶ Starting scenario: Navigate to IFRS 15 Engine","scenario":"Navigate to IFRS 15 Engine","service":"ifrs15-test-agent","tags":["ifrs15","smoke","navigation"],"timestamp":"2025-12-14 14:06:01","type":"scenario_start"}
+{"duration":4026,"level":"error","message":"✗ Scenario completed: Navigate to IFRS 15 Engine (4026ms)","scenario":"Navigate to IFRS 15 Engine","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:06:05","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:05"}
+{"level":"info","message":"▶ Starting scenario: View Billing Schedules page","scenario":"View Billing Schedules page","service":"ifrs15-test-agent","tags":["ifrs15","billing","smoke"],"timestamp":"2025-12-14 14:06:05","type":"scenario_start"}
+{"duration":3887,"level":"error","message":"✗ Scenario completed: View Billing Schedules page (3887ms)","scenario":"View Billing Schedules page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:06:09","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:09"}
+{"level":"info","message":"▶ Starting scenario: View Revenue Ledger page","scenario":"View Revenue Ledger page","service":"ifrs15-test-agent","tags":["ifrs15","ledger","smoke"],"timestamp":"2025-12-14 14:06:09","type":"scenario_start"}
+{"duration":4033,"level":"error","message":"✗ Scenario completed: View Revenue Ledger page (4033ms)","scenario":"View Revenue Ledger page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:06:13","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:13"}
+{"level":"info","message":"▶ Starting scenario: View Consolidated Balances page","scenario":"View Consolidated Balances page","service":"ifrs15-test-agent","tags":["ifrs15","balances","smoke"],"timestamp":"2025-12-14 14:06:13","type":"scenario_start"}
+{"duration":4287,"level":"error","message":"✗ Scenario completed: View Consolidated Balances page (4287ms)","scenario":"View Consolidated Balances page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:06:17","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:17"}
+{"level":"info","message":"▶ Starting scenario: View Revenue Waterfall page","scenario":"View Revenue Waterfall page","service":"ifrs15-test-agent","tags":["ifrs15","waterfall","smoke"],"timestamp":"2025-12-14 14:06:17","type":"scenario_start"}
+{"duration":4536,"level":"error","message":"✗ Scenario completed: View Revenue Waterfall page (4536ms)","scenario":"View Revenue Waterfall page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:06:22","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:22"}
+{"level":"info","message":"▶ Starting scenario: View Contract Costs page","scenario":"View Contract Costs page","service":"ifrs15-test-agent","tags":["ifrs15","costs","smoke"],"timestamp":"2025-12-14 14:06:22","type":"scenario_start"}
+{"duration":4127,"level":"error","message":"✗ Scenario completed: View Contract Costs page (4127ms)","scenario":"View Contract Costs page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:06:26","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:26"}
+{"level":"info","message":"▶ Starting scenario: View Exchange Rates page","scenario":"View Exchange Rates page","service":"ifrs15-test-agent","tags":["ifrs15","forex","smoke"],"timestamp":"2025-12-14 14:06:26","type":"scenario_start"}
+{"duration":4188,"level":"error","message":"✗ Scenario completed: View Exchange Rates page (4188ms)","scenario":"View Exchange Rates page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:06:30","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:30"}
+{"level":"info","message":"▶ Starting scenario: View Financing Components page","scenario":"View Financing Components page","service":"ifrs15-test-agent","tags":["ifrs15","financing","smoke"],"timestamp":"2025-12-14 14:06:30","type":"scenario_start"}
+{"duration":4340,"level":"error","message":"✗ Scenario completed: View Financing Components page (4340ms)","scenario":"View Financing Components page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:06:34","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:34"}
+{"level":"info","message":"▶ Starting scenario: View Executive Dashboard","scenario":"View Executive Dashboard","service":"ifrs15-test-agent","tags":["ifrs15","dashboard","smoke"],"timestamp":"2025-12-14 14:06:34","type":"scenario_start"}
+{"duration":4168,"level":"error","message":"✗ Scenario completed: View Executive Dashboard (4168ms)","scenario":"View Executive Dashboard","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:06:39","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:39"}
+{"level":"info","message":"▶ Starting scenario: View IFRS 15 Accounting Control page","scenario":"View IFRS 15 Accounting Control page","service":"ifrs15-test-agent","tags":["ifrs15","accounting","smoke"],"timestamp":"2025-12-14 14:06:39","type":"scenario_start"}
+{"duration":4123,"level":"error","message":"✗ Scenario completed: View IFRS 15 Accounting Control page (4123ms)","scenario":"View IFRS 15 Accounting Control page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:06:43","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:43"}
+{"level":"info","message":"▶ Starting scenario: View Reports page","scenario":"View Reports page","service":"ifrs15-test-agent","tags":["ifrs15","reports","smoke"],"timestamp":"2025-12-14 14:06:43","type":"scenario_start"}
+{"duration":4417,"level":"error","message":"✗ Scenario completed: View Reports page (4417ms)","scenario":"View Reports page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:06:47","type":"scenario_end"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:47"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:47"}
+{"level":"info","message":"Test Run Summary:","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:47"}
+{"level":"info","message":"  Total:    1","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:47"}
+{"level":"info","message":"  Passed:   0 (0%)","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:47"}
+{"level":"info","message":"  Failed:   1","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:47"}
+{"level":"info","message":"  Skipped:  0","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:47"}
+{"level":"info","message":"  Duration: 89s","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:47"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:47"}
+{"level":"info","message":"Report generated: reports\\test-report_2025-12-14_14-06-47.html","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:06:47"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:12:28"}
+{"level":"info","message":"IFRS 15 Test Agent","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:12:28"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:12:28"}
+{"level":"info","message":"Browser initialized","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:12:28"}
+{"level":"info","message":"Running smoke tests","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:12:28"}
+{"level":"info","message":"Found 14 scenario(s) to run","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:12:28"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:12:28"}
+{"level":"info","message":"▶ Starting scenario: Login with valid credentials","scenario":"Login with valid credentials","service":"ifrs15-test-agent","tags":["auth","smoke","critical"],"timestamp":"2025-12-14 14:12:28","type":"scenario_start"}
+{"duration":4651,"level":"info","message":"✓ Scenario completed: Login with valid credentials (4651ms)","scenario":"Login with valid credentials","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 14:12:33","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/login","timestamp":"2025-12-14 14:12:33","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 14:12:33","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 3: fill ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":3,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 14:12:33","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 4: fill ([data-testid=\"input-login-password\"])","service":"ifrs15-test-agent","stepNumber":4,"success":true,"target":"[data-testid=\"input-login-password\"]","timestamp":"2025-12-14 14:12:33","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 5: click ([data-testid=\"button-login-submit\"])","service":"ifrs15-test-agent","stepNumber":5,"success":true,"target":"[data-testid=\"button-login-submit\"]","timestamp":"2025-12-14 14:12:33","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 6: wait","service":"ifrs15-test-agent","stepNumber":6,"success":true,"timestamp":"2025-12-14 14:12:33","type":"step"}
+{"action":"waitForNavigation","level":"info","message":"  ✓ Step 7: waitForNavigation (/)","service":"ifrs15-test-agent","stepNumber":7,"success":true,"target":"/","timestamp":"2025-12-14 14:12:33","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:12:33","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [element]: Element \"[data-testid=\"button-sidebar-toggle\"]\" is visible Element \"[data-testid=\"button-sidebar-toggle\"]\" is visible","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:12:33","type":"validation","validationType":"element"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:12:33","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:12:33"}
+{"level":"info","message":"▶ Starting scenario: Create a new customer","scenario":"Create a new customer","service":"ifrs15-test-agent","tags":["crud","customer","smoke"],"timestamp":"2025-12-14 14:12:33","type":"scenario_start"}
+{"error":"TimeoutError: page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"http://localhost:5173/login\", waiting until \"networkidle\"\n","level":"error","message":"Test execution failed","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:13:03"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:14:52"}
+{"level":"info","message":"IFRS 15 Test Agent","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:14:52"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:14:52"}
+{"level":"info","message":"Browser initialized","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:14:52"}
+{"level":"info","message":"Running all scenarios","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:14:52"}
+{"level":"info","message":"Found 32 scenario(s) to run","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:14:52"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:14:52"}
+{"level":"info","message":"▶ Starting scenario: Login with valid credentials","scenario":"Login with valid credentials","service":"ifrs15-test-agent","tags":["auth","smoke","critical"],"timestamp":"2025-12-14 14:14:52","type":"scenario_start"}
+{"duration":3859,"level":"info","message":"✓ Scenario completed: Login with valid credentials (3859ms)","scenario":"Login with valid credentials","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 14:14:56","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/login","timestamp":"2025-12-14 14:14:56","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 14:14:56","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 3: fill ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":3,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 14:14:56","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 4: fill ([data-testid=\"input-login-password\"])","service":"ifrs15-test-agent","stepNumber":4,"success":true,"target":"[data-testid=\"input-login-password\"]","timestamp":"2025-12-14 14:14:56","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 5: click ([data-testid=\"button-login-submit\"])","service":"ifrs15-test-agent","stepNumber":5,"success":true,"target":"[data-testid=\"button-login-submit\"]","timestamp":"2025-12-14 14:14:56","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 6: wait","service":"ifrs15-test-agent","stepNumber":6,"success":true,"timestamp":"2025-12-14 14:14:56","type":"step"}
+{"action":"waitForNavigation","level":"info","message":"  ✓ Step 7: waitForNavigation (/)","service":"ifrs15-test-agent","stepNumber":7,"success":true,"target":"/","timestamp":"2025-12-14 14:14:56","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:14:56","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [element]: Element \"[data-testid=\"button-sidebar-toggle\"]\" is visible Element \"[data-testid=\"button-sidebar-toggle\"]\" is visible","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:14:56","type":"validation","validationType":"element"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:14:56","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:14:56"}
+{"level":"info","message":"▶ Starting scenario: Login with invalid credentials","scenario":"Login with invalid credentials","service":"ifrs15-test-agent","tags":["auth","negative"],"timestamp":"2025-12-14 14:14:56","type":"scenario_start"}
+{"duration":35523,"level":"error","message":"✗ Scenario completed: Login with invalid credentials (35523ms)","scenario":"Login with invalid credentials","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:15:31","type":"scenario_end"}
+{"action":"navigate","level":"warn","message":"  ✗ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":false,"target":"/login","timestamp":"2025-12-14 14:15:31","type":"step"}
+{"level":"warn","message":"  ✗ Validation [url]: URL mismatch: expected \"/login\", got \"http://localhost:5173/\" URL mismatch: expected \"/login\", got \"http://localhost:5173/\"","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:15:31","type":"validation","validationType":"url"}
+{"level":"warn","message":"  ✗ Validation [toast]: Toast did not appear within timeout Toast did not appear within timeout","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:15:31","type":"validation","validationType":"toast"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:15:31"}
+{"level":"info","message":"▶ Starting scenario: Login with empty credentials","scenario":"Login with empty credentials","service":"ifrs15-test-agent","tags":["auth","validation"],"timestamp":"2025-12-14 14:15:31","type":"scenario_start"}
+{"duration":30685,"level":"error","message":"✗ Scenario completed: Login with empty credentials (30685ms)","scenario":"Login with empty credentials","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:16:02","type":"scenario_end"}
+{"action":"navigate","level":"warn","message":"  ✗ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":false,"target":"/login","timestamp":"2025-12-14 14:16:02","type":"step"}
+{"level":"warn","message":"  ✗ Validation [url]: URL mismatch: expected \"/login\", got \"http://localhost:5173/\" URL mismatch: expected \"/login\", got \"http://localhost:5173/\"","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:16:02","type":"validation","validationType":"url"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:16:02"}
+{"level":"info","message":"▶ Starting scenario: Toggle password visibility","scenario":"Toggle password visibility","service":"ifrs15-test-agent","tags":["auth","ui"],"timestamp":"2025-12-14 14:16:02","type":"scenario_start"}
+{"duration":30445,"level":"error","message":"✗ Scenario completed: Toggle password visibility (30445ms)","scenario":"Toggle password visibility","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:16:33","type":"scenario_end"}
+{"action":"navigate","level":"warn","message":"  ✗ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":false,"target":"/login","timestamp":"2025-12-14 14:16:33","type":"step"}
+{"level":"warn","message":"  ✗ Validation [element]: Element \"[data-testid=\"input-login-password\"][type=\"text\"]\" expected to be visible, but was hidden Element \"[data-testid=\"input-login-password\"][type=\"text\"]\" expected to be visible, but was hidden","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:16:33","type":"validation","validationType":"element"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:16:33"}
+{"level":"info","message":"▶ Starting scenario: Navigate to subscribe from login","scenario":"Navigate to subscribe from login","service":"ifrs15-test-agent","tags":["auth","navigation"],"timestamp":"2025-12-14 14:16:33","type":"scenario_start"}
+{"duration":30434,"level":"error","message":"✗ Scenario completed: Navigate to subscribe from login (30434ms)","scenario":"Navigate to subscribe from login","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 14:17:03","type":"scenario_end"}
+{"action":"navigate","level":"warn","message":"  ✗ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":false,"target":"/login","timestamp":"2025-12-14 14:17:03","type":"step"}
+{"level":"warn","message":"  ✗ Validation [url]: URL mismatch: expected \"/subscribe\", got \"http://localhost:5173/\" URL mismatch: expected \"/subscribe\", got \"http://localhost:5173/\"","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 14:17:03","type":"validation","validationType":"url"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:17:03"}
+{"level":"info","message":"▶ Starting scenario: Authenticated user redirected from login","scenario":"Authenticated user redirected from login","service":"ifrs15-test-agent","tags":["auth","redirect"],"timestamp":"2025-12-14 14:17:03","type":"scenario_start"}
+{"error":"TimeoutError: page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"http://localhost:5173/login\", waiting until \"networkidle\"\n","level":"error","message":"Test execution failed","service":"ifrs15-test-agent","timestamp":"2025-12-14 14:17:33"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:40:44"}
+{"level":"info","message":"IFRS 15 Test Agent","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:40:44"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:40:44"}
+{"level":"info","message":"Browser initialized","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:40:45"}
+{"level":"info","message":"Running smoke tests (default)","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:40:45"}
+{"level":"info","message":"Found 14 scenario(s) to run","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:40:45"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:40:45"}
+{"level":"info","message":"▶ Starting scenario: Login with valid credentials","scenario":"Login with valid credentials","service":"ifrs15-test-agent","tags":["auth","smoke","critical"],"timestamp":"2025-12-14 18:40:45","type":"scenario_start"}
+{"duration":9600,"level":"info","message":"✓ Scenario completed: Login with valid credentials (9600ms)","scenario":"Login with valid credentials","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 18:40:55","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/login","timestamp":"2025-12-14 18:40:55","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 18:40:55","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 3: fill ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":3,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 18:40:55","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 4: fill ([data-testid=\"input-login-password\"])","service":"ifrs15-test-agent","stepNumber":4,"success":true,"target":"[data-testid=\"input-login-password\"]","timestamp":"2025-12-14 18:40:55","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 5: click ([data-testid=\"button-login-submit\"])","service":"ifrs15-test-agent","stepNumber":5,"success":true,"target":"[data-testid=\"button-login-submit\"]","timestamp":"2025-12-14 18:40:55","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 6: wait","service":"ifrs15-test-agent","stepNumber":6,"success":true,"timestamp":"2025-12-14 18:40:55","type":"step"}
+{"action":"waitForNavigation","level":"info","message":"  ✓ Step 7: waitForNavigation (/,/change-password,/activate-license)","service":"ifrs15-test-agent","stepNumber":7,"success":true,"target":["/","/change-password","/activate-license"],"timestamp":"2025-12-14 18:40:55","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 8: wait","service":"ifrs15-test-agent","stepNumber":8,"success":true,"timestamp":"2025-12-14 18:40:55","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:40:55","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:40:55","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:40:55"}
+{"level":"info","message":"▶ Starting scenario: Create a new customer","scenario":"Create a new customer","service":"ifrs15-test-agent","tags":["crud","customer","smoke"],"timestamp":"2025-12-14 18:40:55","type":"scenario_start"}
+{"error":"TimeoutError: page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"http://localhost:5173/login\", waiting until \"networkidle\"\n","level":"error","message":"Test execution failed","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:41:25"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:46:06"}
+{"level":"info","message":"IFRS 15 Test Agent","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:46:06"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:46:06"}
+{"level":"info","message":"Browser initialized","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:46:06"}
+{"level":"info","message":"Running smoke tests (default)","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:46:06"}
+{"level":"info","message":"Found 14 scenario(s) to run","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:46:06"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:46:06"}
+{"level":"info","message":"▶ Starting scenario: Login with valid credentials","scenario":"Login with valid credentials","service":"ifrs15-test-agent","tags":["auth","smoke","critical"],"timestamp":"2025-12-14 18:46:06","type":"scenario_start"}
+{"duration":8352,"level":"info","message":"✓ Scenario completed: Login with valid credentials (8352ms)","scenario":"Login with valid credentials","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 18:46:15","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/login","timestamp":"2025-12-14 18:46:15","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 18:46:15","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 3: fill ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":3,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 18:46:15","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 4: fill ([data-testid=\"input-login-password\"])","service":"ifrs15-test-agent","stepNumber":4,"success":true,"target":"[data-testid=\"input-login-password\"]","timestamp":"2025-12-14 18:46:15","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 5: click ([data-testid=\"button-login-submit\"])","service":"ifrs15-test-agent","stepNumber":5,"success":true,"target":"[data-testid=\"button-login-submit\"]","timestamp":"2025-12-14 18:46:15","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 6: wait","service":"ifrs15-test-agent","stepNumber":6,"success":true,"timestamp":"2025-12-14 18:46:15","type":"step"}
+{"action":"waitForNavigation","level":"info","message":"  ✓ Step 7: waitForNavigation (/,/change-password,/activate-license)","service":"ifrs15-test-agent","stepNumber":7,"success":true,"target":["/","/change-password","/activate-license"],"timestamp":"2025-12-14 18:46:15","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 8: wait","service":"ifrs15-test-agent","stepNumber":8,"success":true,"timestamp":"2025-12-14 18:46:15","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:46:15","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:46:15","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:46:15"}
+{"level":"info","message":"▶ Starting scenario: Create a new customer","scenario":"Create a new customer","service":"ifrs15-test-agent","tags":["crud","customer","smoke"],"timestamp":"2025-12-14 18:46:15","type":"scenario_start"}
+{"error":"TimeoutError: page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://ifrs15-revenue-manager.web.app/login\", waiting until \"networkidle\"\n","level":"error","message":"Test execution failed","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:46:45"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:47:15"}
+{"level":"info","message":"IFRS 15 Test Agent","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:47:15"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:47:15"}
+{"level":"info","message":"Browser initialized","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:47:16"}
+{"level":"info","message":"Running smoke tests (default)","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:47:16"}
+{"level":"info","message":"Found 14 scenario(s) to run","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:47:16"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:47:16"}
+{"level":"info","message":"▶ Starting scenario: Login with valid credentials","scenario":"Login with valid credentials","service":"ifrs15-test-agent","tags":["auth","smoke","critical"],"timestamp":"2025-12-14 18:47:16","type":"scenario_start"}
+{"duration":9038,"level":"info","message":"✓ Scenario completed: Login with valid credentials (9038ms)","scenario":"Login with valid credentials","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 18:47:25","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/login","timestamp":"2025-12-14 18:47:25","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 18:47:25","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 3: fill ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":3,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 18:47:25","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 4: fill ([data-testid=\"input-login-password\"])","service":"ifrs15-test-agent","stepNumber":4,"success":true,"target":"[data-testid=\"input-login-password\"]","timestamp":"2025-12-14 18:47:25","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 5: click ([data-testid=\"button-login-submit\"])","service":"ifrs15-test-agent","stepNumber":5,"success":true,"target":"[data-testid=\"button-login-submit\"]","timestamp":"2025-12-14 18:47:25","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 6: wait","service":"ifrs15-test-agent","stepNumber":6,"success":true,"timestamp":"2025-12-14 18:47:25","type":"step"}
+{"action":"waitForNavigation","level":"info","message":"  ✓ Step 7: waitForNavigation (/,/change-password,/activate-license)","service":"ifrs15-test-agent","stepNumber":7,"success":true,"target":["/","/change-password","/activate-license"],"timestamp":"2025-12-14 18:47:25","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 8: wait","service":"ifrs15-test-agent","stepNumber":8,"success":true,"timestamp":"2025-12-14 18:47:25","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:47:25","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:47:25","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:47:25"}
+{"level":"info","message":"▶ Starting scenario: Create a new customer","scenario":"Create a new customer","service":"ifrs15-test-agent","tags":["crud","customer","smoke"],"timestamp":"2025-12-14 18:47:25","type":"scenario_start"}
+{"error":"TimeoutError: locator.waitFor: Timeout 60000ms exceeded.\nCall log:\n  - waiting for locator('[data-testid=\"input-login-email\"]') to be visible\n","level":"error","message":"Test execution failed","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:49:26"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:00"}
+{"level":"info","message":"IFRS 15 Test Agent","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:00"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:00"}
+{"level":"info","message":"Browser initialized","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:00"}
+{"level":"info","message":"Running smoke tests","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:00"}
+{"level":"info","message":"Found 14 scenario(s) to run","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:00"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:00"}
+{"level":"info","message":"▶ Starting scenario: Login with valid credentials","scenario":"Login with valid credentials","service":"ifrs15-test-agent","tags":["auth","smoke","critical"],"timestamp":"2025-12-14 18:50:00","type":"scenario_start"}
+{"duration":8832,"level":"info","message":"✓ Scenario completed: Login with valid credentials (8832ms)","scenario":"Login with valid credentials","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 18:50:09","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/login)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/login","timestamp":"2025-12-14 18:50:09","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 18:50:09","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 3: fill ([data-testid=\"input-login-email\"])","service":"ifrs15-test-agent","stepNumber":3,"success":true,"target":"[data-testid=\"input-login-email\"]","timestamp":"2025-12-14 18:50:09","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 4: fill ([data-testid=\"input-login-password\"])","service":"ifrs15-test-agent","stepNumber":4,"success":true,"target":"[data-testid=\"input-login-password\"]","timestamp":"2025-12-14 18:50:09","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 5: click ([data-testid=\"button-login-submit\"])","service":"ifrs15-test-agent","stepNumber":5,"success":true,"target":"[data-testid=\"button-login-submit\"]","timestamp":"2025-12-14 18:50:09","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 6: wait","service":"ifrs15-test-agent","stepNumber":6,"success":true,"timestamp":"2025-12-14 18:50:09","type":"step"}
+{"action":"waitForNavigation","level":"info","message":"  ✓ Step 7: waitForNavigation (/,/change-password,/activate-license)","service":"ifrs15-test-agent","stepNumber":7,"success":true,"target":["/","/change-password","/activate-license"],"timestamp":"2025-12-14 18:50:09","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 8: wait","service":"ifrs15-test-agent","stepNumber":8,"success":true,"timestamp":"2025-12-14 18:50:09","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:09","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:09","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:09"}
+{"level":"info","message":"▶ Starting scenario: Create a new customer","scenario":"Create a new customer","service":"ifrs15-test-agent","tags":["crud","customer","smoke"],"timestamp":"2025-12-14 18:50:09","type":"scenario_start"}
+{"duration":20480,"level":"error","message":"✗ Scenario completed: Create a new customer (20480ms)","scenario":"Create a new customer","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 18:50:29","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/customers)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/customers","timestamp":"2025-12-14 18:50:29","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement ([data-testid=\"button-new-customer\"])","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"[data-testid=\"button-new-customer\"]","timestamp":"2025-12-14 18:50:29","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 3: click ([data-testid=\"button-new-customer\"])","service":"ifrs15-test-agent","stepNumber":3,"success":true,"target":"[data-testid=\"button-new-customer\"]","timestamp":"2025-12-14 18:50:29","type":"step"}
+{"action":"waitForDialog","level":"info","message":"  ✓ Step 4: waitForDialog","service":"ifrs15-test-agent","stepNumber":4,"success":true,"timestamp":"2025-12-14 18:50:29","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 5: fill ([data-testid=\"input-customer-name\"])","service":"ifrs15-test-agent","stepNumber":5,"success":true,"target":"[data-testid=\"input-customer-name\"]","timestamp":"2025-12-14 18:50:29","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 6: fill ([data-testid=\"input-country\"])","service":"ifrs15-test-agent","stepNumber":6,"success":true,"target":"[data-testid=\"input-country\"]","timestamp":"2025-12-14 18:50:29","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 7: click ([data-testid=\"select-currency\"])","service":"ifrs15-test-agent","stepNumber":7,"success":true,"target":"[data-testid=\"select-currency\"]","timestamp":"2025-12-14 18:50:29","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 8: click ([role=\"option\"]:has-text(\"USD\"))","service":"ifrs15-test-agent","stepNumber":8,"success":true,"target":"[role=\"option\"]:has-text(\"USD\")","timestamp":"2025-12-14 18:50:29","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 9: fill ([data-testid=\"input-email\"])","service":"ifrs15-test-agent","stepNumber":9,"success":true,"target":"[data-testid=\"input-email\"]","timestamp":"2025-12-14 18:50:29","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 10: click ([data-testid=\"button-submit-customer\"])","service":"ifrs15-test-agent","stepNumber":10,"success":true,"target":"[data-testid=\"button-submit-customer\"]","timestamp":"2025-12-14 18:50:29","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 11: wait","service":"ifrs15-test-agent","stepNumber":11,"success":true,"timestamp":"2025-12-14 18:50:29","type":"step"}
+{"level":"warn","message":"  ✗ Validation [toast]: Toast did not appear within timeout Toast did not appear within timeout","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:29","type":"validation","validationType":"toast"}
+{"level":"warn","message":"  ✗ Validation [element]: Element \"[role=\"dialog\"]\" expected to be hidden, but was visible Element \"[role=\"dialog\"]\" expected to be hidden, but was visible","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:29","type":"validation","validationType":"element"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:29"}
+{"level":"info","message":"▶ Starting scenario: Create a new contract","scenario":"Create a new contract","service":"ifrs15-test-agent","tags":["crud","contract","smoke"],"timestamp":"2025-12-14 18:50:29","type":"scenario_start"}
+{"duration":20830,"level":"error","message":"✗ Scenario completed: Create a new contract (20830ms)","scenario":"Create a new contract","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 18:50:50","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/contracts)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/contracts","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement ([data-testid=\"button-new-contract\"])","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"[data-testid=\"button-new-contract\"]","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 3: click ([data-testid=\"button-new-contract\"])","service":"ifrs15-test-agent","stepNumber":3,"success":true,"target":"[data-testid=\"button-new-contract\"]","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"waitForDialog","level":"info","message":"  ✓ Step 4: waitForDialog","service":"ifrs15-test-agent","stepNumber":4,"success":true,"timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 5: click ([data-testid=\"select-customer\"])","service":"ifrs15-test-agent","stepNumber":5,"success":true,"target":"[data-testid=\"select-customer\"]","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 6: wait","service":"ifrs15-test-agent","stepNumber":6,"success":true,"timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 7: click ([role=\"option\"]:first-child)","service":"ifrs15-test-agent","stepNumber":7,"success":true,"target":"[role=\"option\"]:first-child","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 8: fill ([data-testid=\"input-contract-number\"])","service":"ifrs15-test-agent","stepNumber":8,"success":true,"target":"[data-testid=\"input-contract-number\"]","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 9: fill ([data-testid=\"input-title\"])","service":"ifrs15-test-agent","stepNumber":9,"success":true,"target":"[data-testid=\"input-title\"]","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 10: fill ([data-testid=\"input-start-date\"])","service":"ifrs15-test-agent","stepNumber":10,"success":true,"target":"[data-testid=\"input-start-date\"]","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 11: fill ([data-testid=\"input-end-date\"])","service":"ifrs15-test-agent","stepNumber":11,"success":true,"target":"[data-testid=\"input-end-date\"]","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 12: fill ([data-testid=\"input-total-value\"])","service":"ifrs15-test-agent","stepNumber":12,"success":true,"target":"[data-testid=\"input-total-value\"]","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 13: click ([data-testid=\"select-currency\"])","service":"ifrs15-test-agent","stepNumber":13,"success":true,"target":"[data-testid=\"select-currency\"]","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 14: click ([role=\"option\"]:has-text(\"USD\"))","service":"ifrs15-test-agent","stepNumber":14,"success":true,"target":"[role=\"option\"]:has-text(\"USD\")","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"fill","level":"info","message":"  ✓ Step 15: fill ([data-testid=\"input-payment-terms\"])","service":"ifrs15-test-agent","stepNumber":15,"success":true,"target":"[data-testid=\"input-payment-terms\"]","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"click","level":"info","message":"  ✓ Step 16: click ([data-testid=\"button-submit-contract\"])","service":"ifrs15-test-agent","stepNumber":16,"success":true,"target":"[data-testid=\"button-submit-contract\"]","timestamp":"2025-12-14 18:50:50","type":"step"}
+{"action":"wait","level":"info","message":"  ✓ Step 17: wait","service":"ifrs15-test-agent","stepNumber":17,"success":true,"timestamp":"2025-12-14 18:50:50","type":"step"}
+{"level":"warn","message":"  ✗ Validation [toast]: Toast did not appear within timeout Toast did not appear within timeout","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:50","type":"validation","validationType":"toast"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:50:50"}
+{"level":"info","message":"▶ Starting scenario: Navigate to IFRS 15 Engine","scenario":"Navigate to IFRS 15 Engine","service":"ifrs15-test-agent","tags":["ifrs15","smoke","navigation"],"timestamp":"2025-12-14 18:50:50","type":"scenario_start"}
+{"duration":12547,"level":"info","message":"✓ Scenario completed: Navigate to IFRS 15 Engine (12547ms)","scenario":"Navigate to IFRS 15 Engine","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 18:51:03","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/ifrs15)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/ifrs15","timestamp":"2025-12-14 18:51:03","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement (h1:has-text(\"IFRS 15\"))","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"h1:has-text(\"IFRS 15\")","timestamp":"2025-12-14 18:51:03","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:03","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [element]: Element \"h1\" is visible Element \"h1\" is visible","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:03","type":"validation","validationType":"element"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:03","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:03"}
+{"level":"info","message":"▶ Starting scenario: View Billing Schedules page","scenario":"View Billing Schedules page","service":"ifrs15-test-agent","tags":["ifrs15","billing","smoke"],"timestamp":"2025-12-14 18:51:03","type":"scenario_start"}
+{"duration":12623,"level":"info","message":"✓ Scenario completed: View Billing Schedules page (12623ms)","scenario":"View Billing Schedules page","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 18:51:15","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/billing-schedules)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/billing-schedules","timestamp":"2025-12-14 18:51:15","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement (h1)","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"h1","timestamp":"2025-12-14 18:51:15","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:15","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [element]: Element \"h1\" is visible Element \"h1\" is visible","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:15","type":"validation","validationType":"element"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:15","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:15"}
+{"level":"info","message":"▶ Starting scenario: View Revenue Ledger page","scenario":"View Revenue Ledger page","service":"ifrs15-test-agent","tags":["ifrs15","ledger","smoke"],"timestamp":"2025-12-14 18:51:15","type":"scenario_start"}
+{"duration":12424,"level":"info","message":"✓ Scenario completed: View Revenue Ledger page (12424ms)","scenario":"View Revenue Ledger page","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 18:51:28","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/revenue-ledger)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/revenue-ledger","timestamp":"2025-12-14 18:51:28","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement (h1)","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"h1","timestamp":"2025-12-14 18:51:28","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:28","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [element]: Element \"h1\" is visible Element \"h1\" is visible","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:28","type":"validation","validationType":"element"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:28","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:28"}
+{"level":"info","message":"▶ Starting scenario: View Consolidated Balances page","scenario":"View Consolidated Balances page","service":"ifrs15-test-agent","tags":["ifrs15","balances","smoke"],"timestamp":"2025-12-14 18:51:28","type":"scenario_start"}
+{"duration":12477,"level":"info","message":"✓ Scenario completed: View Consolidated Balances page (12477ms)","scenario":"View Consolidated Balances page","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 18:51:40","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/consolidated-balances)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/consolidated-balances","timestamp":"2025-12-14 18:51:40","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement (h1)","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"h1","timestamp":"2025-12-14 18:51:40","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:40","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:40","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:40"}
+{"level":"info","message":"▶ Starting scenario: View Revenue Waterfall page","scenario":"View Revenue Waterfall page","service":"ifrs15-test-agent","tags":["ifrs15","waterfall","smoke"],"timestamp":"2025-12-14 18:51:40","type":"scenario_start"}
+{"duration":12479,"level":"info","message":"✓ Scenario completed: View Revenue Waterfall page (12479ms)","scenario":"View Revenue Waterfall page","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 18:51:53","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/revenue-waterfall)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/revenue-waterfall","timestamp":"2025-12-14 18:51:53","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement (h1)","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"h1","timestamp":"2025-12-14 18:51:53","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:53","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:53","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:51:53"}
+{"level":"info","message":"▶ Starting scenario: View Contract Costs page","scenario":"View Contract Costs page","service":"ifrs15-test-agent","tags":["ifrs15","costs","smoke"],"timestamp":"2025-12-14 18:51:53","type":"scenario_start"}
+{"duration":12576,"level":"info","message":"✓ Scenario completed: View Contract Costs page (12576ms)","scenario":"View Contract Costs page","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 18:52:05","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/contract-costs)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/contract-costs","timestamp":"2025-12-14 18:52:05","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement (h1)","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"h1","timestamp":"2025-12-14 18:52:05","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:05","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:05","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:05"}
+{"level":"info","message":"▶ Starting scenario: View Exchange Rates page","scenario":"View Exchange Rates page","service":"ifrs15-test-agent","tags":["ifrs15","forex","smoke"],"timestamp":"2025-12-14 18:52:05","type":"scenario_start"}
+{"duration":12559,"level":"info","message":"✓ Scenario completed: View Exchange Rates page (12559ms)","scenario":"View Exchange Rates page","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 18:52:18","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/exchange-rates)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/exchange-rates","timestamp":"2025-12-14 18:52:18","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement (h1)","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"h1","timestamp":"2025-12-14 18:52:18","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:18","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:18","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:18"}
+{"level":"info","message":"▶ Starting scenario: View Financing Components page","scenario":"View Financing Components page","service":"ifrs15-test-agent","tags":["ifrs15","financing","smoke"],"timestamp":"2025-12-14 18:52:18","type":"scenario_start"}
+{"duration":12562,"level":"info","message":"✓ Scenario completed: View Financing Components page (12562ms)","scenario":"View Financing Components page","service":"ifrs15-test-agent","success":true,"timestamp":"2025-12-14 18:52:31","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/financing-components)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/financing-components","timestamp":"2025-12-14 18:52:31","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement (h1)","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"h1","timestamp":"2025-12-14 18:52:31","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:31","type":"validation","validationType":"url"}
+{"level":"info","message":"  ✓ Validation [console]: No console errors found No console errors found","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:31","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:31"}
+{"level":"info","message":"▶ Starting scenario: View Executive Dashboard","scenario":"View Executive Dashboard","service":"ifrs15-test-agent","tags":["ifrs15","dashboard","smoke"],"timestamp":"2025-12-14 18:52:31","type":"scenario_start"}
+{"duration":12527,"level":"error","message":"✗ Scenario completed: View Executive Dashboard (12527ms)","scenario":"View Executive Dashboard","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 18:52:43","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/executive-dashboard)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/executive-dashboard","timestamp":"2025-12-14 18:52:43","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement (h1)","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"h1","timestamp":"2025-12-14 18:52:43","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:43","type":"validation","validationType":"url"}
+{"level":"warn","message":"  ✗ Validation [console]: Found 1 unexpected console errors Found 1 unexpected console errors","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:43","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:43"}
+{"level":"info","message":"▶ Starting scenario: View IFRS 15 Accounting Control page","scenario":"View IFRS 15 Accounting Control page","service":"ifrs15-test-agent","tags":["ifrs15","accounting","smoke"],"timestamp":"2025-12-14 18:52:43","type":"scenario_start"}
+{"duration":12478,"level":"error","message":"✗ Scenario completed: View IFRS 15 Accounting Control page (12478ms)","scenario":"View IFRS 15 Accounting Control page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 18:52:56","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/ifrs15-accounting-control)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/ifrs15-accounting-control","timestamp":"2025-12-14 18:52:56","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement (h1)","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"h1","timestamp":"2025-12-14 18:52:56","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:56","type":"validation","validationType":"url"}
+{"level":"warn","message":"  ✗ Validation [console]: Found 1 unexpected console errors Found 1 unexpected console errors","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:56","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:52:56"}
+{"level":"info","message":"▶ Starting scenario: View Reports page","scenario":"View Reports page","service":"ifrs15-test-agent","tags":["ifrs15","reports","smoke"],"timestamp":"2025-12-14 18:52:56","type":"scenario_start"}
+{"duration":12602,"level":"error","message":"✗ Scenario completed: View Reports page (12602ms)","scenario":"View Reports page","service":"ifrs15-test-agent","success":false,"timestamp":"2025-12-14 18:53:08","type":"scenario_end"}
+{"action":"navigate","level":"info","message":"  ✓ Step 1: navigate (/reports)","service":"ifrs15-test-agent","stepNumber":1,"success":true,"target":"/reports","timestamp":"2025-12-14 18:53:08","type":"step"}
+{"action":"waitForElement","level":"info","message":"  ✓ Step 2: waitForElement (h1)","service":"ifrs15-test-agent","stepNumber":2,"success":true,"target":"h1","timestamp":"2025-12-14 18:53:08","type":"step"}
+{"level":"info","message":"  ✓ Validation [url]: URL matches expected pattern URL matches expected pattern","passed":true,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:53:08","type":"validation","validationType":"url"}
+{"level":"warn","message":"  ✗ Validation [console]: Found 1 unexpected console errors Found 1 unexpected console errors","passed":false,"service":"ifrs15-test-agent","timestamp":"2025-12-14 18:53:08","type":"validation","validationType":"console"}
+{"level":"info","message":"","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:53:08"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:53:08"}
+{"level":"info","message":"Test Run Summary:","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:53:08"}
+{"level":"info","message":"  Total:    14","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:53:08"}
+{"level":"info","message":"  Passed:   9 (64%)","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:53:08"}
+{"level":"info","message":"  Failed:   5","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:53:08"}
+{"level":"info","message":"  Skipped:  0","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:53:08"}
+{"level":"info","message":"  Duration: 188s","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:53:08"}
+{"level":"info","message":"══════════════════════════════════════════════════","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:53:08"}
+{"level":"info","message":"Report generated: reports\\test-report_2025-12-14_18-53-08.html","service":"ifrs15-test-agent","timestamp":"2025-12-14 18:53:08"}

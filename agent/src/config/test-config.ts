@@ -49,7 +49,7 @@ export const testConfig: TestConfig = {
   },
   
   timeouts: {
-    navigation: 30000,
+    navigation: 60000, // Increased for Firebase hosting which may be slower
     action: 10000,
     assertion: 5000,
     test: 120000,

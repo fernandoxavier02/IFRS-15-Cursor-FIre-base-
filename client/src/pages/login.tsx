@@ -12,13 +12,14 @@ import { useLocation } from "wouter";
 export default function Login() {
   const { toast } = useToast();
   const { t } = useI18n();
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, sendPasswordResetEmail } = useAuth();
   const [, setLocation] = useLocation();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,8 +153,36 @@ export default function Login() {
                       variant="ghost"
                       className="p-0 h-auto text-xs text-muted-foreground"
                       data-testid="button-forgot-password"
+                      disabled={isResettingPassword}
+                      onClick={async () => {
+                        if (!email) {
+                          toast({
+                            title: t("common.error"),
+                            description: "Por favor, insira seu email primeiro.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        
+                        setIsResettingPassword(true);
+                        const result = await sendPasswordResetEmail(email);
+                        setIsResettingPassword(false);
+                        
+                        if (result.success) {
+                          toast({
+                            title: "Email enviado",
+                            description: "Se este email estiver cadastrado, você receberá um link para redefinir sua senha.",
+                          });
+                        } else {
+                          toast({
+                            title: t("common.error"),
+                            description: result.error,
+                            variant: "destructive",
+                          });
+                        }
+                      }}
                     >
-                      Forgot password?
+                      {isResettingPassword ? "Enviando..." : "Forgot password?"}
                     </Button>
                   </div>
                   <div className="relative">

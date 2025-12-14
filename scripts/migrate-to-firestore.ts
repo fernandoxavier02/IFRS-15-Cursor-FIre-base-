@@ -40,6 +40,12 @@ function toFirestoreTimestamp(date: Date | string | null): admin.firestore.Times
   return admin.firestore.Timestamp.fromDate(d);
 }
 
+// Helper to parse decimal values
+function parseDecimal(value: string | number | null): number {
+  if (value === null || value === undefined) return 0;
+  return typeof value === "string" ? parseFloat(value) : value;
+}
+
 // Helper to batch write documents
 async function batchWrite(
   collectionPath: string,
@@ -245,7 +251,7 @@ async function migrateContracts(
       status: row.status || "draft",
       startDate: toFirestoreTimestamp(row.start_date),
       endDate: toFirestoreTimestamp(row.end_date),
-      totalValue: parseFloat(row.total_value) || 0,
+      totalValue: parseDecimal(row.total_value),
       currency: row.currency || "BRL",
       paymentTerms: row.payment_terms,
       currentVersionId: null, // Will be updated after versions are migrated
@@ -263,6 +269,16 @@ async function migrateContracts(
   return idMap;
 }
 
+// Helper to get tenant ID from contract
+async function getContractTenantMap(): Promise<Map<string, string>> {
+  const contractTenantMap = new Map<string, string>();
+  const contractsResult = await pool.query("SELECT id, tenant_id FROM contracts");
+  for (const row of contractsResult.rows) {
+    contractTenantMap.set(row.id, row.tenant_id);
+  }
+  return contractTenantMap;
+}
+
 async function migrateContractVersions(
   tenantIdMap: Map<string, string>,
   contractIdMap: Map<string, string>,
@@ -272,13 +288,7 @@ async function migrateContractVersions(
   const idMap = new Map<string, string>();
 
   const result = await pool.query("SELECT * FROM contract_versions ORDER BY created_at");
-
-  // Get contract to tenant mapping
-  const contractTenantMap = new Map<string, string>();
-  const contractsResult = await pool.query("SELECT id, tenant_id FROM contracts");
-  for (const row of contractsResult.rows) {
-    contractTenantMap.set(row.id, row.tenant_id);
-  }
+  const contractTenantMap = await getContractTenantMap();
 
   for (const row of result.rows) {
     const originalTenantId = contractTenantMap.get(row.contract_id);
@@ -295,7 +305,7 @@ async function migrateContractVersions(
       versionNumber: row.version_number,
       effectiveDate: toFirestoreTimestamp(row.effective_date),
       description: row.description,
-      totalValue: parseFloat(row.total_value) || 0,
+      totalValue: parseDecimal(row.total_value),
       modificationReason: row.modification_reason,
       isProspective: row.is_prospective ?? true,
       createdBy: row.created_by ? userIdMap.get(row.created_by) : null,
@@ -310,6 +320,362 @@ async function migrateContractVersions(
 
   console.log(`  Total: ${result.rows.length} contract versions`);
   return idMap;
+}
+
+// Helper to get version mapping info
+async function getVersionTenantContractMap(
+  tenantIdMap: Map<string, string>,
+  contractIdMap: Map<string, string>
+): Promise<Map<string, { tenantId: string; contractId: string }>> {
+  const versionMap = new Map<string, { tenantId: string; contractId: string }>();
+  const result = await pool.query(`
+    SELECT cv.id, c.tenant_id, c.id as contract_id 
+    FROM contract_versions cv 
+    JOIN contracts c ON cv.contract_id = c.id
+  `);
+  
+  for (const row of result.rows) {
+    const newTenantId = tenantIdMap.get(row.tenant_id);
+    const newContractId = contractIdMap.get(row.contract_id);
+    if (newTenantId && newContractId) {
+      versionMap.set(row.id, { tenantId: newTenantId, contractId: newContractId });
+    }
+  }
+  return versionMap;
+}
+
+async function migrateContractLineItems(
+  tenantIdMap: Map<string, string>,
+  contractIdMap: Map<string, string>,
+  versionIdMap: Map<string, string>
+): Promise<Map<string, string>> {
+  console.log("Migrating contract line items...");
+  const idMap = new Map<string, string>();
+
+  const result = await pool.query("SELECT * FROM contract_line_items ORDER BY created_at");
+  const versionTenantContractMap = await getVersionTenantContractMap(tenantIdMap, contractIdMap);
+
+  for (const row of result.rows) {
+    const versionInfo = versionTenantContractMap.get(row.contract_version_id);
+    const newVersionId = versionIdMap.get(row.contract_version_id);
+
+    if (!versionInfo || !newVersionId) {
+      console.log(`  Skipping line item: version not found`);
+      continue;
+    }
+
+    const data = {
+      contractVersionId: newVersionId,
+      description: row.description,
+      quantity: parseDecimal(row.quantity),
+      unitPrice: parseDecimal(row.unit_price),
+      totalPrice: parseDecimal(row.total_price),
+      standaloneSelllingPrice: row.standalone_selling_price ? parseDecimal(row.standalone_selling_price) : null,
+      isDistinct: row.is_distinct ?? true,
+      distinctWithinContext: row.distinct_within_context ?? true,
+      recognitionMethod: row.recognition_method,
+      measurementMethod: row.measurement_method,
+      deliveryStartDate: toFirestoreTimestamp(row.delivery_start_date),
+      deliveryEndDate: toFirestoreTimestamp(row.delivery_end_date),
+      createdAt: toFirestoreTimestamp(row.created_at) || admin.firestore.Timestamp.now(),
+    };
+
+    const docRef = await firestore
+      .collection(`tenants/${versionInfo.tenantId}/contracts/${versionInfo.contractId}/versions/${newVersionId}/lineItems`)
+      .add(data);
+    idMap.set(row.id, docRef.id);
+  }
+
+  console.log(`  Total: ${result.rows.length} line items`);
+  return idMap;
+}
+
+async function migratePerformanceObligations(
+  tenantIdMap: Map<string, string>,
+  contractIdMap: Map<string, string>,
+  versionIdMap: Map<string, string>
+): Promise<Map<string, string>> {
+  console.log("Migrating performance obligations...");
+  const idMap = new Map<string, string>();
+
+  const result = await pool.query("SELECT * FROM performance_obligations ORDER BY created_at");
+  const versionTenantContractMap = await getVersionTenantContractMap(tenantIdMap, contractIdMap);
+
+  for (const row of result.rows) {
+    const versionInfo = versionTenantContractMap.get(row.contract_version_id);
+    const newVersionId = versionIdMap.get(row.contract_version_id);
+
+    if (!versionInfo || !newVersionId) {
+      console.log(`  Skipping PO: version not found`);
+      continue;
+    }
+
+    const data = {
+      contractVersionId: newVersionId,
+      description: row.description,
+      lineItemIds: row.line_item_ids || [],
+      allocatedPrice: parseDecimal(row.allocated_price),
+      recognitionMethod: row.recognition_method,
+      measurementMethod: row.measurement_method,
+      percentComplete: parseDecimal(row.percent_complete),
+      recognizedAmount: parseDecimal(row.recognized_amount),
+      deferredAmount: parseDecimal(row.deferred_amount),
+      isSatisfied: row.is_satisfied || false,
+      satisfiedDate: toFirestoreTimestamp(row.satisfied_date),
+      justification: row.justification,
+      createdAt: toFirestoreTimestamp(row.created_at) || admin.firestore.Timestamp.now(),
+    };
+
+    const docRef = await firestore
+      .collection(`tenants/${versionInfo.tenantId}/contracts/${versionInfo.contractId}/versions/${newVersionId}/performanceObligations`)
+      .add(data);
+    idMap.set(row.id, docRef.id);
+  }
+
+  console.log(`  Total: ${result.rows.length} performance obligations`);
+  return idMap;
+}
+
+// Helper to get PO mapping info
+async function getPOTenantContractVersionMap(
+  tenantIdMap: Map<string, string>,
+  contractIdMap: Map<string, string>,
+  versionIdMap: Map<string, string>
+): Promise<Map<string, { tenantId: string; contractId: string; versionId: string }>> {
+  const poMap = new Map<string, { tenantId: string; contractId: string; versionId: string }>();
+  const result = await pool.query(`
+    SELECT po.id, c.tenant_id, c.id as contract_id, cv.id as version_id
+    FROM performance_obligations po 
+    JOIN contract_versions cv ON po.contract_version_id = cv.id
+    JOIN contracts c ON cv.contract_id = c.id
+  `);
+  
+  for (const row of result.rows) {
+    const newTenantId = tenantIdMap.get(row.tenant_id);
+    const newContractId = contractIdMap.get(row.contract_id);
+    const newVersionId = versionIdMap.get(row.version_id);
+    if (newTenantId && newContractId && newVersionId) {
+      poMap.set(row.id, { tenantId: newTenantId, contractId: newContractId, versionId: newVersionId });
+    }
+  }
+  return poMap;
+}
+
+async function migrateRevenueSchedules(
+  tenantIdMap: Map<string, string>,
+  contractIdMap: Map<string, string>,
+  versionIdMap: Map<string, string>,
+  poIdMap: Map<string, string>
+): Promise<void> {
+  console.log("Migrating revenue schedules...");
+
+  const result = await pool.query("SELECT * FROM revenue_schedules ORDER BY created_at");
+  const poTenantContractVersionMap = await getPOTenantContractVersionMap(tenantIdMap, contractIdMap, versionIdMap);
+
+  let count = 0;
+  for (const row of result.rows) {
+    const poInfo = poTenantContractVersionMap.get(row.performance_obligation_id);
+    const newPOId = poIdMap.get(row.performance_obligation_id);
+
+    if (!poInfo || !newPOId) {
+      continue;
+    }
+
+    const data = {
+      performanceObligationId: newPOId,
+      periodStart: toFirestoreTimestamp(row.period_start),
+      periodEnd: toFirestoreTimestamp(row.period_end),
+      scheduledAmount: parseDecimal(row.scheduled_amount),
+      recognizedAmount: parseDecimal(row.recognized_amount),
+      isRecognized: row.is_recognized || false,
+      recognizedDate: toFirestoreTimestamp(row.recognized_date),
+      createdAt: toFirestoreTimestamp(row.created_at) || admin.firestore.Timestamp.now(),
+    };
+
+    await firestore
+      .collection(`tenants/${poInfo.tenantId}/contracts/${poInfo.contractId}/versions/${poInfo.versionId}/performanceObligations/${newPOId}/revenueSchedules`)
+      .add(data);
+    count++;
+  }
+
+  console.log(`  Total: ${count} revenue schedules`);
+}
+
+async function migrateBillingSchedules(
+  tenantIdMap: Map<string, string>,
+  contractIdMap: Map<string, string>,
+  poIdMap: Map<string, string>
+): Promise<void> {
+  console.log("Migrating billing schedules...");
+
+  const result = await pool.query("SELECT * FROM billing_schedules ORDER BY created_at");
+
+  let count = 0;
+  for (const row of result.rows) {
+    const newTenantId = tenantIdMap.get(row.tenant_id);
+    const newContractId = contractIdMap.get(row.contract_id);
+    const newPOId = row.performance_obligation_id ? poIdMap.get(row.performance_obligation_id) : null;
+
+    if (!newTenantId) {
+      continue;
+    }
+
+    const data = {
+      tenantId: newTenantId,
+      contractId: newContractId,
+      performanceObligationId: newPOId,
+      billingDate: toFirestoreTimestamp(row.billing_date),
+      dueDate: toFirestoreTimestamp(row.due_date),
+      amount: parseDecimal(row.amount),
+      currency: row.currency || "BRL",
+      frequency: row.frequency,
+      status: row.status || "scheduled",
+      invoiceNumber: row.invoice_number,
+      invoicedAt: toFirestoreTimestamp(row.invoiced_at),
+      paidAt: toFirestoreTimestamp(row.paid_at),
+      paidAmount: row.paid_amount ? parseDecimal(row.paid_amount) : null,
+      notes: row.notes,
+      createdAt: toFirestoreTimestamp(row.created_at) || admin.firestore.Timestamp.now(),
+    };
+
+    await firestore
+      .collection(`tenants/${newTenantId}/billingSchedules`)
+      .add(data);
+    count++;
+  }
+
+  console.log(`  Total: ${count} billing schedules`);
+}
+
+async function migrateRevenueLedgerEntries(
+  tenantIdMap: Map<string, string>,
+  contractIdMap: Map<string, string>,
+  poIdMap: Map<string, string>,
+  userIdMap: Map<string, string>
+): Promise<void> {
+  console.log("Migrating revenue ledger entries...");
+
+  const result = await pool.query("SELECT * FROM revenue_ledger_entries ORDER BY created_at");
+
+  let count = 0;
+  for (const row of result.rows) {
+    const newTenantId = tenantIdMap.get(row.tenant_id);
+    const newContractId = contractIdMap.get(row.contract_id);
+    const newPOId = row.performance_obligation_id ? poIdMap.get(row.performance_obligation_id) : null;
+
+    if (!newTenantId) {
+      continue;
+    }
+
+    const data = {
+      tenantId: newTenantId,
+      contractId: newContractId,
+      performanceObligationId: newPOId,
+      billingScheduleId: row.billing_schedule_id, // Note: would need to map if necessary
+      entryDate: toFirestoreTimestamp(row.entry_date),
+      periodStart: toFirestoreTimestamp(row.period_start),
+      periodEnd: toFirestoreTimestamp(row.period_end),
+      entryType: row.entry_type,
+      debitAccount: row.debit_account,
+      creditAccount: row.credit_account,
+      amount: parseDecimal(row.amount),
+      currency: row.currency || "BRL",
+      exchangeRate: parseDecimal(row.exchange_rate) || 1,
+      functionalAmount: row.functional_amount ? parseDecimal(row.functional_amount) : null,
+      description: row.description,
+      referenceNumber: row.reference_number,
+      isPosted: row.is_posted || false,
+      postedAt: toFirestoreTimestamp(row.posted_at),
+      postedBy: row.posted_by ? userIdMap.get(row.posted_by) : null,
+      isReversed: row.is_reversed || false,
+      reversedEntryId: row.reversed_entry_id,
+      createdAt: toFirestoreTimestamp(row.created_at) || admin.firestore.Timestamp.now(),
+    };
+
+    await firestore
+      .collection(`tenants/${newTenantId}/revenueLedgerEntries`)
+      .add(data);
+    count++;
+  }
+
+  console.log(`  Total: ${count} revenue ledger entries`);
+}
+
+async function migrateContractBalances(
+  tenantIdMap: Map<string, string>,
+  contractIdMap: Map<string, string>
+): Promise<void> {
+  console.log("Migrating contract balances...");
+
+  const result = await pool.query("SELECT * FROM contract_balances ORDER BY created_at");
+  const contractTenantMap = await getContractTenantMap();
+
+  let count = 0;
+  for (const row of result.rows) {
+    const originalTenantId = contractTenantMap.get(row.contract_id);
+    const newTenantId = originalTenantId ? tenantIdMap.get(originalTenantId) : null;
+    const newContractId = contractIdMap.get(row.contract_id);
+
+    if (!newTenantId || !newContractId) {
+      continue;
+    }
+
+    const data = {
+      contractId: newContractId,
+      periodDate: toFirestoreTimestamp(row.period_date),
+      contractAsset: parseDecimal(row.contract_asset),
+      contractLiability: parseDecimal(row.contract_liability),
+      receivable: parseDecimal(row.receivable),
+      revenueRecognized: parseDecimal(row.revenue_recognized),
+      cashReceived: parseDecimal(row.cash_received),
+      createdAt: toFirestoreTimestamp(row.created_at) || admin.firestore.Timestamp.now(),
+    };
+
+    await firestore
+      .collection(`tenants/${newTenantId}/contracts/${newContractId}/balances`)
+      .add(data);
+    count++;
+  }
+
+  console.log(`  Total: ${count} contract balances`);
+}
+
+async function migrateConsolidatedBalances(tenantIdMap: Map<string, string>): Promise<void> {
+  console.log("Migrating consolidated balances...");
+
+  const result = await pool.query("SELECT * FROM consolidated_balances ORDER BY created_at");
+
+  let count = 0;
+  for (const row of result.rows) {
+    const newTenantId = tenantIdMap.get(row.tenant_id);
+    if (!newTenantId) {
+      continue;
+    }
+
+    const data = {
+      tenantId: newTenantId,
+      periodDate: toFirestoreTimestamp(row.period_date),
+      periodType: row.period_type || "monthly",
+      totalContractAssets: parseDecimal(row.total_contract_assets),
+      totalContractLiabilities: parseDecimal(row.total_contract_liabilities),
+      totalReceivables: parseDecimal(row.total_receivables),
+      totalDeferredRevenue: parseDecimal(row.total_deferred_revenue),
+      totalRecognizedRevenue: parseDecimal(row.total_recognized_revenue),
+      totalBilledAmount: parseDecimal(row.total_billed_amount),
+      totalCashReceived: parseDecimal(row.total_cash_received),
+      totalRemainingObligations: parseDecimal(row.total_remaining_obligations),
+      contractCount: row.contract_count || 0,
+      currency: row.currency || "BRL",
+      createdAt: toFirestoreTimestamp(row.created_at) || admin.firestore.Timestamp.now(),
+    };
+
+    await firestore
+      .collection(`tenants/${newTenantId}/consolidatedBalances`)
+      .add(data);
+    count++;
+  }
+
+  console.log(`  Total: ${count} consolidated balances`);
 }
 
 async function migrateLicenses(tenantIdMap: Map<string, string>, userIdMap: Map<string, string>): Promise<void> {
@@ -355,8 +721,8 @@ async function migrateSubscriptionPlans(): Promise<void> {
     const data = {
       name: row.name,
       description: row.description,
-      priceMonthly: parseFloat(row.price_monthly) || 0,
-      priceYearly: row.price_yearly ? parseFloat(row.price_yearly) : null,
+      priceMonthly: parseDecimal(row.price_monthly),
+      priceYearly: row.price_yearly ? parseDecimal(row.price_yearly) : null,
       stripePriceIdMonthly: row.stripe_price_id_monthly,
       stripePriceIdYearly: row.stripe_price_id_yearly,
       features: row.features || [],
@@ -404,6 +770,38 @@ async function migrateAuditLogs(
   console.log(`  Total: ${result.rows.length} audit logs`);
 }
 
+async function migrateAiProviderConfigs(tenantIdMap: Map<string, string>): Promise<Map<string, string>> {
+  console.log("Migrating AI provider configs...");
+  const idMap = new Map<string, string>();
+
+  const result = await pool.query("SELECT * FROM ai_provider_configs ORDER BY created_at");
+
+  for (const row of result.rows) {
+    const newTenantId = tenantIdMap.get(row.tenant_id);
+    if (!newTenantId) continue;
+
+    const data = {
+      tenantId: newTenantId,
+      provider: row.provider,
+      name: row.name,
+      apiKey: row.api_key, // Note: Should be encrypted in production
+      model: row.model,
+      baseUrl: row.base_url,
+      isDefault: row.is_default || false,
+      isActive: row.is_active ?? true,
+      lastUsedAt: toFirestoreTimestamp(row.last_used_at),
+      createdAt: toFirestoreTimestamp(row.created_at) || admin.firestore.Timestamp.now(),
+      updatedAt: toFirestoreTimestamp(row.updated_at) || admin.firestore.Timestamp.now(),
+    };
+
+    const docRef = await firestore.collection(`tenants/${newTenantId}/aiProviderConfigs`).add(data);
+    idMap.set(row.id, docRef.id);
+  }
+
+  console.log(`  Total: ${result.rows.length} AI provider configs`);
+  return idMap;
+}
+
 // Main migration function
 async function migrate() {
   console.log("=".repeat(60));
@@ -412,16 +810,31 @@ async function migrate() {
 
   try {
     // Migrate in order of dependencies
+    console.log("\n--- Phase 1: Core Entities ---");
     const tenantIdMap = await migrateTenants();
     const userIdMap = await migrateUsers(tenantIdMap);
     const customerIdMap = await migrateCustomers(tenantIdMap);
+    
+    console.log("\n--- Phase 2: Contracts ---");
     const contractIdMap = await migrateContracts(tenantIdMap, customerIdMap);
     const versionIdMap = await migrateContractVersions(tenantIdMap, contractIdMap, userIdMap);
+    const lineItemIdMap = await migrateContractLineItems(tenantIdMap, contractIdMap, versionIdMap);
+    const poIdMap = await migratePerformanceObligations(tenantIdMap, contractIdMap, versionIdMap);
+    
+    console.log("\n--- Phase 3: Schedules and Accounting ---");
+    await migrateRevenueSchedules(tenantIdMap, contractIdMap, versionIdMap, poIdMap);
+    await migrateBillingSchedules(tenantIdMap, contractIdMap, poIdMap);
+    await migrateRevenueLedgerEntries(tenantIdMap, contractIdMap, poIdMap, userIdMap);
+    await migrateContractBalances(tenantIdMap, contractIdMap);
+    await migrateConsolidatedBalances(tenantIdMap);
+    
+    console.log("\n--- Phase 4: Auxiliary Data ---");
     await migrateLicenses(tenantIdMap, userIdMap);
     await migrateSubscriptionPlans();
     await migrateAuditLogs(tenantIdMap, userIdMap);
+    await migrateAiProviderConfigs(tenantIdMap);
 
-    console.log("=".repeat(60));
+    console.log("\n" + "=".repeat(60));
     console.log("Migration completed successfully!");
     console.log("=".repeat(60));
     console.log("\nIMPORTANT: All users will need to reset their passwords.");

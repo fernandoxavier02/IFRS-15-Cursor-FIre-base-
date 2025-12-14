@@ -1,54 +1,55 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useI18n } from "@/lib/i18n";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  Plus,
-  MoreHorizontal,
-  KeyRound,
-  Pause,
-  Play,
-  Trash2,
-  RefreshCw,
-  Shield,
-  Users,
-  Monitor,
-  Loader2,
-  Copy,
-  Check,
-  AlertTriangle,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { functions } from "@/lib/firebase";
+import { useI18n } from "@/lib/i18n";
+import { queryClient } from "@/lib/queryClient";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { httpsCallable } from "firebase/functions";
+import {
+    AlertTriangle,
+    Check,
+    Copy,
+    KeyRound,
+    Loader2,
+    Monitor,
+    MoreHorizontal,
+    Pause,
+    Play,
+    Plus,
+    RefreshCw,
+    Shield,
+    Trash2
 } from "lucide-react";
+import { useState } from "react";
 
 interface AdminLicense {
   id: string;
@@ -84,8 +85,15 @@ export default function AdminLicenses() {
   const [createdCredentials, setCreatedCredentials] = useState<CreatedCredentials | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
+  // Admin licenses - requires system admin access
+  // For now, return empty array - admin licenses should be managed via Firebase Console or Cloud Function
   const { data: licenses, isLoading } = useQuery<AdminLicense[]>({
-    queryKey: ["/api/admin/licenses"],
+    queryKey: ["admin-licenses"],
+    queryFn: async () => {
+      // TODO: Implement admin license listing via Cloud Function
+      // This requires system admin privileges
+      return [];
+    },
   });
 
   const copyToClipboard = async (text: string, field: string) => {
@@ -104,11 +112,19 @@ export default function AdminLicenses() {
 
   const createLicenseMutation = useMutation({
     mutationFn: async (data: { email: string; seatCount: number; planType: string }) => {
-      const response = await apiRequest("POST", "/api/admin/licenses", data);
-      return response.json();
+      // Use createUserWithTenant Cloud Function
+      const createUser = httpsCallable(functions, "createUserWithTenant");
+      const result = await createUser({
+        email: data.email,
+        password: undefined, // Will be auto-generated
+        tenantName: data.email.split("@")[0],
+        planType: data.planType,
+        seatCount: data.seatCount,
+      });
+      return result.data as any;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/licenses"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-licenses"] });
       setIsCreateOpen(false);
       setNewLicense({ email: "", seatCount: "1", planType: "professional" });
       
@@ -140,13 +156,19 @@ export default function AdminLicenses() {
 
   const actionMutation = useMutation({
     mutationFn: async ({ id, action }: { id: string; action: string }) => {
-      return apiRequest("POST", `/api/admin/licenses/${id}/${action}`);
+      if (action === "activate") {
+        const activateLicense = httpsCallable(functions, "activateUserLicense");
+        return activateLicense({ licenseId: id });
+      } else {
+        // For suspend/revoke, use licenseService if available
+        throw new Error(`Action ${action} not yet implemented via Cloud Functions`);
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/licenses"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-licenses"] });
       toast({
-        title: "Action completed",
-        description: "The license has been updated.",
+        title: "Ação concluída",
+        description: "A licença foi atualizada.",
       });
     },
     onError: (error: Error) => {

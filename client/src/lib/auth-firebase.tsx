@@ -1,6 +1,7 @@
 // Firebase Authentication Provider for React
 import {
     EmailAuthProvider,
+    sendPasswordResetEmail as firebaseSendPasswordReset,
     User as FirebaseUser,
     onAuthStateChanged,
     reauthenticateWithCredential,
@@ -41,6 +42,7 @@ interface AuthContextType extends AuthState {
   activateLicense: (licenseKey: string) => Promise<{ success: boolean; error?: string }>;
   refreshUser: () => Promise<void>;
   getIdToken: () => Promise<string | null>;
+  sendPasswordResetEmail: (email: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -283,6 +285,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Send password reset email
+  const sendPasswordResetEmail = async (email: string) => {
+    try {
+      await firebaseSendPasswordReset(auth, email);
+      return { success: true };
+    } catch (error: any) {
+      console.error("Password reset error:", error);
+      
+      let errorMessage = "Failed to send password reset email";
+      if (error.code === "auth/user-not-found") {
+        // For security, don't reveal if user exists
+        return { success: true }; // Pretend it worked
+      } else if (error.code === "auth/invalid-email") {
+        errorMessage = "Invalid email address";
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage = "Too many requests. Please try again later.";
+      }
+      
+      return { success: false, error: errorMessage };
+    }
+  };
+
   // Get ID token for API calls
   const getIdToken = async (): Promise<string | null> => {
     const currentUser = auth.currentUser;
@@ -306,6 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         activateLicense,
         refreshUser,
         getIdToken,
+        sendPasswordResetEmail,
       }}
     >
       {children}

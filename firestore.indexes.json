@@ -107,6 +107,40 @@
         { "fieldPath": "toCurrency", "order": "ASCENDING" },
         { "fieldPath": "effectiveDate", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "contractCosts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "incurredDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "contractCosts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "contractId", "order": "ASCENDING" },
+        { "fieldPath": "incurredDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "financingComponents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "financingComponents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "contractId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

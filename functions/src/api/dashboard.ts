@@ -6,7 +6,12 @@ import { AuthenticatedRequest, requireTenant, verifyAuth } from "../utils/auth-m
 import { COLLECTIONS, tenantCollection } from "../utils/collections";
 
 const app = express();
-app.use(cors({ origin: true }));
+app.use(cors({ 
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use(verifyAuth as any);
 app.use(requireTenant as any);

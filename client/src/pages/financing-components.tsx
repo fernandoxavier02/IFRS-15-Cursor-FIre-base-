@@ -1,23 +1,23 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { format } from "date-fns";
-import { Plus, Percent, CurrencyDollar, Clock, Calculator, TrendUp } from "@phosphor-icons/react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useI18n } from "@/lib/i18n";
-import type { FinancingComponent, Contract } from "@/lib/types";
+import { queryClient } from "@/lib/queryClient";
+import type { Contract, FinancingComponent } from "@/lib/types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Calculator, Clock, CurrencyDollar, Percent, Plus, TrendUp } from "@phosphor-icons/react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 const financingComponentSchema = z.object({
   contractId: z.string().min(1, "Contract is required"),
@@ -45,12 +45,23 @@ export default function FinancingComponentsPage() {
   const [previewPV, setPreviewPV] = useState<number | null>(null);
   const [previewInterest, setPreviewInterest] = useState<number | null>(null);
 
+  const { user } = useAuth();
   const { data: financingComponents, isLoading } = useQuery<FinancingComponent[]>({
-    queryKey: ["/api/financing-components"],
+    queryKey: ["financing-components", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return financingComponentService.getAll(user.tenantId) as any;
+    },
+    enabled: !!user?.tenantId,
   });
 
   const { data: contracts } = useQuery<Contract[]>({
-    queryKey: ["/api/contracts"],
+    queryKey: ["contracts", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return contractService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
   });
 
   const form = useForm<FinancingComponentFormData>({
@@ -79,24 +90,30 @@ export default function FinancingComponentsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: FinancingComponentFormData) => {
+      if (!user?.tenantId) throw new Error("No tenant ID");
       const presentValue = calculatePresentValue(data.nominalAmount, data.discountRate, data.financingPeriodMonths);
       const totalInterest = calculateTotalInterest(data.nominalAmount, presentValue);
       
-      return apiRequest("POST", "/api/financing-components", {
-        ...data,
+      return financingComponentService.create(user.tenantId, {
+        contractId: data.contractId,
+        nominalAmount: data.nominalAmount.toString(),
+        discountRate: data.discountRate.toString(),
+        financingPeriodMonths: data.financingPeriodMonths,
+        currency: data.currency,
         presentValue: presentValue.toFixed(2),
         totalInterest: totalInterest.toFixed(2),
-      });
+        recognizedInterest: "0",
+      } as any);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/financing-components"] });
+      queryClient.invalidateQueries({ queryKey: ["financing-components", user?.tenantId] });
       setIsDialogOpen(false);
       form.reset();
       setPreviewPV(null);
       setPreviewInterest(null);
       toast({
         title: t("common.success"),
-        description: "Financing component calculated and saved",
+        description: "Componente de financiamento calculado e salvo",
       });
     },
     onError: () => {

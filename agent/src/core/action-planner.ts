@@ -23,7 +23,7 @@ export type ActionType =
 
 export interface TestAction {
   type: ActionType;
-  target?: string;
+  target?: string | string[]; // Support arrays for waitForNavigation
   value?: string | number;
   options?: Record<string, unknown>;
   description?: string;
@@ -100,44 +100,54 @@ export class ActionPlanner {
     let screenshot: Buffer | undefined;
 
     try {
-      const target = action.target ? this.resolveSelector(action.target) : undefined;
+      // For waitForNavigation, preserve arrays; otherwise resolve selector
+      let target: string | string[] | undefined;
+      if (action.target) {
+        if (action.type === 'waitForNavigation' && Array.isArray(action.target)) {
+          target = action.target;
+        } else if (typeof action.target === 'string') {
+          target = this.resolveSelector(action.target);
+        } else {
+          target = action.target;
+        }
+      }
       const value = action.value !== undefined 
         ? (typeof action.value === 'string' ? this.interpolateValue(action.value, context) : action.value)
         : undefined;
 
       switch (action.type) {
         case 'navigate':
-          if (target) await this.controller.navigate(target);
+          if (target && typeof target === 'string') await this.controller.navigate(target);
           break;
 
         case 'click':
-          if (target) await this.controller.click(target, action.options as { force?: boolean });
+          if (target && typeof target === 'string') await this.controller.click(target, action.options as { force?: boolean });
           break;
 
         case 'fill':
-          if (target && value !== undefined) {
+          if (target && typeof target === 'string' && value !== undefined) {
             await this.controller.fill(target, String(value));
           }
           break;
 
         case 'clearAndFill':
-          if (target && value !== undefined) {
+          if (target && typeof target === 'string' && value !== undefined) {
             await this.controller.clearAndFill(target, String(value));
           }
           break;
 
         case 'select':
-          if (target && value !== undefined) {
+          if (target && typeof target === 'string' && value !== undefined) {
             await this.controller.select(target, String(value));
           }
           break;
 
         case 'check':
-          if (target) await this.controller.check(target);
+          if (target && typeof target === 'string') await this.controller.check(target);
           break;
 
         case 'uncheck':
-          if (target) await this.controller.uncheck(target);
+          if (target && typeof target === 'string') await this.controller.uncheck(target);
           break;
 
         case 'press':
@@ -145,7 +155,7 @@ export class ActionPlanner {
           break;
 
         case 'hover':
-          if (target) await this.controller.hover(target);
+          if (target && typeof target === 'string') await this.controller.hover(target);
           break;
 
         case 'wait':
@@ -153,7 +163,7 @@ export class ActionPlanner {
           break;
 
         case 'waitForElement':
-          if (target) {
+          if (target && typeof target === 'string') {
             await this.controller.waitForElement(target, {
               timeout: action.options?.timeout as number,
               state: action.options?.state as 'visible' | 'hidden',
@@ -162,13 +172,18 @@ export class ActionPlanner {
           break;
 
         case 'waitForElementHidden':
-          if (target) {
+          if (target && typeof target === 'string') {
             await this.controller.waitForElementHidden(target, action.options?.timeout as number);
           }
           break;
 
         case 'waitForNavigation':
-          await this.controller.waitForNavigation(target);
+          // Support both string and array of strings for target
+          if (target) {
+            await this.controller.waitForNavigation(target);
+          } else {
+            await this.controller.waitForNavigation();
+          }
           break;
 
         case 'waitForDialog':
@@ -187,7 +202,7 @@ export class ActionPlanner {
           break;
 
         case 'scroll':
-          if (target) {
+          if (target && typeof target === 'string') {
             await this.controller.scrollToElement(target);
           }
           break;
