@@ -109,11 +109,23 @@ firebase deploy --only hosting
 
 ---
 
-## ✅ Checklist Pós-Deploy
+## ✅ Status do Deploy
 
-Após o deploy, verifique:
+**Deploy realizado**: ✅ Índices já existem no Firebase
 
-- [ ] **Índices criados**: Acesse Firebase Console → Firestore → Indexes e confirme que os novos índices estão "Enabled"
+Verificação realizada:
+- ✅ `consolidatedBalances` com `periodDate` ASCENDING - **JÁ EXISTE**
+- ✅ `consolidatedBalances` com `periodDate` DESCENDING - **JÁ EXISTE**
+- ✅ `revenueLedgerEntries` com `entryDate` ASCENDING - **JÁ EXISTE**
+- ✅ `revenueLedgerEntries` com `entryDate` DESCENDING - **JÁ EXISTE**
+
+**Ação**: Nenhum deploy adicional necessário. Os índices já estão ativos no Firebase.
+
+## ✅ Checklist de Verificação
+
+Após confirmar que os índices estão ativos, verifique:
+
+- [x] **Índices criados**: ✅ Confirmado via `firebase firestore:indexes` - todos os índices necessários existem
 - [ ] **Regras aplicadas**: Teste leitura/escrita de `consolidatedBalances` e `revenueLedgerEntries`
 - [ ] **Executive Dashboard**: Abra a página e verifique se o revenue trend carrega sem erros
 - [ ] **Revenue Waterfall**: Abra a página e verifique se os dados consolidados aparecem (ou estado vazio se não houver dados)
