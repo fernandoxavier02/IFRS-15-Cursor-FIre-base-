@@ -19,6 +19,7 @@ import {
     UsersThree
 } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import {
     Area,
     AreaChart,
