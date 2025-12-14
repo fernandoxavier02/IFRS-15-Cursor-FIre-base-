@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -162,18 +163,25 @@ export default function ContractDetails() {
       
       const percentValue = data.percentComplete?.trim() || "0";
       const parsedPercent = parseFloat(percentValue);
+      const parsedAllocatedPrice = parseFloat(data.allocatedPrice);
+      
+      if (isNaN(parsedAllocatedPrice) || parsedAllocatedPrice <= 0) {
+        throw new Error("O preço alocado deve ser um número positivo");
+      }
+      
       const { performanceObligationService } = await import("@/lib/firestore-service");
       
       return performanceObligationService.create(user.tenantId, id, currentVersionId, {
+        contractVersionId: currentVersionId,
         description: data.description,
-        allocatedPrice: data.allocatedPrice,
+        allocatedPrice: parsedAllocatedPrice,
         recognitionMethod: data.recognitionMethod,
-        measurementMethod: data.measurementMethod || null,
-        percentComplete: isNaN(parsedPercent) ? "0" : percentValue,
-        recognizedAmount: "0",
-        deferredAmount: data.allocatedPrice,
+        measurementMethod: data.measurementMethod || undefined,
+        percentComplete: isNaN(parsedPercent) ? 0 : parsedPercent,
+        recognizedAmount: 0,
+        deferredAmount: parsedAllocatedPrice,
         isSatisfied: false,
-      } as any);
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["performance-obligations", user?.tenantId, id] });
@@ -536,6 +544,9 @@ export default function ContractDetails() {
                   <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
                       <DialogTitle data-testid="text-dialog-title">Add Performance Obligation</DialogTitle>
+                      <DialogDescription>
+                        Adicione uma nova obrigação de performance ao contrato. Certifique-se de que o contrato possui uma versão criada.
+                      </DialogDescription>
                     </DialogHeader>
                     <Form {...poForm}>
                       <form onSubmit={poForm.handleSubmit(handleCreatePO)} className="grid gap-4 py-4">
