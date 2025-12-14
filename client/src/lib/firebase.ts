@@ -9,7 +9,8 @@ const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAR-mXBKfDyFGV5JCCBl6WrReBmlDo2wS0",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "ifrs15-revenue-manager.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "ifrs15-revenue-manager",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "ifrs15-revenue-manager.firebasestorage.app",
+  // Use appspot.com bucket if available, fallback to firebasestorage.app
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "ifrs15-revenue-manager.appspot.com",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1065024526212",
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1065024526212:web:e1de7ccb1cbb7c93f26fd1",
 };

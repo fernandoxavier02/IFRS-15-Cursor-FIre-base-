@@ -5,6 +5,7 @@ import type {
     AiReviewTask,
     AuditLog,
     BillingSchedule,
+    ConsolidatedBalance,
     Contract,
     ContractLineItem,
     ContractVersion,
@@ -735,6 +736,41 @@ export const financingComponentService = {
   },
 };
 
+// ==================== CONSOLIDATED BALANCES ====================
+
+export const consolidatedBalanceService = {
+  async getAll(tenantId: string): Promise<ConsolidatedBalance[]> {
+    return getCollection<ConsolidatedBalance>(
+      tenantCollection(tenantId, "consolidatedBalances"),
+      orderBy("periodDate", "desc")
+    );
+  },
+
+  async getByPeriod(
+    tenantId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<ConsolidatedBalance[]> {
+    const startTimestamp = Timestamp.fromDate(startDate);
+    const endTimestamp = Timestamp.fromDate(endDate);
+    return getCollection<ConsolidatedBalance>(
+      tenantCollection(tenantId, "consolidatedBalances"),
+      where("periodDate", ">=", startTimestamp),
+      where("periodDate", "<=", endTimestamp),
+      orderBy("periodDate", "asc")
+    );
+  },
+
+  async getLatest(tenantId: string): Promise<ConsolidatedBalance | null> {
+    const balances = await getCollection<ConsolidatedBalance>(
+      tenantCollection(tenantId, "consolidatedBalances"),
+      orderBy("periodDate", "desc"),
+      limit(1)
+    );
+    return balances.length > 0 ? balances[0] : null;
+  },
+};
+
 // ==================== TENANT ====================
 
 export const tenantService = {
@@ -750,6 +786,8 @@ export const tenantService = {
   },
 
   // Get plan info with current usage counts
+  // Note: This fetches all contracts/licenses which can be expensive for large tenants.
+  // TODO: Optimize by storing counts in tenant document or using aggregation queries
   // Fallback: returns starter plan defaults if tenant not found
   async getPlanInfo(tenantId: string): Promise<{
     planType: "starter" | "professional" | "enterprise";
@@ -772,6 +810,7 @@ export const tenantService = {
       }
 
       // Get current counts
+      // Performance note: For large tenants, consider caching or using tenant.currentContracts/currentLicenses fields
       const contracts = await contractService.getAll(tenantId);
       const licenses = await licenseService.getAll(tenantId);
 
@@ -834,4 +873,5 @@ export default {
   contractCosts: contractCostService,
   exchangeRates: exchangeRateService,
   financingComponents: financingComponentService,
+  consolidatedBalances: consolidatedBalanceService,
 };
