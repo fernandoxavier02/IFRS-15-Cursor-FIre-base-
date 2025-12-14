@@ -55,6 +55,26 @@ export default function ContractDetails() {
   const { t } = useI18n();
 
   const { user } = useAuth();
+  
+  // Validação de tenantId
+  if (!user?.tenantId && !contractLoading) {
+    return (
+      <div className="p-8 space-y-6 max-w-[1600px] mx-auto">
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <FileText weight="duotone" className="h-16 w-16 text-muted-foreground/30" />
+          <p className="text-lg font-medium text-muted-foreground">Perfil incompleto</p>
+          <p className="text-sm text-muted-foreground">
+            Seu perfil não possui um tenant associado. Por favor, reautentique ou contate o administrador.
+          </p>
+          <Button variant="outline" onClick={() => setLocation("/contracts")} data-testid="button-back-contracts">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar para Contratos
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  
   const { data: contract, isLoading: contractLoading } = useQuery<ContractFullDetails>({
     queryKey: ["contract", user?.tenantId, id],
     queryFn: async () => {

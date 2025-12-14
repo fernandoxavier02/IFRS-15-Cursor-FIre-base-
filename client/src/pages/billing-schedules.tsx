@@ -73,6 +73,21 @@ export default function BillingSchedules() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedView, setSelectedView] = useState<"calendar" | "list">("list");
+  
+  // Validação de tenantId
+  if (!user?.tenantId) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <Calendar className="h-16 w-16 text-muted-foreground/30" />
+          <p className="text-lg font-medium text-muted-foreground">Perfil incompleto</p>
+          <p className="text-sm text-muted-foreground">
+            Seu perfil não possui um tenant associado. Por favor, reautentique ou contate o administrador.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const form = useForm<BillingFormValues>({
     resolver: zodResolver(billingFormSchema),
