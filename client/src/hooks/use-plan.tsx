@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-firebase";
+import { tenantService } from "@/lib/firestore-service";
 
 export interface PlanInfo {
   planType: "starter" | "professional" | "enterprise";
@@ -70,9 +71,25 @@ export function usePlan() {
   const { isAuthenticated, user } = useAuth();
   const isMasterUser = user?.email === MASTER_USER_EMAIL;
 
+  // Fetch plan info from Firestore tenant document
+  // Fallback: returns starter plan defaults if tenant not found or on error
   const { data: planInfo, isLoading } = useQuery<PlanInfo>({
-    queryKey: ["/api/plan"],
-    enabled: isAuthenticated,
+    queryKey: ["plan", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) {
+        // Return starter defaults if no tenantId
+        return {
+          planType: "starter",
+          maxContracts: 10,
+          maxLicenses: 3,
+          currentContracts: 0,
+          currentLicenses: 0,
+        };
+      }
+      return tenantService.getPlanInfo(user.tenantId);
+    },
+    enabled: isAuthenticated && !!user?.tenantId,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   const getPlanFeatures = (): PlanFeatures => {
@@ -97,8 +114,9 @@ export function usePlan() {
     }
 
     const isUnlimited = planInfo.maxContracts === -1;
-    const contractsRemaining = isUnlimited ? Infinity : Math.max(0, planInfo.maxContracts - planInfo.currentContracts);
-    const licensesRemaining = isUnlimited ? Infinity : Math.max(0, planInfo.maxLicenses - planInfo.currentLicenses);
+    // Use -1 for unlimited instead of Infinity to avoid issues
+    const contractsRemaining = isUnlimited ? -1 : Math.max(0, planInfo.maxContracts - planInfo.currentContracts);
+    const licensesRemaining = isUnlimited ? -1 : Math.max(0, planInfo.maxLicenses - planInfo.currentLicenses);
 
     const features = planFeatureMatrix[planInfo.planType] || planFeatureMatrix.starter;
 

@@ -748,6 +748,52 @@ export const tenantService = {
   async update(tenantId: string, data: Record<string, any>): Promise<void> {
     await updateDocument(`tenants`, tenantId, data);
   },
+
+  // Get plan info with current usage counts
+  // Fallback: returns starter plan defaults if tenant not found
+  async getPlanInfo(tenantId: string): Promise<{
+    planType: "starter" | "professional" | "enterprise";
+    maxContracts: number;
+    maxLicenses: number;
+    currentContracts: number;
+    currentLicenses: number;
+  }> {
+    try {
+      const tenant = await this.get(tenantId);
+      if (!tenant) {
+        // Fallback: return starter plan defaults
+        return {
+          planType: "starter",
+          maxContracts: 10,
+          maxLicenses: 3,
+          currentContracts: 0,
+          currentLicenses: 0,
+        };
+      }
+
+      // Get current counts
+      const contracts = await contractService.getAll(tenantId);
+      const licenses = await licenseService.getAll(tenantId);
+
+      return {
+        planType: (tenant.planType as "starter" | "professional" | "enterprise") || "starter",
+        maxContracts: tenant.maxContracts ?? 10,
+        maxLicenses: tenant.maxLicenses ?? 3,
+        currentContracts: contracts.length,
+        currentLicenses: licenses.filter((l) => l.status === "active").length,
+      };
+    } catch (error) {
+      console.warn("Failed to load plan info, using defaults:", error);
+      // Fallback: return starter plan defaults
+      return {
+        planType: "starter",
+        maxContracts: 10,
+        maxLicenses: 3,
+        currentContracts: 0,
+        currentLicenses: 0,
+      };
+    }
+  },
 };
 
 // ==================== USERS ====================
