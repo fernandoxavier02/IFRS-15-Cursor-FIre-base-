@@ -35,7 +35,7 @@ import { queryClient } from "@/lib/queryClient";
 import type { ContractWithDetails, LedgerEntryWithDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Contract, Customer, RevenueLedgerEntry } from "@shared/firestore-types";
-import { toISOString } from "@shared/firestore-types";
+import { LedgerEntryType, toISOString } from "@shared/firestore-types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -57,7 +57,16 @@ const ledgerFormSchema = z.object({
   entryDate: z.string().min(1, "Entry date is required"),
   periodStart: z.string().min(1, "Period start is required"),
   periodEnd: z.string().min(1, "Period end is required"),
-  entryType: z.string().default("revenue_recognition"),
+  entryType: z.enum([
+    LedgerEntryType.REVENUE,
+    LedgerEntryType.DEFERRED_REVENUE,
+    LedgerEntryType.CONTRACT_ASSET,
+    LedgerEntryType.CONTRACT_LIABILITY,
+    LedgerEntryType.RECEIVABLE,
+    LedgerEntryType.CASH,
+    LedgerEntryType.FINANCING_INCOME,
+    LedgerEntryType.COMMISSION_EXPENSE,
+  ]).default(LedgerEntryType.REVENUE),
   debitAccount: z.string().min(1, "Debit account is required"),
   creditAccount: z.string().min(1, "Credit account is required"),
   amount: z.coerce.number().positive("Amount must be positive"),
@@ -83,7 +92,7 @@ export default function RevenueLedger() {
       entryDate: "",
       periodStart: "",
       periodEnd: "",
-      entryType: "revenue_recognition",
+      entryType: LedgerEntryType.REVENUE,
       debitAccount: "",
       creditAccount: "",
       amount: 0,
@@ -245,18 +254,22 @@ export default function RevenueLedger() {
   const createEntryMutation = useMutation({
     mutationFn: async (data: LedgerFormValues) => {
       if (!user?.tenantId) throw new Error("No tenant ID");
+      const { Timestamp } = await import("firebase/firestore");
       return revenueLedgerService.create(user.tenantId, {
         contractId: data.contractId,
         entryType: data.entryType,
-        entryDate: data.entryDate,
+        entryDate: Timestamp.fromDate(new Date(data.entryDate)),
+        periodStart: Timestamp.fromDate(new Date(data.periodStart)),
+        periodEnd: Timestamp.fromDate(new Date(data.periodEnd)),
         debitAccount: data.debitAccount,
         creditAccount: data.creditAccount,
-        amount: data.amount.toString(),
+        amount: Number(data.amount),
         currency: data.currency,
-        description: data.description,
-        referenceNumber: data.referenceNumber,
+        exchangeRate: 1,
+        description: data.description || undefined,
+        referenceNumber: data.referenceNumber || undefined,
         isPosted: false,
-      } as any);
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId] });
@@ -385,10 +398,14 @@ export default function RevenueLedger() {
       header: "Type",
       cell: (row: LedgerEntryWithDetails) => {
         const typeLabels: Record<string, string> = {
-          revenue_recognition: "Revenue Recognition",
-          deferral: "Deferral",
-          adjustment: "Adjustment",
-          reversal: "Reversal",
+          [LedgerEntryType.REVENUE]: "Revenue",
+          [LedgerEntryType.DEFERRED_REVENUE]: "Deferred Revenue",
+          [LedgerEntryType.CONTRACT_ASSET]: "Contract Asset",
+          [LedgerEntryType.CONTRACT_LIABILITY]: "Contract Liability",
+          [LedgerEntryType.RECEIVABLE]: "Receivable",
+          [LedgerEntryType.CASH]: "Cash",
+          [LedgerEntryType.FINANCING_INCOME]: "Financing Income",
+          [LedgerEntryType.COMMISSION_EXPENSE]: "Commission Expense",
         };
         return (
           <span className="text-sm">{typeLabels[row.entryType] || row.entryType}</span>
@@ -534,10 +551,14 @@ export default function RevenueLedger() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="revenue_recognition">Revenue Recognition</SelectItem>
-                              <SelectItem value="deferral">Deferral</SelectItem>
-                              <SelectItem value="adjustment">Adjustment</SelectItem>
-                              <SelectItem value="reversal">Reversal</SelectItem>
+                              <SelectItem value={LedgerEntryType.REVENUE}>Revenue</SelectItem>
+                              <SelectItem value={LedgerEntryType.DEFERRED_REVENUE}>Deferred Revenue</SelectItem>
+                              <SelectItem value={LedgerEntryType.CONTRACT_ASSET}>Contract Asset</SelectItem>
+                              <SelectItem value={LedgerEntryType.CONTRACT_LIABILITY}>Contract Liability</SelectItem>
+                              <SelectItem value={LedgerEntryType.RECEIVABLE}>Receivable</SelectItem>
+                              <SelectItem value={LedgerEntryType.CASH}>Cash</SelectItem>
+                              <SelectItem value={LedgerEntryType.FINANCING_INCOME}>Financing Income</SelectItem>
+                              <SelectItem value={LedgerEntryType.COMMISSION_EXPENSE}>Commission Expense</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -772,10 +793,14 @@ export default function RevenueLedger() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="revenue_recognition">Revenue Recognition</SelectItem>
-            <SelectItem value="deferral">Deferral</SelectItem>
-            <SelectItem value="adjustment">Adjustment</SelectItem>
-            <SelectItem value="reversal">Reversal</SelectItem>
+            <SelectItem value={LedgerEntryType.REVENUE}>Revenue</SelectItem>
+            <SelectItem value={LedgerEntryType.DEFERRED_REVENUE}>Deferred Revenue</SelectItem>
+            <SelectItem value={LedgerEntryType.CONTRACT_ASSET}>Contract Asset</SelectItem>
+            <SelectItem value={LedgerEntryType.CONTRACT_LIABILITY}>Contract Liability</SelectItem>
+            <SelectItem value={LedgerEntryType.RECEIVABLE}>Receivable</SelectItem>
+            <SelectItem value={LedgerEntryType.CASH}>Cash</SelectItem>
+            <SelectItem value={LedgerEntryType.FINANCING_INCOME}>Financing Income</SelectItem>
+            <SelectItem value={LedgerEntryType.COMMISSION_EXPENSE}>Commission Expense</SelectItem>
           </SelectContent>
         </Select>
         <Select value={postedFilter} onValueChange={setPostedFilter}>

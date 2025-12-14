@@ -180,7 +180,8 @@ export default function ExecutiveDashboard() {
           const data = monthlyData.get(monthKey)!;
           
           // Sum recognized and deferred based on entry type
-          if (entry.entryType === "revenue_recognition") {
+          // Use standardized LedgerEntryType values
+          if (entry.entryType === "revenue") {
             data.recognized += Number(entry.amount || 0);
           } else if (entry.entryType === "deferred_revenue") {
             data.deferred += Number(entry.amount || 0);

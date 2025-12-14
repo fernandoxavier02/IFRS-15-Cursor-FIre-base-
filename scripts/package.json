@@ -3,6 +3,7 @@
   "type": "module",
   "scripts": {
     "migrate": "npx tsx migrate-to-firestore.ts",
+    "migrate-entrytype": "npx tsx migrate-entrytype.ts",
     "validate": "npx tsx validate-migration.ts",
     "init-admin": "npx tsx init-admin.ts",
     "test": "npx tsx test-firebase-integration.ts",
