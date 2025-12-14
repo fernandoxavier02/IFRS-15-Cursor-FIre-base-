@@ -37,6 +37,7 @@ import {
     FileText,
     Play,
     RefreshCw,
+    Target,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -297,8 +298,15 @@ export default function IFRS15Engine() {
           </Select>
           <Button
             onClick={() => selectedContract && runEngineMutation.mutate(selectedContract)}
-            disabled={!selectedContract || runEngineMutation.isPending}
+            disabled={!selectedContract || !obligations?.length || runEngineMutation.isPending}
             data-testid="button-run-engine"
+            title={
+              !selectedContract 
+                ? "Selecione um contrato para executar o motor IFRS 15" 
+                : !obligations?.length 
+                ? "Adicione obrigações de performance ao contrato antes de executar o motor"
+                : ""
+            }
           >
             {runEngineMutation.isPending ? (
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -354,7 +362,8 @@ export default function IFRS15Engine() {
             {!selectedContract ? (
               <div className="h-48 flex flex-col items-center justify-center text-muted-foreground">
                 <FileText className="h-12 w-12 mb-3 opacity-30" />
-                <p>Selecione um contrato para ver a análise IFRS 15</p>
+                <p className="font-medium">Selecione um contrato para ver a análise IFRS 15</p>
+                <p className="text-xs text-muted-foreground mt-2">Escolha um contrato no menu acima para começar</p>
               </div>
             ) : contractsLoading ? (
               <div className="space-y-4">
@@ -435,14 +444,35 @@ export default function IFRS15Engine() {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <DataTable
-              columns={obligationColumns}
-              data={obligations ?? []}
-              isLoading={obligationsLoading}
-              emptyMessage="Nenhuma obrigação de performance definida para este contrato"
-              testIdPrefix="obligation"
-              className="border-0"
-            />
+            {obligationsLoading ? (
+              <div className="p-6">
+                <DataTable
+                  columns={obligationColumns}
+                  data={[]}
+                  isLoading={true}
+                  emptyMessage=""
+                  testIdPrefix="obligation"
+                  className="border-0"
+                />
+              </div>
+            ) : !obligations?.length ? (
+              <div className="h-48 flex flex-col items-center justify-center text-muted-foreground p-6">
+                <Target className="h-12 w-12 mb-3 opacity-30" />
+                <p className="font-medium">Nenhuma obrigação de performance encontrada</p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Adicione obrigações de performance ao contrato antes de executar o motor IFRS 15
+                </p>
+              </div>
+            ) : (
+              <DataTable
+                columns={obligationColumns}
+                data={obligations}
+                isLoading={false}
+                emptyMessage="Nenhuma obrigação de performance definida para este contrato"
+                testIdPrefix="obligation"
+                className="border-0"
+              />
+            )}
           </CardContent>
         </Card>
       )}
