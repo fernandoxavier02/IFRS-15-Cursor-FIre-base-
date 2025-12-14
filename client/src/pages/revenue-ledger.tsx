@@ -253,7 +253,12 @@ export default function RevenueLedger() {
   // Create entry via Firestore service
   const createEntryMutation = useMutation({
     mutationFn: async (data: LedgerFormValues) => {
-      if (!user?.tenantId) throw new Error("No tenant ID");
+      if (!user?.tenantId) throw new Error("Perfil incompleto - tenantId ausente. Por favor, reautentique ou contate o administrador.");
+      if (!data.contractId) throw new Error("Selecione um contrato para criar o lançamento");
+      if (!data.entryDate || !data.periodStart || !data.periodEnd) throw new Error("Preencha todas as datas obrigatórias");
+      if (!data.debitAccount || !data.creditAccount) throw new Error("Preencha as contas de débito e crédito");
+      if (!data.amount || data.amount <= 0) throw new Error("O valor do lançamento deve ser maior que zero");
+      
       const { Timestamp } = await import("firebase/firestore");
       return revenueLedgerService.create(user.tenantId, {
         contractId: data.contractId,
@@ -497,7 +502,17 @@ export default function RevenueLedger() {
 
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button data-testid="button-new-entry">
+              <Button 
+                data-testid="button-new-entry"
+                disabled={!user?.tenantId || !contracts?.length}
+                title={
+                  !user?.tenantId 
+                    ? "Perfil incompleto - tenantId ausente" 
+                    : !contracts?.length 
+                    ? "Cadastre um contrato antes de criar lançamentos"
+                    : ""
+                }
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 New Entry
               </Button>
@@ -526,11 +541,17 @@ export default function RevenueLedger() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {contractsWithDetails.map((contract) => (
-                                <SelectItem key={contract.id} value={contract.id}>
-                                  {contract.contractNumber} - {contract.customerName}
-                                </SelectItem>
-                              ))}
+                              {contractsWithDetails.length > 0 ? (
+                                contractsWithDetails.map((contract) => (
+                                  <SelectItem key={contract.id} value={contract.id}>
+                                    {contract.contractNumber} - {contract.customerName}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <div className="p-2 text-sm text-muted-foreground">
+                                  Nenhum contrato disponível
+                                </div>
+                              )}
                             </SelectContent>
                           </Select>
                           <FormMessage />
