@@ -203,7 +203,11 @@ export default function BillingSchedules() {
   // Create billing via Firestore service
   const createBillingMutation = useMutation({
     mutationFn: async (data: BillingFormValues) => {
-      if (!user?.tenantId) throw new Error("No tenant ID");
+      if (!user?.tenantId) throw new Error("Perfil incompleto - tenantId ausente. Por favor, reautentique ou contate o administrador.");
+      if (!data.contractId) throw new Error("Selecione um contrato para criar o faturamento");
+      if (!data.billingDate || !data.dueDate) throw new Error("Preencha as datas de faturamento e vencimento");
+      if (!data.amount || data.amount <= 0) throw new Error("O valor do faturamento deve ser maior que zero");
+      
       return billingScheduleService.create(user.tenantId, {
         contractId: data.contractId,
         billingDate: data.billingDate,
@@ -398,7 +402,17 @@ export default function BillingSchedules() {
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-new-billing">
+            <Button 
+              data-testid="button-new-billing"
+              disabled={!user?.tenantId || !contracts?.length}
+              title={
+                !user?.tenantId 
+                  ? "Perfil incompleto - tenantId ausente" 
+                  : !contracts?.length 
+                  ? "Cadastre um contrato antes de criar faturas"
+                  : ""
+              }
+            >
               <Plus className="h-4 w-4 mr-2" />
               New Billing
             </Button>
@@ -426,13 +440,19 @@ export default function BillingSchedules() {
                               <SelectValue placeholder="Select contract" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
-                            {contractsWithDetails.map((contract) => (
-                              <SelectItem key={contract.id} value={contract.id}>
-                                {contract.contractNumber} - {contract.customerName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
+                            <SelectContent>
+                              {contractsWithDetails.length > 0 ? (
+                                contractsWithDetails.map((contract) => (
+                                  <SelectItem key={contract.id} value={contract.id}>
+                                    {contract.contractNumber} - {contract.customerName}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <div className="p-2 text-sm text-muted-foreground">
+                                  Nenhum contrato disponível
+                                </div>
+                              )}
+                            </SelectContent>
                         </Select>
                         <FormMessage />
                       </FormItem>
