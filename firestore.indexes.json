@@ -115,22 +115,6 @@
       ]
     },
     {
-      "collectionGroup": "consolidatedBalances",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "periodDate", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "revenueLedgerEntries",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "entryDate", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "exchangeRates",
       "queryScope": "COLLECTION",
       "fields": [
