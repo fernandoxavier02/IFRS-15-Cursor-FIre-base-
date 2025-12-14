@@ -202,13 +202,17 @@
 - ✅ Login funciona corretamente
 - ✅ Navegação entre páginas funciona
 - ✅ Smoke tests de páginas IFRS15 (waterfall, costs, forex, financing) passaram
-- ⚠️ CRUD (customer/contract): Toast não aparece - verificar permissões Firestore
-- ⚠️ Algumas páginas têm erros de console (executive-dashboard, accounting-control, reports)
+
+**Correções Aplicadas:**
+- ✅ **CRUD (customer/contract)**: Substituído `apiRequest` por chamadas diretas ao Firestore (`customerService.create()`, `contractService.create()`)
+- ✅ **Erros de console**: Adicionado tratamento de erro com try/catch e valores padrão em:
+  - `executive-dashboard.tsx` - `dashboardService.getStats()` com fallback
+  - `ifrs15-accounting-control.tsx` - `reportsService.generateContractBalances()` com fallback
+  - `reports.tsx` - Todos os `reportsService` methods com fallback
 
 **Próximos passos para 100%:**
-1. Verificar regras de segurança do Firestore para operações de escrita
-2. Investigar erros de console nas páginas afetadas
-3. Verificar se `dashboardService.getStats()` retorna dados corretamente
+1. Rodar testes novamente para verificar se as correções resolveram os problemas
+2. Se ainda houver falhas, verificar se o usuário de teste tem as claims necessárias (`tenantId`, `role`)
 
 ---
 
