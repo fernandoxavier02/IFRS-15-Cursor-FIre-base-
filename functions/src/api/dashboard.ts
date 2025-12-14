@@ -1,6 +1,7 @@
 import cors from "cors";
 import express from "express";
 import * as functions from "firebase-functions";
+import { LedgerEntryType } from "@shared/firestore-types";
 import { db } from "../utils/admin";
 import { AuthenticatedRequest, requireTenant, verifyAuth } from "../utils/auth-middleware";
 import { COLLECTIONS, tenantCollection } from "../utils/collections";
@@ -42,7 +43,7 @@ app.get("/stats", async (req: any, res: any) => {
     // Get revenue ledger entries for recognized revenue
     const revenueEntriesSnapshot = await db
       .collection(tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES))
-      .where("entryType", "==", "revenue")
+      .where("entryType", "==", LedgerEntryType.REVENUE)
       .where("isPosted", "==", true)
       .get();
 
@@ -125,7 +126,7 @@ app.get("/revenue-waterfall", async (req: any, res: any) => {
 
     let query = db
       .collection(tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES))
-      .where("entryType", "==", "revenue");
+      .where("entryType", "==", LedgerEntryType.REVENUE);
 
     if (contractId) {
       query = query.where("contractId", "==", contractId);
@@ -152,7 +153,7 @@ app.get("/revenue-waterfall", async (req: any, res: any) => {
     // Get deferred revenue entries
     const deferredSnapshot = await db
       .collection(tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES))
-      .where("entryType", "==", "deferred_revenue")
+      .where("entryType", "==", LedgerEntryType.DEFERRED_REVENUE)
       .orderBy("entryDate", "asc")
       .get();
 

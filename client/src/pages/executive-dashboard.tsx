@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-firebase";
 import { useI18n } from "@/lib/i18n";
 import type { Contract, DashboardStats, RevenueByPeriod } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { LedgerEntryType } from "@shared/firestore-types";
 import {
     ArrowsClockwise,
     ChartBar,
@@ -180,10 +181,10 @@ export default function ExecutiveDashboard() {
           const data = monthlyData.get(monthKey)!;
           
           // Sum recognized and deferred based on entry type
-          // Use standardized LedgerEntryType values
-          if (entry.entryType === "revenue") {
+          // Use standardized LedgerEntryType enum values
+          if (entry.entryType === LedgerEntryType.REVENUE) {
             data.recognized += Number(entry.amount || 0);
-          } else if (entry.entryType === "deferred_revenue") {
+          } else if (entry.entryType === LedgerEntryType.DEFERRED_REVENUE) {
             data.deferred += Number(entry.amount || 0);
           }
         });
