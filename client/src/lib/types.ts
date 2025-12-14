@@ -99,6 +99,8 @@ export interface BillingScheduleWithDetails {
   customerName: string;
 }
 
+import type { LedgerEntryType } from "@shared/firestore-types";
+
 export interface LedgerEntryWithDetails {
   id: string;
   tenantId: string;
@@ -108,7 +110,7 @@ export interface LedgerEntryWithDetails {
   entryDate: string;
   periodStart: string;
   periodEnd: string;
-  entryType: "revenue_recognition" | "deferral" | "adjustment" | "reversal";
+  entryType: LedgerEntryType;
   debitAccount: string;
   creditAccount: string;
   amount: string;
