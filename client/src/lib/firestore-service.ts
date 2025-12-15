@@ -55,11 +55,20 @@ async function getCollection<T>(
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as T);
 }
 
+// Helper para remover campos undefined (Firestore não aceita undefined)
+function removeUndefinedFields(obj: Record<string, any>): Record<string, any> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([_, value]) => value !== undefined)
+  );
+}
+
 async function addDocument<T>(path: string, data: Omit<T, "id" | "createdAt">): Promise<string> {
-  const docRef = await addDoc(collection(db, path), {
+  // Remover campos undefined antes de enviar ao Firestore
+  const cleanedData = removeUndefinedFields({
     ...data,
     createdAt: Timestamp.now(),
   });
+  const docRef = await addDoc(collection(db, path), cleanedData);
   return docRef.id;
 }
 
