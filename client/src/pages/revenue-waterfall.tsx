@@ -102,18 +102,43 @@ export default function RevenueWaterfall() {
 
     if (dateRange) {
       contractsInRange = contracts.filter(c => {
-        const startDate = parseISO(c.startDate);
-        const endDate = c.endDate ? parseISO(c.endDate) : new Date();
-        return isWithinInterval(dateRange.start, { start: startDate, end: endDate }) ||
-               isWithinInterval(startDate, { start: dateRange.start, end: dateRange.end });
+        try {
+          const startDate = c.startDate ? (typeof c.startDate === 'string' ? parseISO(c.startDate) : (c.startDate instanceof Date ? c.startDate : (c.startDate as any)?.toDate?.() || new Date())) : new Date();
+          const endDate = c.endDate ? (typeof c.endDate === 'string' ? parseISO(c.endDate) : (c.endDate instanceof Date ? c.endDate : (c.endDate as any)?.toDate?.() || new Date())) : new Date();
+          
+          if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            return false;
+          }
+          
+          return isWithinInterval(dateRange.start, { start: startDate, end: endDate }) ||
+                 isWithinInterval(startDate, { start: dateRange.start, end: dateRange.end });
+        } catch {
+          return false;
+        }
       });
 
       balancesInRange = balances.filter(b => {
-        // Handle Firestore Timestamp
-        const periodDate = b.periodDate instanceof Date 
-          ? b.periodDate 
-          : (b.periodDate as any)?.toDate?.() || parseISO(b.periodDate as any);
-        return isWithinInterval(periodDate, { start: dateRange.start, end: dateRange.end });
+        try {
+          // Handle Firestore Timestamp
+          let periodDate: Date;
+          if (b.periodDate instanceof Date) {
+            periodDate = b.periodDate;
+          } else if (typeof b.periodDate === 'string') {
+            periodDate = parseISO(b.periodDate);
+          } else if ((b.periodDate as any)?.toDate) {
+            periodDate = (b.periodDate as any).toDate();
+          } else {
+            return false;
+          }
+          
+          if (isNaN(periodDate.getTime())) {
+            return false;
+          }
+          
+          return isWithinInterval(periodDate, { start: dateRange.start, end: dateRange.end });
+        } catch {
+          return false;
+        }
       });
     }
 

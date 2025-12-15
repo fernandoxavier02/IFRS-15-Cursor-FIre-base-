@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IFRS 15 Test Agent Report</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; padding: 20px; background: #f5f5f5; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { background: linear-gradient(135deg, #1a237e, #3949ab); color: white; padding: 30px; border-radius: 10px; margin-bottom: 20px; }
+    .header h1 { font-size: 28px; margin-bottom: 10px; }
+    .header .meta { opacity: 0.9; font-size: 14px; }
+    .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+    .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .card h3 { color: #666; font-size: 14px; text-transform: uppercase; margin-bottom: 5px; }
+    .card .value { font-size: 36px; font-weight: bold; }
+    .card .value.pass { color: #4caf50; }
+    .card .value.fail { color: #f44336; }
+    .card .value.skip { color: #ff9800; }
+    .progress-bar { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin-top: 10px; }
+    .progress-fill { height: 100%; background: #f44336; width: 64%; }
+    .scenarios { background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; }
+    .scenarios h2 { padding: 20px; border-bottom: 1px solid #eee; }
+    .scenario { border-bottom: 1px solid #eee; }
+    .scenario:last-child { border-bottom: none; }
+    .scenario-header { padding: 15px 20px; display: flex; align-items: center; cursor: pointer; }
+    .scenario-header:hover { background: #f9f9f9; }
+    .scenario-icon { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; margin-right: 15px; font-size: 14px; }
+    .scenario-icon.pass { background: #4caf50; }
+    .scenario-icon.fail { background: #f44336; }
+    .scenario-name { flex: 1; font-weight: 500; }
+    .scenario-duration { color: #999; font-size: 14px; }
+    .scenario-details { padding: 15px 20px; background: #f9f9f9; display: none; }
+    .scenario.expanded .scenario-details { display: block; }
+    .step { padding: 8px 0; display: flex; align-items: center; font-size: 14px; }
+    .step-icon { margin-right: 10px; }
+    .step-icon.pass { color: #4caf50; }
+    .step-icon.fail { color: #f44336; }
+    .validation { padding: 8px 0; display: flex; align-items: center; font-size: 14px; }
+    .validation-icon { margin-right: 10px; }
+    .error-box { background: #ffebee; border-left: 4px solid #f44336; padding: 15px; margin-top: 10px; border-radius: 4px; }
+    .error-box h4 { color: #c62828; margin-bottom: 10px; }
+    .ai-analysis { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin-top: 10px; border-radius: 4px; }
+    .ai-analysis h4 { color: #1565c0; margin-bottom: 10px; }
+    .tags { display: flex; gap: 5px; margin-top: 5px; }
+    .tag { background: #e0e0e0; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+    .footer { text-align: center; padding: 20px; color: #999; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>IFRS 15 Test Agent Report</h1>
+      <div class="meta">
+        <div>Run Date: Dec 14, 2025, 8:07:59 PM</div>
+        <div>Environment: production | Browser: chromium</div>
+      </div>
+    </div>
+
+    <div class="summary-cards">
+      <div class="card">
+        <h3>Total Tests</h3>
+        <div class="value">14</div>
+      </div>
+      <div class="card">
+        <h3>Passed</h3>
+        <div class="value pass">9</div>
+      </div>
+      <div class="card">
+        <h3>Failed</h3>
+        <div class="value fail">5</div>
+      </div>
+      <div class="card">
+        <h3>Pass Rate</h3>
+        <div class="value">64%</div>
+        <div class="progress-bar"><div class="progress-fill"></div></div>
+      </div>
+      <div class="card">
+        <h3>Duration</h3>
+        <div class="value">3m 6s</div>
+      </div>
+    </div>
+
+    <div class="scenarios">
+      <h2>Test Scenarios (14)</h2>
+      
+      <div class="scenario ">
+        <div class="scenario-header">
+          <div class="scenario-icon pass">✓</div>
+          <div class="scenario-name">
+            Login with valid credentials
+            <div class="tags"><span class="tag">auth</span><span class="tag">smoke</span><span class="tag">critical</span></div>
+          </div>
+          <div class="scenario-duration">9196ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (8)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /login (2399ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → [data-testid="input-login-email"] (121ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              3. fill → [data-testid="input-login-email"] (111ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              4. fill → [data-testid="input-login-password"] (49ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              5. click → [data-testid="button-login-submit"] (245ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              6. wait (3010ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              7. waitForNavigation → /,/change-password,/activate-license (1012ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              8. wait (2003ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (2)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [url] URL matches expected pattern
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [console] No console errors found
+            </div>
+          
+          
+          
+          
+          
+        </div>
+      </div>
+    
+      <div class="scenario expanded">
+        <div class="scenario-header">
+          <div class="scenario-icon fail">✗</div>
+          <div class="scenario-name">
+            Create a new customer
+            <div class="tags"><span class="tag">crud</span><span class="tag">customer</span><span class="tag">smoke</span></div>
+          </div>
+          <div class="scenario-duration">20154ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (11)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /customers (12100ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → [data-testid="button-new-customer"] (30ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              3. click → [data-testid="button-new-customer"] (171ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              4. waitForDialog (9ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              5. fill → [data-testid="input-customer-name"] (39ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              6. fill → [data-testid="input-country"] (21ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              7. click → [data-testid="select-currency"] (224ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              8. click → [role="option"]:has-text("USD") (246ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              9. fill → [data-testid="input-email"] (48ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              10. click → [data-testid="button-submit-customer"] (94ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              11. wait (2001ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (2)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon fail">✗</span>
+              [toast] Toast did not appear within timeout
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon fail">✗</span>
+              [element] Element "[role="dialog"]" expected to be hidden, but was visible
+            </div>
+          
+          
+          
+            <div class="error-box">
+              <h4>Error</h4>
+              <p>Validation failed: Toast did not appear within timeout</p>
+            </div>
+          
+          
+          
+        </div>
+      </div>
+    
+      <div class="scenario expanded">
+        <div class="scenario-header">
+          <div class="scenario-icon fail">✗</div>
+          <div class="scenario-name">
+            Create a new contract
+            <div class="tags"><span class="tag">crud</span><span class="tag">contract</span><span class="tag">smoke</span></div>
+          </div>
+          <div class="scenario-duration">20619ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (17)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /contracts (12101ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → [data-testid="button-new-contract"] (28ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              3. click → [data-testid="button-new-contract"] (154ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              4. waitForDialog (15ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              5. click → [data-testid="select-customer"] (255ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              6. wait (512ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              7. click → [role="option"]:first-child (153ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              8. fill → [data-testid="input-contract-number"] (57ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              9. fill → [data-testid="input-title"] (44ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              10. fill → [data-testid="input-start-date"] (40ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              11. fill → [data-testid="input-end-date"] (29ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              12. fill → [data-testid="input-total-value"] (27ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              13. click → [data-testid="select-currency"] (147ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              14. click → [role="option"]:has-text("USD") (241ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              15. fill → [data-testid="input-payment-terms"] (36ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              16. click → [data-testid="button-submit-contract"] (71ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              17. wait (2009ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (1)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon fail">✗</span>
+              [toast] Toast did not appear within timeout
+            </div>
+          
+          
+          
+            <div class="error-box">
+              <h4>Error</h4>
+              <p>Validation failed: Toast did not appear within timeout</p>
+            </div>
+          
+          
+          
+        </div>
+      </div>
+    
+      <div class="scenario ">
+        <div class="scenario-header">
+          <div class="scenario-icon pass">✓</div>
+          <div class="scenario-name">
+            Navigate to IFRS 15 Engine
+            <div class="tags"><span class="tag">ifrs15</span><span class="tag">smoke</span><span class="tag">navigation</span></div>
+          </div>
+          <div class="scenario-duration">12619ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (2)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /ifrs15 (12091ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → h1:has-text("IFRS 15") (196ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (3)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [url] URL matches expected pattern
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [element] Element "h1" is visible
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [console] No console errors found
+            </div>
+          
+          
+          
+          
+          
+        </div>
+      </div>
+    
+      <div class="scenario ">
+        <div class="scenario-header">
+          <div class="scenario-icon pass">✓</div>
+          <div class="scenario-name">
+            View Billing Schedules page
+            <div class="tags"><span class="tag">ifrs15</span><span class="tag">billing</span><span class="tag">smoke</span></div>
+          </div>
+          <div class="scenario-duration">12352ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (2)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /billing-schedules (12131ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → h1 (23ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (3)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [url] URL matches expected pattern
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [element] Element "h1" is visible
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [console] No console errors found
+            </div>
+          
+          
+          
+          
+          
+        </div>
+      </div>
+    
+      <div class="scenario ">
+        <div class="scenario-header">
+          <div class="scenario-icon pass">✓</div>
+          <div class="scenario-name">
+            View Revenue Ledger page
+            <div class="tags"><span class="tag">ifrs15</span><span class="tag">ledger</span><span class="tag">smoke</span></div>
+          </div>
+          <div class="scenario-duration">12339ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (2)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /revenue-ledger (12105ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → h1 (37ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (3)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [url] URL matches expected pattern
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [element] Element "h1" is visible
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [console] No console errors found
+            </div>
+          
+          
+          
+          
+          
+        </div>
+      </div>
+    
+      <div class="scenario ">
+        <div class="scenario-header">
+          <div class="scenario-icon pass">✓</div>
+          <div class="scenario-name">
+            View Consolidated Balances page
+            <div class="tags"><span class="tag">ifrs15</span><span class="tag">balances</span><span class="tag">smoke</span></div>
+          </div>
+          <div class="scenario-duration">12300ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (2)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /consolidated-balances (12101ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → h1 (28ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (2)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [url] URL matches expected pattern
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [console] No console errors found
+            </div>
+          
+          
+          
+          
+          
+        </div>
+      </div>
+    
+      <div class="scenario ">
+        <div class="scenario-header">
+          <div class="scenario-icon pass">✓</div>
+          <div class="scenario-name">
+            View Revenue Waterfall page
+            <div class="tags"><span class="tag">ifrs15</span><span class="tag">waterfall</span><span class="tag">smoke</span></div>
+          </div>
+          <div class="scenario-duration">12349ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (2)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /revenue-waterfall (12126ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → h1 (56ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (2)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [url] URL matches expected pattern
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [console] No console errors found
+            </div>
+          
+          
+          
+          
+          
+        </div>
+      </div>
+    
+      <div class="scenario ">
+        <div class="scenario-header">
+          <div class="scenario-icon pass">✓</div>
+          <div class="scenario-name">
+            View Contract Costs page
+            <div class="tags"><span class="tag">ifrs15</span><span class="tag">costs</span><span class="tag">smoke</span></div>
+          </div>
+          <div class="scenario-duration">12313ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (2)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /contract-costs (12104ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → h1 (31ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (2)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [url] URL matches expected pattern
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [console] No console errors found
+            </div>
+          
+          
+          
+          
+          
+        </div>
+      </div>
+    
+      <div class="scenario ">
+        <div class="scenario-header">
+          <div class="scenario-icon pass">✓</div>
+          <div class="scenario-name">
+            View Exchange Rates page
+            <div class="tags"><span class="tag">ifrs15</span><span class="tag">forex</span><span class="tag">smoke</span></div>
+          </div>
+          <div class="scenario-duration">12284ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (2)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /exchange-rates (12094ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → h1 (28ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (2)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [url] URL matches expected pattern
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [console] No console errors found
+            </div>
+          
+          
+          
+          
+          
+        </div>
+      </div>
+    
+      <div class="scenario ">
+        <div class="scenario-header">
+          <div class="scenario-icon pass">✓</div>
+          <div class="scenario-name">
+            View Financing Components page
+            <div class="tags"><span class="tag">ifrs15</span><span class="tag">financing</span><span class="tag">smoke</span></div>
+          </div>
+          <div class="scenario-duration">12276ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (2)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /financing-components (12078ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → h1 (24ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (2)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [url] URL matches expected pattern
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [console] No console errors found
+            </div>
+          
+          
+          
+          
+          
+        </div>
+      </div>
+    
+      <div class="scenario expanded">
+        <div class="scenario-header">
+          <div class="scenario-icon fail">✗</div>
+          <div class="scenario-name">
+            View Executive Dashboard
+            <div class="tags"><span class="tag">ifrs15</span><span class="tag">dashboard</span><span class="tag">smoke</span></div>
+          </div>
+          <div class="scenario-duration">12360ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (2)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /executive-dashboard (12103ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → h1 (39ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (2)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [url] URL matches expected pattern
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon fail">✗</span>
+              [console] Found 1 unexpected console errors
+            </div>
+          
+          
+          
+            <div class="error-box">
+              <h4>Error</h4>
+              <p>Validation failed: Found 1 unexpected console errors</p>
+            </div>
+          
+          
+          
+        </div>
+      </div>
+    
+      <div class="scenario expanded">
+        <div class="scenario-header">
+          <div class="scenario-icon fail">✗</div>
+          <div class="scenario-name">
+            View IFRS 15 Accounting Control page
+            <div class="tags"><span class="tag">ifrs15</span><span class="tag">accounting</span><span class="tag">smoke</span></div>
+          </div>
+          <div class="scenario-duration">12267ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (2)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /ifrs15-accounting-control (12083ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → h1 (33ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (2)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [url] URL matches expected pattern
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon fail">✗</span>
+              [console] Found 1 unexpected console errors
+            </div>
+          
+          
+          
+            <div class="error-box">
+              <h4>Error</h4>
+              <p>Validation failed: Found 1 unexpected console errors</p>
+            </div>
+          
+          
+          
+        </div>
+      </div>
+    
+      <div class="scenario expanded">
+        <div class="scenario-header">
+          <div class="scenario-icon fail">✗</div>
+          <div class="scenario-name">
+            View Reports page
+            <div class="tags"><span class="tag">ifrs15</span><span class="tag">reports</span><span class="tag">smoke</span></div>
+          </div>
+          <div class="scenario-duration">12295ms</div>
+        </div>
+        <div class="scenario-details">
+          <h4>Steps (2)</h4>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              1. navigate → /reports (12109ms)
+            </div>
+          
+            <div class="step">
+              <span class="step-icon pass">✓</span>
+              2. waitForElement → h1 (21ms)
+            </div>
+          
+          
+          <h4 style="margin-top: 15px;">Validations (2)</h4>
+          
+            <div class="validation">
+              <span class="validation-icon pass">✓</span>
+              [url] URL matches expected pattern
+            </div>
+          
+            <div class="validation">
+              <span class="validation-icon fail">✗</span>
+              [console] Found 1 unexpected console errors
+            </div>
+          
+          
+          
+            <div class="error-box">
+              <h4>Error</h4>
+              <p>Validation failed: Found 1 unexpected console errors</p>
+            </div>
+          
+          
+          
+        </div>
+      </div>
+    
+    </div>
+
+    <div class="footer">
+      Generated by IFRS 15 Test Agent
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.scenario-header').forEach(header => {
+      header.addEventListener('click', () => {
+        header.parentElement.classList.toggle('expanded');
+      });
+    });
+  </script>
+</body>
+</html>
