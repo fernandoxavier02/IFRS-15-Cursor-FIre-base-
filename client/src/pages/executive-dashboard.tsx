@@ -166,26 +166,44 @@ export default function ExecutiveDashboard() {
         const monthlyData = new Map<string, { recognized: number; deferred: number }>();
         
         entries.forEach((entry) => {
-          // Handle Firestore Timestamp
-          const entryDate = entry.entryDate instanceof Date 
-            ? entry.entryDate 
-            : (entry.entryDate as any)?.toDate?.() || new Date(entry.entryDate as any);
-          
-          const monthKey = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, "0")}`;
-          const monthLabel = entryDate.toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
-          
-          if (!monthlyData.has(monthKey)) {
-            monthlyData.set(monthKey, { recognized: 0, deferred: 0 });
-          }
-          
-          const data = monthlyData.get(monthKey)!;
-          
-          // Sum recognized and deferred based on entry type
-          // Use standardized LedgerEntryType enum values
-          if (entry.entryType === LedgerEntryType.REVENUE) {
-            data.recognized += Number(entry.amount || 0);
-          } else if (entry.entryType === LedgerEntryType.DEFERRED_REVENUE) {
-            data.deferred += Number(entry.amount || 0);
+          try {
+            // Handle Firestore Timestamp
+            let entryDate: Date;
+            if (entry.entryDate instanceof Date) {
+              entryDate = entry.entryDate;
+            } else if ((entry.entryDate as any)?.toDate) {
+              entryDate = (entry.entryDate as any).toDate();
+            } else if (typeof entry.entryDate === 'string') {
+              entryDate = new Date(entry.entryDate);
+            } else {
+              console.warn("Invalid entryDate format for ledger entry:", entry.id);
+              return;
+            }
+            
+            // Validate date
+            if (isNaN(entryDate.getTime())) {
+              console.warn("Invalid entryDate for ledger entry:", entry.id);
+              return;
+            }
+            
+            const monthKey = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, "0")}`;
+            const monthLabel = entryDate.toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
+            
+            if (!monthlyData.has(monthKey)) {
+              monthlyData.set(monthKey, { recognized: 0, deferred: 0 });
+            }
+            
+            const data = monthlyData.get(monthKey)!;
+            
+            // Sum recognized and deferred based on entry type
+            // Use standardized LedgerEntryType enum values
+            if (entry.entryType === LedgerEntryType.REVENUE) {
+              data.recognized += Number(entry.amount || 0);
+            } else if (entry.entryType === LedgerEntryType.DEFERRED_REVENUE) {
+              data.deferred += Number(entry.amount || 0);
+            }
+          } catch (error) {
+            console.warn("Error processing ledger entry:", entry.id, error);
           }
         });
         
@@ -198,11 +216,29 @@ export default function ExecutiveDashboard() {
           }))
           .sort((a, b) => a.period.localeCompare(b.period))
           .slice(-12) // Last 12 months
-          .map((item) => ({
-            period: new Date(item.period + "-01").toLocaleDateString("pt-BR", { month: "short" }),
-            recognized: item.recognized,
-            deferred: item.deferred,
-          }));
+          .map((item) => {
+            try {
+              const date = new Date(item.period + "-01");
+              if (isNaN(date.getTime())) {
+                return {
+                  period: item.period,
+                  recognized: item.recognized,
+                  deferred: item.deferred,
+                };
+              }
+              return {
+                period: date.toLocaleDateString("pt-BR", { month: "short" }),
+                recognized: item.recognized,
+                deferred: item.deferred,
+              };
+            } catch {
+              return {
+                period: item.period,
+                recognized: item.recognized,
+                deferred: item.deferred,
+              };
+            }
+          });
       } catch (error) {
         console.warn("Failed to load revenue trend, returning empty:", error);
         return [];
@@ -218,11 +254,25 @@ export default function ExecutiveDashboard() {
       const { contractService } = await import("@/lib/firestore-service");
       const contractsData = await contractService.getAll(user.tenantId);
       // Convert Firestore types to client types
-      return contractsData.map(c => ({
-        ...c,
-        startDate: c.startDate instanceof Date ? c.startDate.toISOString() : (c.startDate as any)?.toDate?.()?.toISOString() || c.startDate,
-        endDate: c.endDate instanceof Date ? c.endDate.toISOString() : (c.endDate as any)?.toDate?.()?.toISOString() || c.endDate,
-      })) as Contract[];
+      const { toISOString } = await import("@shared/firestore-types");
+      return contractsData.map(c => {
+        try {
+          const startDateStr = toISOString(c.startDate) || (typeof c.startDate === 'string' ? c.startDate : '');
+          const endDateStr = toISOString(c.endDate) || (typeof c.endDate === 'string' ? c.endDate : '');
+          return {
+            ...c,
+            startDate: startDateStr,
+            endDate: endDateStr,
+          };
+        } catch (error) {
+          console.warn("Error converting contract dates:", c.id, error);
+          return {
+            ...c,
+            startDate: typeof c.startDate === 'string' ? c.startDate : '',
+            endDate: typeof c.endDate === 'string' ? c.endDate : '',
+          };
+        }
+      }) as Contract[];
     },
     enabled: !!user?.tenantId,
   });

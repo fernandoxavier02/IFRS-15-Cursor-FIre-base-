@@ -34,6 +34,7 @@ import {
     Target,
     TrendUp,
 } from "@phosphor-icons/react";
+import type { PerformanceObligation } from "@shared/firestore-types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -56,25 +57,6 @@ export default function ContractDetails() {
   const { t } = useI18n();
 
   const { user } = useAuth();
-  
-  // Validação de tenantId
-  if (!user?.tenantId && !contractLoading) {
-    return (
-      <div className="p-8 space-y-6 max-w-[1600px] mx-auto">
-        <div className="flex flex-col items-center justify-center h-64 gap-4">
-          <FileText weight="duotone" className="h-16 w-16 text-muted-foreground/30" />
-          <p className="text-lg font-medium text-muted-foreground">Perfil incompleto</p>
-          <p className="text-sm text-muted-foreground">
-            Seu perfil não possui um tenant associado. Por favor, reautentique ou contate o administrador.
-          </p>
-          <Button variant="outline" onClick={() => setLocation("/contracts")} data-testid="button-back-contracts">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar para Contratos
-          </Button>
-        </div>
-      </div>
-    );
-  }
   
   const { data: contract, isLoading: contractLoading } = useQuery<ContractFullDetails>({
     queryKey: ["contract", user?.tenantId, id],
@@ -99,6 +81,25 @@ export default function ContractDetails() {
     },
     enabled: !!id && !!user?.tenantId,
   });
+
+  // Validação de tenantId
+  if (!user?.tenantId && !contractLoading) {
+    return (
+      <div className="p-8 space-y-6 max-w-[1600px] mx-auto">
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <FileText weight="duotone" className="h-16 w-16 text-muted-foreground/30" />
+          <p className="text-lg font-medium text-muted-foreground">Perfil incompleto</p>
+          <p className="text-sm text-muted-foreground">
+            Seu perfil não possui um tenant associado. Por favor, reautentique ou contate o administrador.
+          </p>
+          <Button variant="outline" onClick={() => setLocation("/contracts")} data-testid="button-back-contracts">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar para Contratos
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const currentVersionId = contract?.currentVersionId || (contract?.versions && contract.versions.length > 0 ? contract.versions[0].id : undefined);
   
@@ -139,7 +140,7 @@ export default function ContractDetails() {
     description: z.string().min(1, "Description is required"),
     allocatedPrice: z.string().min(1, "Allocated price is required").refine(v => !isNaN(parseFloat(v)) && parseFloat(v) > 0, "Must be a positive number"),
     recognitionMethod: z.enum(["over_time", "point_in_time"]),
-    measurementMethod: z.enum(["input", "output", ""]).optional(),
+    measurementMethod: z.enum(["input", "output"]).optional(),
     percentComplete: z.string().optional().default("0"),
   });
 
@@ -151,41 +152,61 @@ export default function ContractDetails() {
       description: "",
       allocatedPrice: "",
       recognitionMethod: "over_time",
-      measurementMethod: "",
+      measurementMethod: undefined,
       percentComplete: "0",
     },
   });
 
   const createPOMutation = useMutation({
     mutationFn: async (data: POFormValues) => {
-      if (!user?.tenantId || !id) throw new Error("Dados do contrato ausentes");
-      if (!currentVersionId) throw new Error("É necessário criar uma versão do contrato antes de adicionar obrigações de performance");
+      if (!user?.tenantId || !id) {
+        throw new Error("Dados do contrato ausentes");
+      }
       
-      const percentValue = data.percentComplete?.trim() || "0";
-      const parsedPercent = parseFloat(percentValue);
+      // Validação crítica: garantir que existe uma versão válida do contrato
+      if (!currentVersionId) {
+        throw new Error("É necessário criar uma versão do contrato antes de adicionar obrigações de performance. Por favor, crie uma versão inicial do contrato primeiro.");
+      }
+      
+      // Validação adicional: verificar se a versão ainda existe
+      const { contractVersionService } = await import("@/lib/firestore-service");
+      const version = await contractVersionService.getById(user.tenantId, id, currentVersionId);
+      if (!version) {
+        throw new Error("A versão do contrato não foi encontrada. Por favor, recarregue a página e tente novamente.");
+      }
+      
+      // Validar e converter allocatedPrice
       const parsedAllocatedPrice = parseFloat(data.allocatedPrice);
-      
       if (isNaN(parsedAllocatedPrice) || parsedAllocatedPrice <= 0) {
         throw new Error("O preço alocado deve ser um número positivo");
       }
       
+      // Validar e converter percentComplete
+      const percentValue = data.percentComplete?.trim() || "0";
+      const parsedPercent = parseFloat(percentValue);
+      const finalPercent = isNaN(parsedPercent) || parsedPercent < 0 ? 0 : Math.min(parsedPercent, 100);
+      
+      // Calcular valores derivados
+      const recognizedAmount = (parsedAllocatedPrice * finalPercent) / 100;
+      const deferredAmount = parsedAllocatedPrice - recognizedAmount;
+      
       const { performanceObligationService } = await import("@/lib/firestore-service");
       
-      // Preparar dados, removendo undefined (Firestore não aceita undefined)
-      const poData: any = {
+      // Preparar dados com tipos corretos (PerformanceObligation interface)
+      const poData: Omit<PerformanceObligation, "id" | "createdAt"> = {
         contractVersionId: currentVersionId,
-        description: data.description,
+        description: data.description.trim(),
         allocatedPrice: parsedAllocatedPrice,
-        recognitionMethod: data.recognitionMethod,
-        percentComplete: isNaN(parsedPercent) ? 0 : parsedPercent,
-        recognizedAmount: 0,
-        deferredAmount: parsedAllocatedPrice,
+        recognitionMethod: data.recognitionMethod as "over_time" | "point_in_time",
+        percentComplete: finalPercent,
+        recognizedAmount: recognizedAmount,
+        deferredAmount: deferredAmount,
         isSatisfied: false,
       };
       
-      // Adicionar measurementMethod apenas se tiver valor
-      if (data.measurementMethod && data.measurementMethod.trim() !== "") {
-        poData.measurementMethod = data.measurementMethod;
+      // Adicionar measurementMethod apenas se tiver valor válido (e se recognitionMethod for over_time)
+      if (data.recognitionMethod === "over_time" && data.measurementMethod && (data.measurementMethod === "input" || data.measurementMethod === "output")) {
+        poData.measurementMethod = data.measurementMethod as "input" | "output";
       }
       
       return performanceObligationService.create(user.tenantId, id, currentVersionId, poData);
@@ -541,8 +562,8 @@ export default function ContractDetails() {
                     <Button 
                       size="sm" 
                       data-testid="button-add-po"
-                      disabled={!currentVersionId}
-                      title={!currentVersionId ? "Crie uma versão do contrato antes de adicionar obrigações" : ""}
+                      disabled={!currentVersionId || !contract}
+                      title={!currentVersionId ? "Crie uma versão do contrato antes de adicionar obrigações de performance" : !contract ? "Carregando dados do contrato..." : ""}
                     >
                       <Plus className="h-4 w-4 mr-1" />
                       Add

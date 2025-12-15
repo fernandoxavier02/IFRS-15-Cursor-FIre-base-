@@ -278,9 +278,21 @@ export default function RevenueLedger() {
       return revenueLedgerService.create(user.tenantId, {
         contractId: data.contractId,
         entryType: data.entryType,
-        entryDate: Timestamp.fromDate(new Date(data.entryDate)),
-        periodStart: Timestamp.fromDate(new Date(data.periodStart)),
-        periodEnd: Timestamp.fromDate(new Date(data.periodEnd)),
+        entryDate: Timestamp.fromDate((() => {
+          const date = new Date(data.entryDate);
+          if (isNaN(date.getTime())) throw new Error("Invalid entryDate");
+          return date;
+        })()),
+        periodStart: Timestamp.fromDate((() => {
+          const date = new Date(data.periodStart);
+          if (isNaN(date.getTime())) throw new Error("Invalid periodStart");
+          return date;
+        })()),
+        periodEnd: Timestamp.fromDate((() => {
+          const date = new Date(data.periodEnd);
+          if (isNaN(date.getTime())) throw new Error("Invalid periodEnd");
+          return date;
+        })()),
         debitAccount: data.debitAccount,
         creditAccount: data.creditAccount,
         amount: Number(data.amount),
@@ -392,7 +404,16 @@ export default function RevenueLedger() {
       cell: (row: LedgerEntryWithDetails) => (
         <div className="flex items-center gap-2">
           <BookOpen className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">{format(new Date(row.entryDate), "MMM dd, yyyy")}</span>
+          <span className="font-medium">{(() => {
+            try {
+              const date = row.entryDate instanceof Date 
+                ? row.entryDate 
+                : (row.entryDate as any)?.toDate?.() || new Date(row.entryDate);
+              return isNaN(date.getTime()) ? "-" : format(date, "MMM dd, yyyy");
+            } catch {
+              return "-";
+            }
+          })()}</span>
         </div>
       ),
     },
@@ -890,7 +911,16 @@ export default function RevenueLedger() {
                     <div>
                       <p className="font-medium">{entry.contractNumber}</p>
                       <p className="text-sm text-muted-foreground">
-                        {format(new Date(entry.entryDate), "MMM dd, yyyy")} - {entry.debitAccount} / {entry.creditAccount}
+                        {(() => {
+                          try {
+                            const date = entry.entryDate instanceof Date 
+                              ? entry.entryDate 
+                              : (entry.entryDate as any)?.toDate?.() || new Date(entry.entryDate);
+                            return isNaN(date.getTime()) ? "-" : format(date, "MMM dd, yyyy");
+                          } catch {
+                            return "-";
+                          }
+                        })()} - {entry.debitAccount} / {entry.creditAccount}
                       </p>
                     </div>
                   </div>

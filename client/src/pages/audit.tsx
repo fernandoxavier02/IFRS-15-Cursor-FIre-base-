@@ -66,12 +66,20 @@ export default function AuditTrail() {
     queryKey: ["audit-logs", user?.tenantId],
     queryFn: async () => {
       if (!user?.tenantId) return [];
+      const { toDate } = await import("@shared/firestore-types");
       const logs = await auditLogService.getAll(user.tenantId);
-      // Convert Firestore timestamps to Date objects
-      return logs.map(log => ({
-        ...log,
-        createdAt: log.createdAt instanceof Date ? log.createdAt : (log.createdAt as any)?.toDate?.() || new Date(),
-      })) as AuditLogWithDetails[];
+      // Convert Firestore timestamps to Date objects safely
+      return logs.map(log => {
+        const createdAt = toDate(log.createdAt);
+        return {
+          ...log,
+          createdAt: createdAt || new Date(), // Fallback to current date if invalid
+        };
+      }).filter(log => {
+        // Filter out logs with invalid dates
+        const date = log.createdAt instanceof Date ? log.createdAt : new Date(log.createdAt);
+        return !isNaN(date.getTime());
+      }) as AuditLogWithDetails[];
     },
     enabled: !!user?.tenantId,
   });
@@ -106,11 +114,20 @@ export default function AuditTrail() {
   const groupLogsByDate = (logs: AuditLogWithDetails[]) => {
     const groups: Record<string, AuditLogWithDetails[]> = {};
     logs.forEach((log) => {
-      const date = new Date(log.createdAt).toLocaleDateString();
-      if (!groups[date]) {
-        groups[date] = [];
+      try {
+        const dateObj = log.createdAt instanceof Date ? log.createdAt : new Date(log.createdAt);
+        if (isNaN(dateObj.getTime())) {
+          console.warn("Invalid date for log:", log.id);
+          return;
+        }
+        const date = dateObj.toLocaleDateString();
+        if (!groups[date]) {
+          groups[date] = [];
+        }
+        groups[date].push(log);
+      } catch (error) {
+        console.warn("Error formatting date for log:", log.id, error);
       }
-      groups[date].push(log);
     });
     return groups;
   };
@@ -241,7 +258,14 @@ export default function AuditTrail() {
                                       <span className="font-mono">{log.entityId.substring(0, 8)}...</span>
                                       <span>|</span>
                                       <Clock className="h-3 w-3" />
-                                      <span>{new Date(log.createdAt).toLocaleTimeString()}</span>
+                                      <span>{(() => {
+                                        try {
+                                          const date = log.createdAt instanceof Date ? log.createdAt : new Date(log.createdAt);
+                                          return isNaN(date.getTime()) ? "-" : date.toLocaleTimeString();
+                                        } catch {
+                                          return "-";
+                                        }
+                                      })()}</span>
                                       {log.ipAddress && (
                                         <>
                                           <span>|</span>
