@@ -171,17 +171,24 @@ export default function ContractDetails() {
       
       const { performanceObligationService } = await import("@/lib/firestore-service");
       
-      return performanceObligationService.create(user.tenantId, id, currentVersionId, {
+      // Preparar dados, removendo undefined (Firestore não aceita undefined)
+      const poData: any = {
         contractVersionId: currentVersionId,
         description: data.description,
         allocatedPrice: parsedAllocatedPrice,
         recognitionMethod: data.recognitionMethod,
-        measurementMethod: data.measurementMethod || undefined,
         percentComplete: isNaN(parsedPercent) ? 0 : parsedPercent,
         recognizedAmount: 0,
         deferredAmount: parsedAllocatedPrice,
         isSatisfied: false,
-      });
+      };
+      
+      // Adicionar measurementMethod apenas se tiver valor
+      if (data.measurementMethod && data.measurementMethod.trim() !== "") {
+        poData.measurementMethod = data.measurementMethod;
+      }
+      
+      return performanceObligationService.create(user.tenantId, id, currentVersionId, poData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["performance-obligations", user?.tenantId, id] });
