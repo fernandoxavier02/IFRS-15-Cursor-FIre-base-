@@ -14,7 +14,12 @@
     "firebase:deploy:hosting": "npm run build && firebase deploy --only hosting",
     "firebase:deploy:functions": "firebase deploy --only functions",
     "migrate:firestore": "cd scripts && npm run migrate",
-    "validate:migration": "cd scripts && npm run validate"
+    "validate:migration": "cd scripts && npm run validate",
+    "e2e": "npx playwright test",
+    "e2e:ui": "npx playwright test --ui",
+    "e2e:headed": "npx playwright test --headed",
+    "e2e:debug": "npx playwright test --debug",
+    "e2e:report": "npx playwright show-report"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -74,6 +79,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "^4.1.3",
     "@types/node": "20.16.11",
