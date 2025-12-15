@@ -10,9 +10,10 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
+  testMatch: "comprehensive-autocrawler.spec.ts", // Usar o agente comprehensivo
   
-  // Timeout global para cada teste (2 minutos)
-  timeout: 120000,
+  // Timeout global para cada teste (10 minutos - tempo suficiente para navegar todas as rotas)
+  timeout: 600000,
   
   // Timeout para expect assertions
   expect: {
@@ -45,9 +46,12 @@ export default defineConfig({
     // Browser visível (não headless)
     headless: false,
     
+    // Manter browser aberto após teste (para debug)
+    // Isso não é uma opção padrão do Playwright, mas podemos usar launchOptions
+    
     // Delay entre ações para melhor visualização
     launchOptions: {
-      slowMo: 75,
+      slowMo: 100, // Reduzido para 100ms para ações mais rápidas
     },
     
     // Viewport

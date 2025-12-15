@@ -53,8 +53,16 @@ export function attachGuards(page: Page): ErrorCollection {
     const url = request.url();
     const failureText = request.failure()?.errorText || "Unknown error";
     
-    // Ignorar alguns falsos positivos
-    if (!url.includes("favicon.ico") && !url.includes("chrome-extension://")) {
+    // Ignorar alguns falsos positivos e erros normais
+    const shouldIgnore = 
+      url.includes("favicon.ico") ||
+      url.includes("chrome-extension://") ||
+      // Ignorar erros de websocket do Firestore (ERR_ABORTED é normal em conexões websocket)
+      (url.includes("firestore.googleapis.com") && failureText.includes("ERR_ABORTED")) ||
+      // Ignorar outros erros de websocket que são normais
+      (failureText.includes("ERR_ABORTED") && (url.includes("/Listen/") || url.includes("websocket")));
+    
+    if (!shouldIgnore) {
       errors.failedRequests.push({ url, failureText });
       console.log(`\n❌ Request Failed: ${url} - ${failureText}`);
     }
