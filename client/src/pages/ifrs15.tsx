@@ -88,54 +88,52 @@ export default function IFRS15Engine() {
     enabled: !!tenantId,
   });
 
-  // Load performance obligations when contract changes
-  useEffect(() => {
-    async function loadObligations() {
-      if (!selectedContract || !tenantId) {
+  async function loadObligationsFor(contractId: string) {
+    if (!contractId || !tenantId) {
+      setObligations([]);
+      return;
+    }
+
+    setObligationsLoading(true);
+    try {
+      const contract = contracts?.find((c) => c.id === contractId);
+      const versionId =
+        contract?.currentVersionId ||
+        (await contractVersionService.getAll(tenantId, contractId))[0]?.id;
+
+      if (!versionId) {
         setObligations([]);
         return;
       }
 
-      setObligationsLoading(true);
-      try {
-        const contract = contracts?.find(c => c.id === selectedContract);
-        if (contract?.currentVersionId) {
-          const pos = await performanceObligationService.getAll(
-            tenantId,
-            selectedContract,
-            contract.currentVersionId
-          );
-          setObligations(pos);
-        } else {
-          // Try to get the first version
-          const versions = await contractVersionService.getAll(tenantId, selectedContract);
-          if (versions.length > 0) {
-            const pos = await performanceObligationService.getAll(
-              tenantId,
-              selectedContract,
-              versions[0].id
-            );
-            setObligations(pos);
-          }
-        }
-      } catch (error) {
-        console.error("Error loading obligations:", error);
-        setObligations([]);
-      } finally {
-        setObligationsLoading(false);
-      }
+      const pos = await performanceObligationService.getAll(tenantId, contractId, versionId);
+      setObligations(pos);
+    } catch (error) {
+      console.error("Error loading obligations:", error);
+      setObligations([]);
+    } finally {
+      setObligationsLoading(false);
     }
+  }
 
-    loadObligations();
+  // Load performance obligations when contract changes
+  useEffect(() => {
+    void loadObligationsFor(selectedContract);
   }, [selectedContract, tenantId, contracts]);
 
   const runEngineMutation = useMutation({
     mutationFn: async (contractId: string) => {
       return ifrs15Service.runEngine(contractId);
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result: any, contractId: string) => {
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["contract"] });
+      queryClient.invalidateQueries({ queryKey: ["performance-obligations"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-schedules"] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries-unposted"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard/revenue-trend"] });
       queryClient.invalidateQueries({ queryKey: ["consolidatedBalances"] });
       
       // Display results from engine
@@ -150,13 +148,8 @@ export default function IFRS15Engine() {
         description: message,
       });
 
-      // Reload obligations
-      if (selectedContract && tenantId) {
-        const contract = contracts?.find(c => c.id === selectedContract);
-        if (contract?.currentVersionId) {
-          performanceObligationService.getAll(tenantId, selectedContract, contract.currentVersionId)
-            .then(setObligations);
-        }
+      if (contractId === selectedContract) {
+        void loadObligationsFor(contractId);
       }
     },
     onError: (error: Error) => {
