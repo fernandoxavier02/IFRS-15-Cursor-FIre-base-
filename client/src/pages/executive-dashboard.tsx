@@ -4,7 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-firebase";
 import { useI18n } from "@/lib/i18n";
-import type { Contract, DashboardStats, RevenueByPeriod } from "@/lib/types";
+import type { DashboardStats, RevenueByPeriod } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
     ArrowsClockwise,
@@ -18,7 +18,7 @@ import {
     TrendUp,
     UsersThree
 } from "@phosphor-icons/react";
-import { LedgerEntryType } from "@shared/firestore-types";
+import { LedgerEntryType, type Contract as FirestoreContract } from "@shared/firestore-types";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import {
@@ -134,20 +134,22 @@ export default function ExecutiveDashboard() {
       try {
         const { dashboardService } = await import("@/lib/firestore-service");
         return await dashboardService.getStats(user.tenantId);
-      } catch (error) {
-        console.warn("Failed to load dashboard stats:", error);
-        return {
-          totalContracts: 0,
-          activeContracts: 0,
-          totalRevenue: 0,
-          recognizedRevenue: 0,
-          deferredRevenue: 0,
-          activeLicenses: 0,
-          licensesInUse: 0,
-        };
-      }
-    },
-    enabled: !!user?.tenantId,
+       } catch (error) {
+         console.warn("Failed to load dashboard stats:", error);
+         return {
+           totalContracts: 0,
+           activeContracts: 0,
+           totalRevenue: "0.00",
+           recognizedRevenue: "0.00",
+           deferredRevenue: "0.00",
+           activeLicenses: 0,
+           licensesInUse: 0,
+           contractAssets: "0.00",
+           contractLiabilities: "0.00",
+         };
+       }
+     },
+     enabled: !!user?.tenantId,
   });
 
   // Fetch real revenue trend from revenue ledger entries
@@ -247,32 +249,12 @@ export default function ExecutiveDashboard() {
     enabled: !!user?.tenantId,
   });
 
-  const { data: contracts } = useQuery<Contract[]>({
+  const { data: contracts } = useQuery<FirestoreContract[]>({
     queryKey: ["contracts", user?.tenantId],
     queryFn: async () => {
       if (!user?.tenantId) return [];
       const { contractService } = await import("@/lib/firestore-service");
-      const contractsData = await contractService.getAll(user.tenantId);
-      // Convert Firestore types to client types
-      const { toISOString } = await import("@shared/firestore-types");
-      return contractsData.map(c => {
-        try {
-          const startDateStr = toISOString(c.startDate) || (typeof c.startDate === 'string' ? c.startDate : '');
-          const endDateStr = toISOString(c.endDate) || (typeof c.endDate === 'string' ? c.endDate : '');
-          return {
-            ...c,
-            startDate: startDateStr,
-            endDate: endDateStr,
-          };
-        } catch (error) {
-          console.warn("Error converting contract dates:", c.id, error);
-          return {
-            ...c,
-            startDate: typeof c.startDate === 'string' ? c.startDate : '',
-            endDate: typeof c.endDate === 'string' ? c.endDate : '',
-          };
-        }
-      }) as Contract[];
+      return contractService.getAll(user.tenantId);
     },
     enabled: !!user?.tenantId,
   });

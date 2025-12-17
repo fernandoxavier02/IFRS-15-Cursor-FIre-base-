@@ -885,11 +885,11 @@ export default function BillingSchedules() {
                 const dueDateObj = toDate(billing.dueDate);
                 const dueDate = dueDateObj || new Date();
                 const isValidDueDate = dueDateObj && !isNaN(dueDate.getTime());
-                const contractNumber = contract?.contractNumber || billing.contractNumber || "Unknown";
-                const currency = billing.currency || "BRL";
-                const amount = Number(billing.amount || 0);
-                
-                return (
+                 const contractNumber = contract?.contractNumber || "Unknown";
+                 const currency = billing.currency || "BRL";
+                 const amount = Number(billing.amount || 0);
+                 
+                 return (
                   <div
                     key={billing.id}
                     className="flex items-center justify-between gap-4 p-3 rounded-md bg-destructive/5"

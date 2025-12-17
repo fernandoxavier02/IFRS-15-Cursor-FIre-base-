@@ -370,7 +370,7 @@ export default function Dashboard() {
     
     const change = ((currentTotal - previousTotal) / previousTotal) * 100;
     return {
-      value: Math.abs(change).toFixed(1),
+      value: Number(Math.abs(change).toFixed(1)),
       direction: change >= 0 ? "up" as const : "down" as const,
     };
   }, [revenueData]);
@@ -384,7 +384,7 @@ export default function Dashboard() {
     
     const change = ((current.recognized - previous.recognized) / previous.recognized) * 100;
     return {
-      value: Math.abs(change).toFixed(1),
+      value: Number(Math.abs(change).toFixed(1)),
       direction: change >= 0 ? "up" as const : "down" as const,
     };
   }, [revenueData]);
