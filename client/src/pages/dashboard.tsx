@@ -210,7 +210,7 @@ export default function Dashboard() {
   
   // Fetch dashboard stats directly from Firestore
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats | null>({
-    queryKey: ["dashboard-stats", user?.tenantId],
+    queryKey: ["dashboard/stats", user?.tenantId],
     queryFn: async () => {
       if (!user?.tenantId) return null;
       return dashboardService.getStats(user.tenantId);
