@@ -52,6 +52,11 @@ export default function ConsolidatedBalances() {
     totalRecognizedRevenue: stats.recognizedRevenue || "0",
     totalDeferredRevenue: stats.deferredRevenue || "0",
     totalReceivables: "0",
+    totalBilledAmount: "0",
+    totalCashReceived: "0",
+    totalRemainingObligations: "0",
+    contractCount: stats.totalContracts ?? 0,
+    currency: "BRL",
     createdAt: new Date().toISOString(),
   }] : [];
 
