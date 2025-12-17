@@ -51,6 +51,14 @@
       ]
     },
     {
+      "collectionGroup": "billingSchedules",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "contractId", "order": "ASCENDING" },
+        { "fieldPath": "billingDate", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "revenueLedgerEntries",
       "queryScope": "COLLECTION",
       "fields": [
