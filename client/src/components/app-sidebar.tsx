@@ -1,45 +1,46 @@
-import { useLocation, Link } from "wouter";
-import {
-  ChartLineUp,
-  FileText,
-  Users,
-  Key,
-  ChartBar,
-  Gear,
-  Calculator,
-  ShieldCheck,
-  SignOut,
-  CurrencyDollar,
-  TrendUp,
-  ClockCounterClockwise,
-  Brain,
-  FileArrowUp,
-  CalendarCheck,
-  BookOpen,
-  Scales,
-  Funnel,
-  Receipt,
-  ArrowsLeftRight,
-  Percent,
-  Gauge,
-} from "@phosphor-icons/react";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarHeader,
-  SidebarFooter,
-} from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/lib/i18n";
-import { useAuth } from "@/lib/auth-firebase";
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarGroupLabel,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+} from "@/components/ui/sidebar";
 import { usePlan } from "@/hooks/use-plan";
+import { useAuth } from "@/lib/auth-firebase";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import {
+    ArrowsLeftRight,
+    BookOpen,
+    Brain,
+    Calculator,
+    CalendarCheck,
+    ChartBar,
+    ChartLineUp,
+    ClockCounterClockwise,
+    CurrencyDollar,
+    FileArrowUp,
+    FileText,
+    Funnel,
+    Gauge,
+    Gear,
+    Key,
+    Percent,
+    Receipt,
+    Scales,
+    ShieldCheck,
+    SignOut,
+    Trash,
+    TrendUp,
+    Users,
+} from "@phosphor-icons/react";
+import { Link, useLocation } from "wouter";
 
 interface NavItem {
   titleKey: string;
@@ -176,6 +177,12 @@ export function AppSidebar() {
       url: "/audit",
       icon: ClockCounterClockwise,
       gradient: "from-slate-500 to-slate-600",
+    },
+    {
+      titleKey: "nav.deleteManagement",
+      url: "/delete-management",
+      icon: Trash,
+      gradient: "from-red-500 to-rose-600",
     },
     {
       titleKey: "nav.settings",

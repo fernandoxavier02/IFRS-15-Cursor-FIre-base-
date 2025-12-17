@@ -8,6 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-firebase";
+import { contractService, financingComponentService } from "@/lib/firestore-service";
 import { useI18n } from "@/lib/i18n";
 import { queryClient } from "@/lib/queryClient";
 import type { Contract, FinancingComponent } from "@/lib/types";
@@ -95,6 +97,7 @@ export default function FinancingComponentsPage() {
       const totalInterest = calculateTotalInterest(data.nominalAmount, presentValue);
       
       return financingComponentService.create(user.tenantId, {
+        tenantId: user.tenantId,
         contractId: data.contractId,
         nominalAmount: data.nominalAmount.toString(),
         discountRate: data.discountRate.toString(),
@@ -103,6 +106,7 @@ export default function FinancingComponentsPage() {
         presentValue: presentValue.toFixed(2),
         totalInterest: totalInterest.toFixed(2),
         recognizedInterest: "0",
+        calculatedAt: new Date().toISOString(),
       } as any);
     },
     onSuccess: () => {
@@ -406,7 +410,7 @@ export default function FinancingComponentsPage() {
                           {contract?.contractNumber || "Unknown Contract"} - {contract?.title}
                         </h3>
                         <p className="text-sm text-muted-foreground">
-                          Calculated: {format(new Date(fc.calculatedAt), "dd MMM yyyy")}
+                          Calculated: {fc.calculatedAt ? format(new Date(fc.calculatedAt), "dd MMM yyyy") : "N/A"}
                         </p>
                       </div>
                       <div className="flex gap-2">

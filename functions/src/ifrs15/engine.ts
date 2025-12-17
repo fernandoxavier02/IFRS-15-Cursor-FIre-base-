@@ -165,6 +165,228 @@ function generateMonthlyPeriods(start: Date, end: Date): { start: Date; end: Dat
 }
 
 /**
+ * Gera automaticamente os lançamentos contábeis do IFRS 15 no Revenue Ledger
+ * 
+ * Lançamentos gerados:
+ * 1. AR (Accounts Receivable) - Quando há faturamento não recebido
+ * 2. Receita (Revenue) - Quando há receita reconhecida
+ * 3. Receita Diferida (Deferred Revenue) - Quando há receita diferida
+ * 4. Custo (Cost) - Quando há custos do contrato amortizados
+ */
+async function generateAutomaticJournalEntries(
+  tenantId: string,
+  contractId: string,
+  ifrs15Result: IFRS15Result,
+  totalBilled: number,
+  totalCashReceived: number,
+  currency: string,
+  entryDate: admin.firestore.Timestamp,
+  periodStart: Date,
+  periodEnd: Date
+): Promise<void> {
+  try {
+    const ledgerCollection = db.collection(tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES));
+    const entryDateTimestamp = Timestamp.fromDate(entryDate.toDate());
+    const periodStartTimestamp = Timestamp.fromDate(periodStart);
+    const periodEndTimestamp = Timestamp.fromDate(periodEnd);
+    
+    // Lógica de lançamentos contábeis do IFRS 15:
+    // 
+    // 1. AR (Accounts Receivable) - Quando há faturamento não recebido
+    //    Débito: AR | Crédito: Revenue (quando faturado)
+    //
+    // 2. Receita Reconhecida - Quando há receita reconhecida pelo IFRS 15
+    //    Se há faturamento: Débito: AR | Crédito: Revenue
+    //    Se não há faturamento: Débito: Contract Asset | Crédito: Revenue
+    //
+    // 3. Receita Diferida - Quando há receita que ainda não foi reconhecida
+    //    Débito: AR (se faturado) ou Contract Asset | Crédito: Deferred Revenue
+    //
+    // 4. Custo - Quando há custos do contrato amortizados
+    //    Débito: Cost of Revenue | Crédito: Contract Costs Asset
+
+    // 1. AR (Accounts Receivable) - Contas a Receber
+    // Quando há faturamento não recebido em dinheiro
+    const accountsReceivable = totalBilled - totalCashReceived;
+    if (accountsReceivable > 0) {
+      await ledgerCollection.add({
+        tenantId,
+        contractId,
+        entryDate: entryDateTimestamp,
+        periodStart: periodStartTimestamp,
+        periodEnd: periodEndTimestamp,
+        entryType: "receivable",
+        debitAccount: "1200 - Accounts Receivable (AR)",
+        creditAccount: "4000 - Revenue",
+        amount: accountsReceivable,
+        currency,
+        exchangeRate: 1,
+        description: `AR automático - Faturamento não recebido do contrato ${contractId}`,
+        referenceNumber: `AR-AUTO-${contractId}-${Date.now()}`,
+        isPosted: false,
+        createdAt: entryDateTimestamp,
+      });
+    }
+
+    // 2. Receita (Revenue) - Receita Reconhecida
+    // Quando há receita reconhecida pelo IFRS 15
+    // Se há faturamento: Débito: AR | Crédito: Revenue
+    // Se não há faturamento: Débito: Contract Asset | Crédito: Revenue
+    if (ifrs15Result.totalRecognizedRevenue > 0) {
+      // Determinar conta de débito baseado em se há faturamento ou não
+      let debitAccount: string;
+      if (totalBilled >= ifrs15Result.totalRecognizedRevenue) {
+        // Há faturamento suficiente, usar AR
+        debitAccount = "1200 - Accounts Receivable (AR)";
+      } else if (ifrs15Result.contractAsset > 0) {
+        // Não há faturamento suficiente, usar Contract Asset
+        debitAccount = "1300 - Contract Asset";
+      } else {
+        // Fallback para AR
+        debitAccount = "1200 - Accounts Receivable (AR)";
+      }
+      
+      await ledgerCollection.add({
+        tenantId,
+        contractId,
+        entryDate: entryDateTimestamp,
+        periodStart: periodStartTimestamp,
+        periodEnd: periodEndTimestamp,
+        entryType: "revenue",
+        debitAccount,
+        creditAccount: "4000 - Revenue",
+        amount: ifrs15Result.totalRecognizedRevenue,
+        currency,
+        exchangeRate: 1,
+        description: `Receita reconhecida automaticamente pelo IFRS 15 Engine`,
+        referenceNumber: `REV-AUTO-${contractId}-${Date.now()}`,
+        isPosted: false,
+        createdAt: entryDateTimestamp,
+      });
+    }
+
+    // 3. Receita Diferida (Deferred Revenue) - Receita Diferida
+    // Quando há receita que ainda não foi reconhecida
+    // Débito: AR (se faturado) ou Contract Asset | Crédito: Deferred Revenue
+    if (ifrs15Result.totalDeferredRevenue > 0) {
+      // Determinar conta de débito baseado em se há faturamento ou não
+      let debitAccount: string;
+      if (totalBilled > 0) {
+        // Há faturamento, usar AR
+        debitAccount = "1200 - Accounts Receivable (AR)";
+      } else {
+        // Não há faturamento, usar Contract Asset
+        debitAccount = "1300 - Contract Asset";
+      }
+      
+      await ledgerCollection.add({
+        tenantId,
+        contractId,
+        entryDate: entryDateTimestamp,
+        periodStart: periodStartTimestamp,
+        periodEnd: periodEndTimestamp,
+        entryType: "deferred_revenue",
+        debitAccount,
+        creditAccount: "2500 - Deferred Revenue",
+        amount: ifrs15Result.totalDeferredRevenue,
+        currency,
+        exchangeRate: 1,
+        description: `Receita diferida automaticamente pelo IFRS 15 Engine`,
+        referenceNumber: `DEF-AUTO-${contractId}-${Date.now()}`,
+        isPosted: false,
+        createdAt: entryDateTimestamp,
+      });
+    }
+
+    // 4. Custo (Cost) - Custos do Contrato Amortizados
+    // Buscar custos do contrato e gerar lançamento se houver amortização
+    // Débito: Cost of Revenue | Crédito: Contract Costs Asset
+    const contractCostsSnapshot = await db
+      .collection(tenantCollection(tenantId, COLLECTIONS.CONTRACT_COSTS))
+      .where("contractId", "==", contractId)
+      .get();
+
+    let totalAmortizedCosts = 0;
+    for (const costDoc of contractCostsSnapshot.docs) {
+      const cost = costDoc.data();
+      const amortized = Number(cost.totalAmortized || 0);
+      if (amortized > 0) {
+        totalAmortizedCosts += amortized;
+      }
+    }
+
+    if (totalAmortizedCosts > 0) {
+      await ledgerCollection.add({
+        tenantId,
+        contractId,
+        entryDate: entryDateTimestamp,
+        periodStart: periodStartTimestamp,
+        periodEnd: periodEndTimestamp,
+        entryType: "commission_expense",
+        debitAccount: "5000 - Cost of Revenue",
+        creditAccount: "1500 - Contract Costs Asset",
+        amount: totalAmortizedCosts,
+        currency,
+        exchangeRate: 1,
+        description: `Custos do contrato amortizados automaticamente`,
+        referenceNumber: `COST-AUTO-${contractId}-${Date.now()}`,
+        isPosted: false,
+        createdAt: entryDateTimestamp,
+      });
+    }
+
+    // 5. Contract Asset - Se houver (Receita reconhecida > Faturamento)
+    // Débito: Contract Asset | Crédito: Revenue
+    if (ifrs15Result.contractAsset > 0) {
+      await ledgerCollection.add({
+        tenantId,
+        contractId,
+        entryDate: entryDateTimestamp,
+        periodStart: periodStartTimestamp,
+        periodEnd: periodEndTimestamp,
+        entryType: "contract_asset",
+        debitAccount: "1300 - Contract Asset",
+        creditAccount: "4000 - Revenue",
+        amount: ifrs15Result.contractAsset,
+        currency,
+        exchangeRate: 1,
+        description: `Contract Asset gerado automaticamente pelo IFRS 15`,
+        referenceNumber: `CA-AUTO-${contractId}-${Date.now()}`,
+        isPosted: false,
+        createdAt: entryDateTimestamp,
+      });
+    }
+
+    // 6. Contract Liability - Se houver (Faturamento > Receita reconhecida)
+    // Débito: Revenue | Crédito: Contract Liability
+    if (ifrs15Result.contractLiability > 0) {
+      await ledgerCollection.add({
+        tenantId,
+        contractId,
+        entryDate: entryDateTimestamp,
+        periodStart: periodStartTimestamp,
+        periodEnd: periodEndTimestamp,
+        entryType: "contract_liability",
+        debitAccount: "4000 - Revenue",
+        creditAccount: "2600 - Contract Liability",
+        amount: ifrs15Result.contractLiability,
+        currency,
+        exchangeRate: 1,
+        description: `Contract Liability gerado automaticamente pelo IFRS 15`,
+        referenceNumber: `CL-AUTO-${contractId}-${Date.now()}`,
+        isPosted: false,
+        createdAt: entryDateTimestamp,
+      });
+    }
+
+    console.log(`✅ Lançamentos contábeis automáticos gerados para contrato ${contractId}`);
+  } catch (error: any) {
+    console.error(`❌ Erro ao gerar lançamentos contábeis automáticos: ${error.message}`);
+    // Não falhar o processo principal se a geração de lançamentos falhar
+  }
+}
+
+/**
  * Main IFRS 15 Engine Cloud Function
  * 
  * Executes the 5-Step revenue recognition model
@@ -555,6 +777,19 @@ export const runIFRS15Engine = functions.https.onCall(
         },
         createdAt: now,
       });
+
+      // Gerar lançamentos contábeis automaticamente
+      await generateAutomaticJournalEntries(
+        tenantId,
+        contractId,
+        result,
+        totalBilled,
+        totalCashReceived,
+        contract.currency || "BRL",
+        now,
+        contractStartDate,
+        contractEndDate
+      );
 
       return result;
     } catch (error: any) {

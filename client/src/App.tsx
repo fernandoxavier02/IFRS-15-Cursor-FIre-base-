@@ -20,6 +20,7 @@ import ContractIngestion from "@/pages/contract-ingestion";
 import Contracts from "@/pages/contracts";
 import Customers from "@/pages/customers";
 import Dashboard from "@/pages/dashboard";
+import DeleteManagement from "@/pages/delete-management";
 import ExchangeRates from "@/pages/exchange-rates";
 import ExecutiveDashboard from "@/pages/executive-dashboard";
 import FinancingComponents from "@/pages/financing-components";
@@ -107,6 +108,7 @@ function MainRouter() {
         <Route path="/contracts" component={Contracts} />
         <Route path="/contracts/:id" component={ContractDetails} />
         <Route path="/customers" component={Customers} />
+        <Route path="/delete-management" component={DeleteManagement} />
         <Route path="/licenses" component={Licenses} />
         <Route path="/reports" component={Reports} />
         <Route path="/ifrs15" component={IFRS15Engine} />

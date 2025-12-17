@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
 export type Language = "en" | "pt-BR" | "es";
 
@@ -22,6 +22,7 @@ export const translations = {
     "nav.revenueWaterfall": "Revenue Waterfall",
     "nav.contractCosts": "Contract Costs",
     "nav.ifrs15AccountingControl": "Accounting Control",
+    "nav.deleteManagement": "Delete Management",
     
     // Dashboard
     "dashboard.title": "Dashboard",
@@ -290,6 +291,7 @@ export const translations = {
     "nav.revenueWaterfall": "Cascata de Receita",
     "nav.contractCosts": "Custos de Contrato",
     "nav.ifrs15AccountingControl": "Controle Contábil",
+    "nav.deleteManagement": "Gerenciamento de Exclusões",
     
     // Painel
     "dashboard.title": "Painel",
@@ -558,6 +560,7 @@ export const translations = {
     "nav.revenueWaterfall": "Cascada de Ingresos",
     "nav.contractCosts": "Costos de Contrato",
     "nav.ifrs15AccountingControl": "Control Contable",
+    "nav.deleteManagement": "Gestión de Eliminaciones",
     
     // Panel
     "dashboard.title": "Panel",

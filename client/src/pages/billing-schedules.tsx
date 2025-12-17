@@ -163,56 +163,86 @@ export default function BillingSchedules() {
   const overdueBillings = useMemo(() => {
     const now = new Date();
     return billingSchedules?.filter((billing) => {
-      const dueDate = toDate(billing.dueDate) || new Date();
+      const dueDate = toDate(billing.dueDate);
+      if (!dueDate || isNaN(dueDate.getTime())) return false;
       return billing.status === "scheduled" && dueDate < now;
     }) || [];
   }, [billingSchedules]);
 
   // Transform billing schedules with details
   const billingsWithDetails: BillingScheduleWithDetails[] = useMemo(() => {
+    // Helper para converter timestamp de forma segura
+    const safeToISOString = (ts: any): string => {
+      if (!ts) return new Date().toISOString(); // Se null/undefined, usa data atual
+      try {
+        const iso = toISOString(ts);
+        // Se toISOString retornar string vazia, usa data atual
+        if (!iso || iso.trim() === "") {
+          return new Date().toISOString();
+        }
+        // Valida se a string é uma data válida
+        const testDate = new Date(iso);
+        if (isNaN(testDate.getTime())) {
+          return new Date().toISOString();
+        }
+        return iso;
+      } catch (error) {
+        return new Date().toISOString();
+      }
+    };
+    
     return (billingSchedules || []).map((billing) => {
       const contract = contractMap.get(billing.contractId);
       const customerName = contract ? customerMap.get(contract.customerId) || "Unknown" : "Unknown";
       
       return {
         id: billing.id,
-        tenantId: billing.tenantId,
-        contractId: billing.contractId,
+        tenantId: billing.tenantId || "",
+        contractId: billing.contractId || "",
         performanceObligationId: billing.performanceObligationId || null,
-        billingDate: toISOString(billing.billingDate),
-        dueDate: toISOString(billing.dueDate),
+        billingDate: safeToISOString(billing.billingDate),
+        dueDate: safeToISOString(billing.dueDate),
         amount: billing.amount?.toString() || "0",
-        currency: billing.currency,
-        frequency: billing.frequency as any,
-        status: billing.status as any,
+        currency: billing.currency || "BRL",
+        frequency: billing.frequency as any || "one_time",
+        status: billing.status as any || "scheduled",
         invoiceNumber: billing.invoiceNumber || null,
-        invoicedAt: toISOString(billing.invoicedAt) || null,
-        paidAt: toISOString(billing.paidAt) || null,
+        invoicedAt: billing.invoicedAt ? safeToISOString(billing.invoicedAt) : null,
+        paidAt: billing.paidAt ? safeToISOString(billing.paidAt) : null,
         paidAmount: billing.paidAmount?.toString() || null,
         notes: billing.notes || null,
-        createdAt: toISOString(billing.createdAt),
+        createdAt: safeToISOString(billing.createdAt),
         contractNumber: contract?.contractNumber || "Unknown",
         contractTitle: contract?.title || "Unknown",
-        customerName,
+        customerName: customerName || "Unknown",
       };
     });
   }, [billingSchedules, contractMap, customerMap]);
 
   // Contracts with details for dropdown
   const contractsWithDetails: ContractWithDetails[] = useMemo(() => {
-    return (contracts || []).map((contract) => ({
-      id: contract.id,
-      contractNumber: contract.contractNumber,
-      title: contract.title,
-      status: contract.status,
-      customerName: customerMap.get(contract.customerId) || "Unknown",
-      totalValue: contract.totalValue?.toString() || "0",
-      currency: contract.currency,
-      startDate: toISOString(contract.startDate),
-      endDate: toISOString(contract.endDate) || null,
-      recognizedRevenue: "0",
-      deferredRevenue: contract.totalValue?.toString() || "0",
-    }));
+    return (contracts || []).map((contract) => {
+      // Helper seguro para converter datas
+      const safeToISOString = (ts: any): string | null => {
+        if (!ts) return null;
+        const iso = toISOString(ts);
+        return iso || null;
+      };
+      
+      return {
+        id: contract.id,
+        contractNumber: contract.contractNumber || "Unknown",
+        title: contract.title || "Untitled",
+        status: contract.status || "draft",
+        customerName: customerMap.get(contract.customerId) || "Unknown",
+        totalValue: contract.totalValue?.toString() || "0",
+        currency: contract.currency || "BRL",
+        startDate: safeToISOString(contract.startDate) || new Date().toISOString(),
+        endDate: safeToISOString(contract.endDate),
+        recognizedRevenue: "0",
+        deferredRevenue: contract.totalValue?.toString() || "0",
+      };
+    });
   }, [contracts, customerMap]);
 
   // Create billing via Firestore service
@@ -283,10 +313,11 @@ export default function BillingSchedules() {
   });
 
   const filteredBillings = billingsWithDetails.filter((billing) => {
-    const matchesSearch =
-      billing.contractNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      billing.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      billing.invoiceNumber?.toLowerCase().includes(searchQuery.toLowerCase());
+    const searchLower = (searchQuery || "").toLowerCase();
+    const matchesSearch = searchLower === "" || 
+      (billing.contractNumber || "").toLowerCase().includes(searchLower) ||
+      (billing.customerName || "").toLowerCase().includes(searchLower) ||
+      (billing.invoiceNumber || "").toLowerCase().includes(searchLower);
     const matchesStatus = statusFilter === "all" || billing.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -297,8 +328,15 @@ export default function BillingSchedules() {
 
   const getBillingsForDate = (date: Date) => {
     return billingsWithDetails.filter((billing) => {
-      const billingDate = new Date(billing.billingDate);
-      return isSameDay(billingDate, date);
+      if (!billing.billingDate || billing.billingDate.trim() === "") return false;
+      try {
+        const billingDate = new Date(billing.billingDate);
+        // Verificar se a data é válida antes de comparar
+        if (isNaN(billingDate.getTime())) return false;
+        return isSameDay(billingDate, date);
+      } catch (error) {
+        return false;
+      }
     });
   };
 
@@ -306,12 +344,35 @@ export default function BillingSchedules() {
     {
       key: "billingDate",
       header: "Billing Date",
-      cell: (row: BillingScheduleWithDetails) => (
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">{format(new Date(row.billingDate), "MMM dd, yyyy")}</span>
-        </div>
-      ),
+      cell: (row: BillingScheduleWithDetails) => {
+        if (!row.billingDate || row.billingDate.trim() === "") {
+          return (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-muted-foreground">N/A</span>
+            </div>
+          );
+        }
+        try {
+          const date = new Date(row.billingDate);
+          const isValidDate = !isNaN(date.getTime());
+          return (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">
+                {isValidDate ? format(date, "MMM dd, yyyy") : "Invalid date"}
+              </span>
+            </div>
+          );
+        } catch (error) {
+          return (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-muted-foreground">Invalid date</span>
+            </div>
+          );
+        }
+      },
     },
     {
       key: "contractNumber",
@@ -340,11 +401,26 @@ export default function BillingSchedules() {
     {
       key: "dueDate",
       header: "Due Date",
-      cell: (row: BillingScheduleWithDetails) => (
-        <span className="text-sm text-muted-foreground">
-          {format(new Date(row.dueDate), "MMM dd, yyyy")}
-        </span>
-      ),
+      cell: (row: BillingScheduleWithDetails) => {
+        if (!row.dueDate || row.dueDate.trim() === "") {
+          return (
+            <span className="text-sm text-muted-foreground">N/A</span>
+          );
+        }
+        try {
+          const date = new Date(row.dueDate);
+          const isValidDate = !isNaN(date.getTime());
+          return (
+            <span className="text-sm text-muted-foreground">
+              {isValidDate ? format(date, "MMM dd, yyyy") : "Invalid date"}
+            </span>
+          );
+        } catch (error) {
+          return (
+            <span className="text-sm text-muted-foreground">Invalid date</span>
+          );
+        }
+      },
     },
     {
       key: "status",
@@ -743,9 +819,12 @@ export default function BillingSchedules() {
               {daysInMonth.map((day) => {
                 const dayBillings = getBillingsForDate(day);
                 const isToday = isSameDay(day, new Date());
+                const dayKey = day instanceof Date && !isNaN(day.getTime()) 
+                  ? day.toISOString() 
+                  : `day-${day.getTime()}`;
                 return (
                   <div
-                    key={day.toISOString()}
+                    key={dayKey}
                     className={`min-h-24 p-2 border rounded-md ${
                       isToday ? "border-primary bg-primary/5" : "border-border"
                     }`}
@@ -803,7 +882,12 @@ export default function BillingSchedules() {
               {overdueBillings.map((billing) => {
                 const contract = contractMap.get(billing.contractId);
                 const customerName = contract ? customerMap.get(contract.customerId) || "Unknown" : "Unknown";
-                const dueDate = toDate(billing.dueDate) || new Date();
+                const dueDateObj = toDate(billing.dueDate);
+                const dueDate = dueDateObj || new Date();
+                const isValidDueDate = dueDateObj && !isNaN(dueDate.getTime());
+                const contractNumber = contract?.contractNumber || billing.contractNumber || "Unknown";
+                const currency = billing.currency || "BRL";
+                const amount = Number(billing.amount || 0);
                 
                 return (
                   <div
@@ -812,15 +896,15 @@ export default function BillingSchedules() {
                     data-testid={`overdue-billing-${billing.id}`}
                   >
                     <div>
-                      <p className="font-medium">{contract?.contractNumber || "Unknown"}</p>
+                      <p className="font-medium">{contractNumber}</p>
                       <p className="text-sm text-muted-foreground">{customerName}</p>
                     </div>
                     <div className="text-right">
                       <p className="font-medium tabular-nums">
-                        {billing.currency} {Number(billing.amount || 0).toLocaleString()}
+                        {currency} {amount.toLocaleString()}
                       </p>
                       <p className="text-sm text-destructive">
-                        Due: {format(dueDate, "MMM dd, yyyy")}
+                        Due: {isValidDueDate ? format(dueDate, "MMM dd, yyyy") : "Invalid date"}
                       </p>
                     </div>
                     <Button

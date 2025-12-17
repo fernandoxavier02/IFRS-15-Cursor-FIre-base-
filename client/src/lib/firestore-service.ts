@@ -83,6 +83,40 @@ async function deleteDocument(path: string, id: string): Promise<void> {
   await deleteDoc(doc(db, path, id));
 }
 
+// Helper para deletar todas as subcoleções de um documento
+async function deleteSubcollections(parentPath: string, parentId: string, subcollectionNames: string[]): Promise<void> {
+  for (const subcollectionName of subcollectionNames) {
+    const subcollectionPath = `${parentPath}/${parentId}/${subcollectionName}`;
+    const subcollectionRef = collection(db, subcollectionPath);
+    const snapshot = await getDocs(subcollectionRef);
+    
+    // Deletar todos os documentos da subcoleção
+    const deletePromises = snapshot.docs.map(async (docSnap) => {
+      const docPath = `${subcollectionPath}/${docSnap.id}`;
+      
+      // Verificar se há subcoleções aninhadas (ex: versions/{versionId}/lineItems)
+      if (subcollectionName === "versions") {
+        // Deletar lineItems e performanceObligations de cada versão
+        const versionId = docSnap.id;
+        const lineItemsPath = `${subcollectionPath}/${versionId}/lineItems`;
+        const posPath = `${subcollectionPath}/${versionId}/performanceObligations`;
+        
+        const lineItemsSnapshot = await getDocs(collection(db, lineItemsPath));
+        const posSnapshot = await getDocs(collection(db, posPath));
+        
+        const lineItemsPromises = lineItemsSnapshot.docs.map(d => deleteDoc(doc(db, lineItemsPath, d.id)));
+        const posPromises = posSnapshot.docs.map(d => deleteDoc(doc(db, posPath, d.id)));
+        
+        await Promise.all([...lineItemsPromises, ...posPromises]);
+      }
+      
+      return deleteDoc(doc(db, docPath));
+    });
+    
+    await Promise.all(deletePromises);
+  }
+}
+
 // ==================== CUSTOMERS ====================
 
 export const customerService = {
@@ -147,11 +181,28 @@ export const contractService = {
     tenantId: string,
     data: Omit<Contract, "id" | "createdAt" | "updatedAt" | "tenantId">
   ): Promise<string> {
-    return addDocument<Contract>(tenantCollection(tenantId, "contracts"), {
+    const contractId = await addDocument<Contract>(tenantCollection(tenantId, "contracts"), {
       ...data,
       tenantId,
       updatedAt: Timestamp.now(),
     } as any);
+    
+    // Criar versão inicial automaticamente
+    const versionId = await contractVersionService.create(tenantId, contractId, {
+      contractId,
+      versionNumber: 1,
+      effectiveDate: data.startDate || Timestamp.now(),
+      description: "Versão inicial do contrato",
+      totalValue: data.totalValue || 0,
+      isProspective: true,
+    });
+    
+    // Atualizar o contrato com a versão atual
+    await this.update(tenantId, contractId, {
+      currentVersionId: versionId,
+    } as any);
+    
+    return contractId;
   },
 
   async update(tenantId: string, id: string, data: Partial<Contract>): Promise<void> {
@@ -159,7 +210,27 @@ export const contractService = {
   },
 
   async delete(tenantId: string, id: string): Promise<void> {
-    await deleteDocument(tenantCollection(tenantId, "contracts"), id);
+    const contractPath = tenantCollection(tenantId, "contracts");
+    
+    // Deletar todas as subcoleções relacionadas ao contrato
+    await deleteSubcollections(contractPath, id, ["versions"]);
+    
+    // Deletar também billing schedules e revenue ledger entries relacionados
+    const billingSchedules = await billingScheduleService.getByContract(tenantId, id);
+    const revenueEntries = await revenueLedgerService.getByContract(tenantId, id);
+    
+    // Deletar billing schedules relacionados
+    for (const schedule of billingSchedules) {
+      await billingScheduleService.delete(tenantId, schedule.id);
+    }
+    
+    // Deletar revenue ledger entries relacionados
+    for (const entry of revenueEntries) {
+      await revenueLedgerService.delete(tenantId, entry.id);
+    }
+    
+    // Finalmente, deletar o contrato principal
+    await deleteDocument(contractPath, id);
   },
 
   // Get full contract with versions and POs
@@ -416,6 +487,10 @@ export const billingScheduleService = {
   async update(tenantId: string, id: string, data: Partial<BillingSchedule>): Promise<void> {
     await updateDocument(tenantCollection(tenantId, "billingSchedules"), id, data);
   },
+
+  async delete(tenantId: string, id: string): Promise<void> {
+    await deleteDocument(tenantCollection(tenantId, "billingSchedules"), id);
+  },
 };
 
 // ==================== REVENUE LEDGER ====================
@@ -453,6 +528,10 @@ export const revenueLedgerService = {
 
   async update(tenantId: string, id: string, data: Partial<RevenueLedgerEntry>): Promise<void> {
     await updateDocument(tenantCollection(tenantId, "revenueLedgerEntries"), id, data);
+  },
+
+  async delete(tenantId: string, id: string): Promise<void> {
+    await deleteDocument(tenantCollection(tenantId, "revenueLedgerEntries"), id);
   },
 };
 
@@ -823,10 +902,12 @@ export const tenantService = {
       const contracts = await contractService.getAll(tenantId);
       const licenses = await licenseService.getAll(tenantId);
 
+      const tenantData = tenant as any; // Type assertion for tenant data from Firestore
+
       return {
-        planType: (tenant.planType as "starter" | "professional" | "enterprise") || "starter",
-        maxContracts: tenant.maxContracts ?? 10,
-        maxLicenses: tenant.maxLicenses ?? 3,
+        planType: (tenantData.planType as "starter" | "professional" | "enterprise") || "starter",
+        maxContracts: tenantData.maxContracts ?? 10,
+        maxLicenses: tenantData.maxLicenses ?? 3,
         currentContracts: contracts.length,
         currentLicenses: licenses.filter((l) => l.status === "active").length,
       };

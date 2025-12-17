@@ -71,7 +71,8 @@ export default function ContractDetails() {
         ? await customerService.getById(user.tenantId, contractData.customerId)
         : null;
       
-      const currentVersionId = versions.length > 0 ? versions[0].id : undefined;
+      // Usar currentVersionId do contrato, ou a primeira versão como fallback
+      const currentVersionId = contractData.currentVersionId || (versions.length > 0 ? versions[0].id : undefined);
       return {
         ...contractData,
         customerName: customer?.name || "",
@@ -157,20 +158,120 @@ export default function ContractDetails() {
     },
   });
 
+  // Mutation para criar a primeira versão do contrato
+  const createInitialVersionMutation = useMutation({
+    mutationFn: async () => {
+      if (!user?.tenantId || !id || !contract) {
+        throw new Error("Dados do contrato ausentes");
+      }
+      
+      const { contractVersionService, contractService } = await import("@/lib/firestore-service");
+      const { Timestamp } = await import("firebase/firestore");
+      
+      // Criar a versão inicial (versão 1)
+      // Converter startDate para Timestamp
+      let effectiveDate: typeof Timestamp;
+      if (contract.startDate instanceof Date) {
+        effectiveDate = Timestamp.fromDate(contract.startDate);
+      } else if ((contract.startDate as any)?.toDate) {
+        // Firestore Timestamp
+        effectiveDate = contract.startDate as typeof Timestamp;
+      } else if (typeof contract.startDate === 'string') {
+        effectiveDate = Timestamp.fromDate(new Date(contract.startDate));
+      } else {
+        // Fallback para agora
+        effectiveDate = Timestamp.now();
+      }
+      
+      const versionData = {
+        contractId: id,
+        versionNumber: 1,
+        effectiveDate,
+        description: "Versão inicial do contrato",
+        totalValue: Number(contract.totalValue || 0),
+        isProspective: true,
+      };
+      
+      const versionId = await contractVersionService.create(user.tenantId, id, versionData);
+      
+      // Atualizar o contrato com a versão atual
+      await contractService.update(user.tenantId, id, {
+        currentVersionId: versionId,
+        status: contract.status === "draft" ? "active" : contract.status,
+      });
+      
+      return versionId;
+    },
+    onSuccess: (versionId) => {
+      queryClient.invalidateQueries({ queryKey: ["contract", user?.tenantId, id] });
+      queryClient.invalidateQueries({ queryKey: ["performance-obligations", user?.tenantId, id] });
+      toast({
+        title: "Versão criada",
+        description: "A versão inicial do contrato foi criada com sucesso.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Falha ao criar versão do contrato",
+        variant: "destructive",
+      });
+    },
+  });
+
   const createPOMutation = useMutation({
     mutationFn: async (data: POFormValues) => {
       if (!user?.tenantId || !id) {
         throw new Error("Dados do contrato ausentes");
       }
       
-      // Validação crítica: garantir que existe uma versão válida do contrato
-      if (!currentVersionId) {
-        throw new Error("É necessário criar uma versão do contrato antes de adicionar obrigações de performance. Por favor, crie uma versão inicial do contrato primeiro.");
+      let versionId = currentVersionId;
+      
+      // Se não houver versão, criar a primeira versão automaticamente
+      if (!versionId) {
+        if (!contract) {
+          throw new Error("Dados do contrato não disponíveis");
+        }
+        
+        const { contractVersionService, contractService } = await import("@/lib/firestore-service");
+        const { Timestamp } = await import("firebase/firestore");
+        
+        // Criar a versão inicial (versão 1)
+        // Converter startDate para Timestamp
+        let effectiveDate: typeof Timestamp;
+        if (contract.startDate instanceof Date) {
+          effectiveDate = Timestamp.fromDate(contract.startDate);
+        } else if ((contract.startDate as any)?.toDate) {
+          // Firestore Timestamp
+          effectiveDate = contract.startDate as typeof Timestamp;
+        } else if (typeof contract.startDate === 'string') {
+          effectiveDate = Timestamp.fromDate(new Date(contract.startDate));
+        } else {
+          // Fallback para agora
+          effectiveDate = Timestamp.now();
+        }
+        
+        const versionData = {
+          contractId: id,
+          versionNumber: 1,
+          effectiveDate,
+          description: "Versão inicial do contrato",
+          totalValue: Number(contract.totalValue || 0),
+          isProspective: true,
+        };
+        
+        versionId = await contractVersionService.create(user.tenantId, id, versionData);
+        
+        // Atualizar o contrato com a versão atual
+        await contractService.update(user.tenantId, id, {
+          currentVersionId: versionId,
+          status: contract.status === "draft" ? "active" : contract.status,
+        });
       }
       
       // Validação adicional: verificar se a versão ainda existe
       const { contractVersionService } = await import("@/lib/firestore-service");
-      const version = await contractVersionService.getById(user.tenantId, id, currentVersionId);
+      const version = await contractVersionService.getById(user.tenantId, id, versionId);
       if (!version) {
         throw new Error("A versão do contrato não foi encontrada. Por favor, recarregue a página e tente novamente.");
       }
@@ -194,7 +295,7 @@ export default function ContractDetails() {
       
       // Preparar dados com tipos corretos (PerformanceObligation interface)
       const poData: Omit<PerformanceObligation, "id" | "createdAt"> = {
-        contractVersionId: currentVersionId,
+        contractVersionId: versionId,
         description: data.description.trim(),
         allocatedPrice: parsedAllocatedPrice,
         recognitionMethod: data.recognitionMethod as "over_time" | "point_in_time",
@@ -209,11 +310,12 @@ export default function ContractDetails() {
         poData.measurementMethod = data.measurementMethod as "input" | "output";
       }
       
-      return performanceObligationService.create(user.tenantId, id, currentVersionId, poData);
+      return performanceObligationService.create(user.tenantId, id, versionId, poData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["performance-obligations", user?.tenantId, id] });
       queryClient.invalidateQueries({ queryKey: ["contract", user?.tenantId, id] });
+      queryClient.invalidateQueries({ queryKey: ["contracts", user?.tenantId] });
       setPoDialogOpen(false);
       poForm.reset();
       toast({
@@ -234,11 +336,29 @@ export default function ContractDetails() {
     createPOMutation.mutate(data);
   };
 
-  const formatCurrency = (amount: string | number, currency: string = "USD") => {
+  const formatCurrency = (amount: string | number | undefined | null, currency: string = "USD") => {
+    // Tratar valores undefined, null ou vazios
+    if (amount === undefined || amount === null || amount === "") {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency,
+      }).format(0);
+    }
+    
+    const numValue = typeof amount === "string" ? parseFloat(amount) : amount;
+    
+    // Verificar se o parse resultou em NaN
+    if (isNaN(numValue)) {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency,
+      }).format(0);
+    }
+    
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency,
-    }).format(typeof amount === "string" ? parseFloat(amount) : amount);
+    }).format(numValue);
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -411,9 +531,18 @@ export default function ContractDetails() {
     },
   ];
 
-  const recognitionProgress = contract.totalValue !== "0" 
-    ? (parseFloat(contract.recognizedRevenue) / parseFloat(contract.totalValue)) * 100 
-    : 0;
+  const recognitionProgress = (() => {
+    if (!contract) return 0;
+    
+    const totalValue = parseFloat(contract.totalValue || "0");
+    const recognizedRevenue = parseFloat(contract.recognizedRevenue || "0");
+    
+    if (totalValue === 0 || isNaN(totalValue) || isNaN(recognizedRevenue)) {
+      return 0;
+    }
+    
+    return (recognizedRevenue / totalValue) * 100;
+  })();
 
   return (
     <div className="p-8 space-y-6 max-w-[1600px] mx-auto">
@@ -458,7 +587,7 @@ export default function ContractDetails() {
             </div>
             <div className="mt-4">
               <p className="text-2xl font-bold tabular-nums" data-testid="text-total-value">
-                {formatCurrency(contract.totalValue, contract.currency)}
+                {formatCurrency(contract?.totalValue || "0", contract?.currency || "BRL")}
               </p>
               <p className="text-sm text-muted-foreground mt-1">Total Contract Value</p>
             </div>
@@ -474,7 +603,7 @@ export default function ContractDetails() {
             </div>
             <div className="mt-4">
               <p className="text-2xl font-bold tabular-nums" data-testid="text-recognized">
-                {formatCurrency(contract.recognizedRevenue, contract.currency)}
+                {formatCurrency(contract?.recognizedRevenue || "0", contract?.currency || "BRL")}
               </p>
               <p className="text-sm text-muted-foreground mt-1">Recognized Revenue</p>
               <div className="mt-2 flex items-center gap-2">
@@ -501,7 +630,7 @@ export default function ContractDetails() {
             </div>
             <div className="mt-4">
               <p className="text-2xl font-bold tabular-nums" data-testid="text-deferred">
-                {formatCurrency(contract.deferredRevenue, contract.currency)}
+                {formatCurrency(contract?.deferredRevenue || "0", contract?.currency || "BRL")}
               </p>
               <p className="text-sm text-muted-foreground mt-1">Deferred Revenue</p>
             </div>
@@ -699,10 +828,12 @@ export default function ContractDetails() {
                   ))}
                 </div>
               ) : !currentVersionId ? (
-                <div className="h-32 flex flex-col items-center justify-center text-muted-foreground gap-2">
+                <div className="h-32 flex flex-col items-center justify-center text-muted-foreground gap-3">
                   <Target weight="duotone" className="h-10 w-10 text-muted-foreground/30" />
                   <p className="text-sm font-medium">Nenhuma versão do contrato encontrada</p>
-                  <p className="text-xs text-muted-foreground">Crie uma versão do contrato antes de adicionar obrigações de performance</p>
+                  <p className="text-xs text-muted-foreground text-center max-w-md">
+                    Uma versão inicial será criada automaticamente quando você adicionar a primeira obrigação de performance
+                  </p>
                 </div>
               ) : performanceObligations && performanceObligations.length > 0 ? (
                 <DataTable columns={poColumns} data={performanceObligations} />
