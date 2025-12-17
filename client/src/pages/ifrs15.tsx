@@ -135,7 +135,13 @@ export default function IFRS15Engine() {
     },
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["contract"] });
+      queryClient.invalidateQueries({ queryKey: ["performance-obligations"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-schedules"] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries-unposted"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard/revenue-trend"] });
       queryClient.invalidateQueries({ queryKey: ["consolidatedBalances"] });
       
       // Display results from engine
