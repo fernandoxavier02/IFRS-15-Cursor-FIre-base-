@@ -10,9 +10,10 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-firebase";
-import { dashboardService } from "@/lib/firestore-service";
+import { consolidatedBalanceService } from "@/lib/firestore-service";
 import { queryClient } from "@/lib/queryClient";
 import type { ConsolidatedBalanceData } from "@/lib/types";
+import { toISOString, type ConsolidatedBalance } from "@shared/firestore-types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -24,7 +25,7 @@ import {
     TrendingDown,
     TrendingUp
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function ConsolidatedBalances() {
@@ -32,45 +33,42 @@ export default function ConsolidatedBalances() {
   const { user } = useAuth();
   const [periodFilter, setPeriodFilter] = useState<string>("all");
 
-  const { data: stats } = useQuery({
-    queryKey: ["dashboard/stats", user?.tenantId],
+  const { data: balancesRaw, isLoading: balancesLoading } = useQuery<ConsolidatedBalance[]>({
+    queryKey: ["consolidatedBalances", user?.tenantId],
     queryFn: async () => {
-      if (!user?.tenantId) return null;
-      return dashboardService.getStats(user.tenantId);
+      if (!user?.tenantId) return [];
+      return consolidatedBalanceService.getAll(user.tenantId);
     },
     enabled: !!user?.tenantId,
   });
 
-  // Generate mock balance data from stats
-  const balances: ConsolidatedBalanceData[] = stats ? [{
-    id: "latest",
-    tenantId: user?.tenantId || "",
-    periodDate: new Date().toISOString(),
-    periodType: "monthly",
-    totalContractAssets: stats.contractAssets || "0",
-    totalContractLiabilities: stats.contractLiabilities || "0",
-    totalRecognizedRevenue: stats.recognizedRevenue || "0",
-    totalDeferredRevenue: stats.deferredRevenue || "0",
-    totalReceivables: "0",
-    totalBilledAmount: "0",
-    totalCashReceived: "0",
-    totalRemainingObligations: "0",
-    contractCount: stats.totalContracts ?? 0,
-    currency: "BRL",
-    createdAt: new Date().toISOString(),
-  }] : [];
-
-  const latestBalance = balances[0];
-  const isLoading = !stats;
+  const balances: ConsolidatedBalanceData[] = useMemo(() => {
+    return (balancesRaw || []).map((balance) => ({
+      id: balance.id,
+      tenantId: balance.tenantId,
+      periodDate: toISOString(balance.periodDate) || new Date().toISOString(),
+      periodType: balance.periodType,
+      totalContractAssets: Number(balance.totalContractAssets || 0).toFixed(2),
+      totalContractLiabilities: Number(balance.totalContractLiabilities || 0).toFixed(2),
+      totalReceivables: Number(balance.totalReceivables || 0).toFixed(2),
+      totalDeferredRevenue: Number(balance.totalDeferredRevenue || 0).toFixed(2),
+      totalRecognizedRevenue: Number(balance.totalRecognizedRevenue || 0).toFixed(2),
+      totalBilledAmount: Number(balance.totalBilledAmount || 0).toFixed(2),
+      totalCashReceived: Number(balance.totalCashReceived || 0).toFixed(2),
+      totalRemainingObligations: Number(balance.totalRemainingObligations || 0).toFixed(2),
+      contractCount: balance.contractCount || 0,
+      currency: balance.currency || "BRL",
+      createdAt: toISOString(balance.createdAt) || new Date().toISOString(),
+    }));
+  }, [balancesRaw]);
 
   const generateBalanceMutation = useMutation({
     mutationFn: async () => {
-      // Refresh stats to generate new balance
-      queryClient.invalidateQueries({ queryKey: ["dashboard/stats", user?.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["consolidatedBalances", user?.tenantId] });
       return { success: true };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["dashboard/stats", user?.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["consolidatedBalances", user?.tenantId] });
       toast({
         title: "Balance atualizado",
         description: "Os saldos consolidados foram atualizados.",
@@ -89,6 +87,9 @@ export default function ConsolidatedBalances() {
     if (periodFilter === "all") return true;
     return balance.periodType === periodFilter;
   });
+
+  const latestBalance = filteredBalances?.[0];
+  const isLoading = balancesLoading;
 
   const chartData = filteredBalances?.slice().reverse().map((balance) => ({
     period: format(new Date(balance.periodDate), "MMM yyyy"),
