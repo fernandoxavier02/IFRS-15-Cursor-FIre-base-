@@ -1,24 +1,9 @@
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
     Select,
@@ -27,50 +12,36 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-firebase";
-import { billingScheduleService, contractService, customerService } from "@/lib/firestore-service";
+import { billingScheduleService, contractService, customerService, performanceObligationService } from "@/lib/firestore-service";
 import { queryClient } from "@/lib/queryClient";
 import type { BillingScheduleWithDetails, ContractWithDetails } from "@/lib/types";
-import { zodResolver } from "@hookform/resolvers/zod";
 import type { BillingSchedule, Contract, Customer } from "@shared/firestore-types";
 import { toDate, toISOString } from "@shared/firestore-types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { addMonths, eachDayOfInterval, endOfMonth, format, isSameDay, startOfMonth, subMonths } from "date-fns";
+import { Timestamp } from "firebase/firestore";
 import {
     AlertTriangle,
     Calendar,
+    CheckCircle,
     ChevronLeft,
     ChevronRight,
     Clock,
     DollarSign,
     FileText,
-    Plus,
+    Info,
     Search
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
 
-const billingFormSchema = z.object({
-  contractId: z.string().min(1, "Contract is required"),
-  billingDate: z.string().min(1, "Billing date is required"),
-  dueDate: z.string().min(1, "Due date is required"),
-  amount: z.coerce.number().positive("Amount must be positive"),
-  currency: z.string().default("BRL"),
-  frequency: z.string().default("monthly"),
-  notes: z.string().optional(),
-});
-
-type BillingFormValues = z.infer<typeof billingFormSchema>;
 
 export default function BillingSchedules() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedView, setSelectedView] = useState<"calendar" | "list">("list");
   
@@ -89,18 +60,6 @@ export default function BillingSchedules() {
     );
   }
 
-  const form = useForm<BillingFormValues>({
-    resolver: zodResolver(billingFormSchema),
-    defaultValues: {
-      contractId: "",
-      billingDate: "",
-      dueDate: "",
-      amount: 0,
-      currency: "BRL",
-      frequency: "monthly",
-      notes: "",
-    },
-  });
 
   // Fetch billing schedules from Firestore
   const { data: billingSchedules, isLoading, refetch: refetchBillings } = useQuery<BillingSchedule[]>({
@@ -140,6 +99,45 @@ export default function BillingSchedules() {
       return customerService.getAll(user.tenantId);
     },
     enabled: !!user?.tenantId,
+  });
+
+  // Fetch Performance Obligations for contracts that have billings
+  const { data: performanceObligationsMap } = useQuery({
+    queryKey: ["performance-obligations-for-billings", user?.tenantId, billingSchedules?.length],
+    queryFn: async () => {
+      if (!user?.tenantId || !billingSchedules || billingSchedules.length === 0) return new Map();
+      
+      // Get unique contract IDs from billings
+      const contractIds = Array.from(new Set(billingSchedules.map(b => b.contractId).filter(Boolean) as string[]));
+      
+      // Fetch contracts to get currentVersionId
+      const contractsData = await contractService.getAll(user.tenantId);
+      const contractVersionMap = new Map<string, string>();
+      contractsData.forEach(contract => {
+        if (contract.currentVersionId) {
+          contractVersionMap.set(contract.id, contract.currentVersionId);
+        }
+      });
+      
+      // Fetch POs for each contract
+      const poMap = new Map<string, any>();
+      for (const contractId of contractIds) {
+        const versionId = contractVersionMap.get(contractId);
+        if (versionId) {
+          try {
+            const pos = await performanceObligationService.getAll(user.tenantId, contractId, versionId);
+            pos.forEach(po => {
+              poMap.set(po.id, { ...po, contractId, versionId });
+            });
+          } catch (error) {
+            console.error(`Error fetching POs for contract ${contractId}:`, error);
+          }
+        }
+      }
+      
+      return poMap;
+    },
+    enabled: !!user?.tenantId && !!billingSchedules && billingSchedules.length > 0,
   });
 
   // Create lookup maps
@@ -190,26 +188,85 @@ export default function BillingSchedules() {
         return new Date().toISOString();
       }
     };
+
+    const normalizeFrequency = (value: any): BillingScheduleWithDetails["frequency"] => {
+      switch (value) {
+        case "monthly":
+        case "quarterly":
+        case "one_time":
+          return value;
+        case "semi_annual":
+        case "semi_annually":
+          return "semi_annual";
+        case "annual":
+        case "annually":
+          return "annual";
+        default:
+          return "one_time";
+      }
+    };
     
     return (billingSchedules || []).map((billing) => {
       const contract = contractMap.get(billing.contractId);
       const customerName = contract ? customerMap.get(contract.customerId) || "Unknown" : "Unknown";
+      
+      // Converter billingDate e dueDate de forma mais robusta
+      const convertTimestamp = (ts: any): string => {
+        if (!ts) return "";
+        try {
+          // Se já for string ISO, retornar
+          if (typeof ts === "string") {
+            const testDate = new Date(ts);
+            if (!isNaN(testDate.getTime())) {
+              return ts;
+            }
+          }
+          // Se for Timestamp do Firestore
+          if (ts && typeof ts.toDate === "function") {
+            const date = ts.toDate();
+            if (!isNaN(date.getTime())) {
+              return date.toISOString();
+            }
+          }
+          // Se for Date
+          if (ts instanceof Date) {
+            if (!isNaN(ts.getTime())) {
+              return ts.toISOString();
+            }
+          }
+          // Tentar converter via toISOString helper
+          const iso = toISOString(ts);
+          if (iso && iso.trim() !== "") {
+            const testDate = new Date(iso);
+            if (!isNaN(testDate.getTime())) {
+              return iso;
+            }
+          }
+        } catch (error) {
+          console.error("Error converting timestamp:", error, ts);
+        }
+        return "";
+      };
+      
+      const billingDateStr = convertTimestamp(billing.billingDate);
+      const dueDateStr = convertTimestamp(billing.dueDate);
       
       return {
         id: billing.id,
         tenantId: billing.tenantId || "",
         contractId: billing.contractId || "",
         performanceObligationId: billing.performanceObligationId || null,
-        billingDate: safeToISOString(billing.billingDate),
-        dueDate: safeToISOString(billing.dueDate),
+        billingDate: billingDateStr,
+        dueDate: dueDateStr,
         amount: billing.amount?.toString() || "0",
         currency: billing.currency || "BRL",
-        frequency: billing.frequency as any || "one_time",
+        frequency: normalizeFrequency(billing.frequency),
         status: billing.status as any || "scheduled",
         invoiceNumber: billing.invoiceNumber || null,
-        invoicedAt: billing.invoicedAt ? safeToISOString(billing.invoicedAt) : null,
-        paidAt: billing.paidAt ? safeToISOString(billing.paidAt) : null,
+        invoicedAt: billing.invoicedAt ? convertTimestamp(billing.invoicedAt) : null,
+        paidAt: billing.paidAt ? convertTimestamp(billing.paidAt) : null,
         paidAmount: billing.paidAmount?.toString() || null,
+        poSatisfiedAt: (billing as any).poSatisfiedAt ? convertTimestamp((billing as any).poSatisfiedAt) : null,
         notes: billing.notes || null,
         createdAt: safeToISOString(billing.createdAt),
         contractNumber: contract?.contractNumber || "Unknown",
@@ -245,42 +302,6 @@ export default function BillingSchedules() {
     });
   }, [contracts, customerMap]);
 
-  // Create billing via Firestore service
-  const createBillingMutation = useMutation({
-    mutationFn: async (data: BillingFormValues) => {
-      if (!user?.tenantId) throw new Error("Perfil incompleto - tenantId ausente. Por favor, reautentique ou contate o administrador.");
-      if (!data.contractId) throw new Error("Selecione um contrato para criar o faturamento");
-      if (!data.billingDate || !data.dueDate) throw new Error("Preencha as datas de faturamento e vencimento");
-      if (!data.amount || data.amount <= 0) throw new Error("O valor do faturamento deve ser maior que zero");
-      
-      return billingScheduleService.create(user.tenantId, {
-        contractId: data.contractId,
-        billingDate: data.billingDate,
-        amount: data.amount.toString(),
-        currency: data.currency,
-        dueDate: data.dueDate,
-        status: "scheduled",
-      } as any);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["billing-schedules", user?.tenantId] });
-      queryClient.invalidateQueries({ queryKey: ["billing-schedules-upcoming", user?.tenantId] });
-      refetchBillings();
-      setDialogOpen(false);
-      form.reset();
-      toast({
-        title: "Billing scheduled",
-        description: "The billing schedule has been created successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status, invoiceNumber }: { id: string; status: string; invoiceNumber?: string }) => {
@@ -307,6 +328,55 @@ export default function BillingSchedules() {
       toast({
         title: "Error",
         description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation para marcar PO como satisfied para um billing específico
+  // Isso também marca o billing como "invoiced" automaticamente
+  const markPOSatisfiedMutation = useMutation({
+    mutationFn: async ({ 
+      billingId, 
+      contractId, 
+      versionId, 
+      poId 
+    }: { 
+      billingId: string;
+      contractId: string; 
+      versionId: string; 
+      poId: string;
+    }) => {
+      if (!user?.tenantId) throw new Error("No tenant ID");
+      
+      // 1. Marcar PO como satisfied (para aquele período específico)
+      // Nota: Não marcamos isSatisfied na PO inteira, apenas registramos no billing
+      // A PO pode ter múltiplos períodos, cada um com seu próprio billing
+      
+      // 2. Atualizar o billing schedule:
+      // - Adicionar poSatisfiedAt (marca que a PO foi satisfied para aquele billing)
+      // - Marcar como "invoiced" (faturamento automático)
+      await billingScheduleService.update(user.tenantId, billingId, {
+        poSatisfiedAt: Timestamp.now().toDate().toISOString(),
+        status: "invoiced",
+        invoicedAt: new Date().toISOString(),
+      } as any);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["billing-schedules", user?.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["billing-schedules-upcoming", user?.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["performance-obligations-for-billings", user?.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId] });
+      refetchBillings();
+      toast({
+        title: "PO marcada como satisfeita e faturamento gerado",
+        description: "A obrigação de performance foi marcada como satisfeita para esta parcela e o faturamento foi gerado automaticamente.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Falha ao marcar obrigação de performance como satisfeita",
         variant: "destructive",
       });
     },
@@ -437,6 +507,61 @@ export default function BillingSchedules() {
       ),
     },
     {
+      key: "poActions",
+      header: "PO Status",
+      cell: (row: BillingScheduleWithDetails) => {
+        if (!row.performanceObligationId) return null;
+        
+        const po = performanceObligationsMap?.get(row.performanceObligationId);
+        if (!po) {
+          return <span className="text-xs text-muted-foreground">Loading...</span>;
+        }
+        
+        // Verificar se a PO foi satisfied para ESTE billing específico
+        // Usar poSatisfiedAt do billing schedule (se existir) ou verificar se já está invoiced
+        const isPOSatisfiedForThisBilling = row.status === "invoiced" || row.status === "paid" || (row as any).poSatisfiedAt;
+        
+        if (isPOSatisfiedForThisBilling) {
+          return (
+            <Badge variant="default" className="gap-1">
+              <CheckCircle className="h-3 w-3" />
+              Satisfied
+            </Badge>
+          );
+        }
+        
+        // Só mostrar botão se o billing ainda não foi faturado
+        if (row.status !== "scheduled") {
+          return null;
+        }
+        
+        return (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (po.contractId && po.versionId && row.performanceObligationId) {
+                markPOSatisfiedMutation.mutate({
+                  billingId: row.id,
+                  contractId: po.contractId,
+                  versionId: po.versionId,
+                  poId: row.performanceObligationId,
+                });
+              }
+            }}
+            disabled={markPOSatisfiedMutation.isPending}
+            data-testid={`button-mark-po-satisfied-${row.id}`}
+            className="gap-1"
+            title="Marcar PO como satisfeita e gerar faturamento automaticamente"
+          >
+            <CheckCircle className="h-3 w-3" />
+            Mark PO Satisfied
+          </Button>
+        );
+      },
+    },
+    {
       key: "actions",
       header: "Actions",
       cell: (row: BillingScheduleWithDetails) => (
@@ -474,9 +599,6 @@ export default function BillingSchedules() {
     },
   ];
 
-  const onSubmit = (data: BillingFormValues) => {
-    createBillingMutation.mutate(data);
-  };
 
   const totalUpcoming = upcomingBillings?.reduce((sum, b) => sum + Number(b.amount || 0), 0) || 0;
   const totalOverdue = overdueBillings.reduce((sum, b) => sum + Number(b.amount || 0), 0);
@@ -490,207 +612,16 @@ export default function BillingSchedules() {
             Manage invoice schedules and track payment status
           </p>
         </div>
-
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              data-testid="button-new-billing"
-              disabled={!user?.tenantId || !contracts?.length}
-              title={
-                !user?.tenantId 
-                  ? "Perfil incompleto - tenantId ausente" 
-                  : !contracts?.length 
-                  ? "Cadastre um contrato antes de criar faturas"
-                  : ""
-              }
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Billing
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)}>
-                <DialogHeader>
-                  <DialogTitle>Create Billing Schedule</DialogTitle>
-                  <DialogDescription>
-                    Schedule a new invoice for a contract.
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="grid gap-4 py-4">
-                  <FormField
-                    control={form.control}
-                    name="contractId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Contract</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-contract">
-                              <SelectValue placeholder="Select contract" />
-                            </SelectTrigger>
-                          </FormControl>
-                            <SelectContent>
-                              {contractsWithDetails.length > 0 ? (
-                                contractsWithDetails.map((contract) => (
-                                  <SelectItem key={contract.id} value={contract.id}>
-                                    {contract.contractNumber} - {contract.customerName}
-                                  </SelectItem>
-                                ))
-                              ) : (
-                                <div className="p-2 text-sm text-muted-foreground">
-                                  Nenhum contrato disponível
-                                </div>
-                              )}
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="billingDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Billing Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} data-testid="input-billing-date" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="dueDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Due Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} data-testid="input-due-date" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="amount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Amount</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              {...field}
-                              data-testid="input-amount"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="currency"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Currency</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-currency">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="BRL">BRL</SelectItem>
-                              <SelectItem value="USD">USD</SelectItem>
-                              <SelectItem value="EUR">EUR</SelectItem>
-                              <SelectItem value="GBP">GBP</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="frequency"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Frequency</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-frequency">
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="one_time">One Time</SelectItem>
-                            <SelectItem value="monthly">Monthly</SelectItem>
-                            <SelectItem value="quarterly">Quarterly</SelectItem>
-                            <SelectItem value="semi_annually">Semi-Annually</SelectItem>
-                            <SelectItem value="annually">Annually</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="notes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Notes</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Optional billing notes"
-                            className="resize-none"
-                            {...field}
-                            data-testid="input-notes"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDialogOpen(false)}
-                    data-testid="button-cancel-billing"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createBillingMutation.isPending}
-                    data-testid="button-submit-billing"
-                  >
-                    {createBillingMutation.isPending ? "Creating..." : "Create Billing"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
       </div>
+
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Billing Schedules Automáticos</AlertTitle>
+        <AlertDescription>
+          Os cronogramas de faturamento são gerados automaticamente quando um contrato é criado ou ativado,
+          baseado nas condições de pagamento do contrato. Não é possível criar billing schedules manualmente.
+        </AlertDescription>
+      </Alert>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
