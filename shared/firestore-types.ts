@@ -16,7 +16,6 @@ export const UserRole = {
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
 export const ContractStatus = {
-  DRAFT: "draft",
   ACTIVE: "active",
   MODIFIED: "modified",
   TERMINATED: "terminated",
@@ -453,6 +452,7 @@ export interface BillingSchedule extends BaseDocument {
   invoicedAt?: FirestoreTimestamp;
   paidAt?: FirestoreTimestamp;
   paidAmount?: number;
+  poSatisfiedAt?: FirestoreTimestamp; // Data em que a PO foi marcada como satisfied para este billing específico
   notes?: string;
 }
 
@@ -569,7 +569,7 @@ export const createContractSchema = z.object({
   customerId: z.string(),
   contractNumber: z.string(),
   title: z.string().min(3),
-  status: z.enum(["draft", "active", "modified", "terminated", "expired"]).default("draft"),
+  status: z.enum(["active", "modified", "terminated", "expired"]).default("active"),
   startDate: z.date(),
   endDate: z.date().optional(),
   totalValue: z.number().positive(),

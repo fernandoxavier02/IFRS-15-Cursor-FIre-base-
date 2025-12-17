@@ -22,7 +22,7 @@ export interface ContractWithDetails {
   id: string;
   contractNumber: string;
   title: string;
-  status: "draft" | "active" | "modified" | "terminated" | "expired";
+  status: "active" | "modified" | "terminated" | "expired";
   customerName: string;
   totalValue: string;
   currency: string;
@@ -86,12 +86,13 @@ export interface BillingScheduleWithDetails {
   dueDate: string;
   amount: string;
   currency: string;
-  frequency: "one_time" | "monthly" | "quarterly" | "semi_annually" | "annually";
+  frequency: "one_time" | "monthly" | "quarterly" | "semi_annual" | "annual";
   status: "scheduled" | "invoiced" | "paid" | "overdue" | "cancelled";
   invoiceNumber: string | null;
   invoicedAt: string | null;
   paidAt: string | null;
   paidAmount: string | null;
+  poSatisfiedAt?: string | null;
   notes: string | null;
   createdAt: string;
   contractNumber: string;
@@ -223,7 +224,7 @@ export interface Contract {
   customerId: string;
   contractNumber: string;
   title: string;
-  status: "draft" | "active" | "modified" | "terminated" | "expired";
+  status: "active" | "modified" | "terminated" | "expired";
   startDate: string;
   endDate: string | null;
   totalValue: string;
