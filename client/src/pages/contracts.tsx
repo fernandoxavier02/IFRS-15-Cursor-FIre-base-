@@ -22,12 +22,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-firebase";
-import { contractService, customerService } from "@/lib/firestore-service";
+import { contractService, customerService, revenueLedgerService } from "@/lib/firestore-service";
 import { useI18n } from "@/lib/i18n";
 import { queryClient } from "@/lib/queryClient";
 import type { ContractWithDetails } from "@/lib/types";
-import type { Contract, Customer } from "@shared/firestore-types";
-import { ContractStatus, toISOString } from "@shared/firestore-types";
+import type { Contract, Customer, RevenueLedgerEntry } from "@shared/firestore-types";
+import { ContractStatus, LedgerEntryType, toISOString } from "@shared/firestore-types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Timestamp } from "firebase/firestore";
 import { Calendar, FileText, Plus, Search } from "lucide-react";
@@ -74,6 +74,15 @@ export default function Contracts() {
     enabled: !!user?.tenantId,
   });
 
+  const { data: ledgerEntries } = useQuery<RevenueLedgerEntry[]>({
+    queryKey: ["ledger-entries", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return revenueLedgerService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
+  });
+
   // Create a lookup map for customer names
   const customerMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -83,22 +92,40 @@ export default function Contracts() {
     return map;
   }, [customers]);
 
+  const recognizedRevenueByContractId = useMemo(() => {
+    const map = new Map<string, number>();
+    (ledgerEntries || []).forEach((entry) => {
+      if (entry.entryType !== LedgerEntryType.REVENUE) return;
+      const amount = Number(entry.amount || 0);
+      map.set(entry.contractId, (map.get(entry.contractId) || 0) + amount);
+    });
+    return map;
+  }, [ledgerEntries]);
+
   // Transform contracts to ContractWithDetails format
   const contractsWithDetails: ContractWithDetails[] = useMemo(() => {
-    return (contracts || []).map((contract) => ({
-      id: contract.id,
-      contractNumber: contract.contractNumber,
-      title: contract.title,
-      status: contract.status,
-      customerName: customerMap.get(contract.customerId) || "Unknown",
-      totalValue: contract.totalValue?.toString() || "0",
-      currency: contract.currency,
-      startDate: toISOString(contract.startDate),
-      endDate: toISOString(contract.endDate) || null,
-      recognizedRevenue: "0", // Will be calculated separately
-      deferredRevenue: contract.totalValue?.toString() || "0",
-    }));
-  }, [contracts, customerMap]);
+    return (contracts || []).map((contract) => {
+      const recognizedAmount = recognizedRevenueByContractId.get(contract.id);
+      const totalValue = Number(contract.totalValue || 0);
+      const recognizedRevenue = recognizedAmount === undefined ? "" : recognizedAmount.toFixed(2);
+      const deferredRevenue =
+        recognizedAmount === undefined ? "" : Math.max(0, totalValue - recognizedAmount).toFixed(2);
+
+      return {
+        id: contract.id,
+        contractNumber: contract.contractNumber,
+        title: contract.title,
+        status: contract.status,
+        customerName: customerMap.get(contract.customerId) || "Unknown",
+        totalValue: contract.totalValue?.toString() || "0",
+        currency: contract.currency,
+        startDate: toISOString(contract.startDate),
+        endDate: toISOString(contract.endDate) || null,
+        recognizedRevenue,
+        deferredRevenue,
+      };
+    });
+  }, [contracts, customerMap, recognizedRevenueByContractId]);
 
   // Create contract via Firestore service
   const createContractMutation = useMutation({
@@ -199,7 +226,7 @@ export default function Contracts() {
       header: "Recognized",
       cell: (row: ContractWithDetails) => (
         <span className="tabular-nums text-muted-foreground">
-          {Number(row.recognizedRevenue).toLocaleString()}
+          {row.recognizedRevenue ? Number(row.recognizedRevenue).toLocaleString() : "-"}
         </span>
       ),
       className: "text-right",
@@ -209,7 +236,7 @@ export default function Contracts() {
       header: "Deferred",
       cell: (row: ContractWithDetails) => (
         <span className="tabular-nums text-muted-foreground">
-          {Number(row.deferredRevenue).toLocaleString()}
+          {row.deferredRevenue ? Number(row.deferredRevenue).toLocaleString() : "-"}
         </span>
       ),
       className: "text-right",

@@ -19,7 +19,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-firebase";
 import { auditLogService } from "@/lib/firestore-service";
-import type { AuditLog } from "@shared/firestore-types";
+import { toDate, type AuditLog } from "@shared/firestore-types";
 import { useQuery } from "@tanstack/react-query";
 import {
     Calculator,
@@ -115,8 +115,8 @@ export default function AuditTrail() {
     const groups: Record<string, AuditLogWithDetails[]> = {};
     logs.forEach((log) => {
       try {
-        const dateObj = log.createdAt instanceof Date ? log.createdAt : new Date(log.createdAt);
-        if (isNaN(dateObj.getTime())) {
+        const dateObj = toDate(log.createdAt);
+        if (!dateObj || isNaN(dateObj.getTime())) {
           console.warn("Invalid date for log:", log.id);
           return;
         }
@@ -260,7 +260,8 @@ export default function AuditTrail() {
                                       <Clock className="h-3 w-3" />
                                       <span>{(() => {
                                         try {
-                                          const date = log.createdAt instanceof Date ? log.createdAt : new Date(log.createdAt);
+                                          const date = toDate(log.createdAt);
+                                          if (!date) return "-";
                                           return isNaN(date.getTime()) ? "-" : date.toLocaleTimeString();
                                         } catch {
                                           return "-";

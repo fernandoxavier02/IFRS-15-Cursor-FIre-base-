@@ -40,21 +40,7 @@ import {
 } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-
-
-interface AiProviderConfig {
-  id: string;
-  tenantId: string;
-  provider: string;
-  name: string;
-  apiKey: string;
-  model: string;
-  baseUrl: string | null;
-  isDefault: boolean;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { AiProvider, AiProviderConfig } from "@shared/firestore-types";
 
 interface AiModel {
   id: string;
@@ -86,7 +72,7 @@ export default function AiSettings() {
     isDefault: false,
   });
 
-  const { data: providers, isLoading: providersLoading } = useQuery({
+  const { data: providers, isLoading: providersLoading } = useQuery<AiProviderConfig[]>({
     queryKey: ["ai-providers", user?.tenantId],
     queryFn: async () => {
       if (!user?.tenantId || !hasAiIngestion) return [];
@@ -119,11 +105,12 @@ export default function AiSettings() {
     mutationFn: async (data: typeof formData) => {
       if (!user?.tenantId) throw new Error("No tenant ID");
       return aiProviderConfigService.create(user.tenantId, {
-        provider: data.provider as any,
+        tenantId: user.tenantId,
+        provider: data.provider as AiProvider,
         name: data.name,
         apiKey: data.apiKey,
         model: data.model,
-        baseUrl: data.baseUrl || null,
+        baseUrl: data.baseUrl.trim() ? data.baseUrl.trim() : undefined,
         isDefault: data.isDefault,
         isActive: true,
       });
@@ -154,7 +141,7 @@ export default function AiSettings() {
       if (data.name) updateData.name = data.name;
       if (data.apiKey) updateData.apiKey = data.apiKey;
       if (data.model) updateData.model = data.model;
-      if (data.baseUrl !== undefined) updateData.baseUrl = data.baseUrl || null;
+      if (data.baseUrl !== undefined) updateData.baseUrl = data.baseUrl?.trim() ? data.baseUrl.trim() : undefined;
       if (data.isDefault !== undefined) updateData.isDefault = data.isDefault;
       return aiProviderConfigService.update(user.tenantId, id, updateData);
     },

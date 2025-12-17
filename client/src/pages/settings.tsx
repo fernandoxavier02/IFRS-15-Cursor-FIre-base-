@@ -19,7 +19,7 @@ import { useAuth } from "@/lib/auth-firebase";
 import { tenantService, userService } from "@/lib/firestore-service";
 import { Language, useI18n } from "@/lib/i18n";
 import { queryClient } from "@/lib/queryClient";
-import type { Tenant, User } from "@shared/firestore-types";
+import { toDate, type Tenant, type User } from "@shared/firestore-types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
     Bell,
@@ -258,7 +258,7 @@ export default function Settings() {
                   {tenant?.currentPeriodEnd && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Current period ends</span>
-                      <span>{new Date(tenant.currentPeriodEnd).toLocaleDateString()}</span>
+                      <span>{toDate(tenant.currentPeriodEnd)?.toLocaleDateString() ?? "-"}</span>
                     </div>
                   )}
 

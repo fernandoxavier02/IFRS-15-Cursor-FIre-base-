@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-firebase";
-import { contractService, customerService, dashboardService } from "@/lib/firestore-service";
+import { contractService, customerService, dashboardService, revenueLedgerService } from "@/lib/firestore-service";
 import { useI18n } from "@/lib/i18n";
 import type { ContractWithDetails, DashboardStats, RevenueByPeriod } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,7 @@ import {
     TrendUp,
     Warning,
 } from "@phosphor-icons/react";
-import type { Contract, Customer } from "@shared/firestore-types";
+import type { Contract, Customer, RevenueLedgerEntry } from "@shared/firestore-types";
 import { LedgerEntryType, toISOString } from "@shared/firestore-types";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
@@ -120,7 +120,7 @@ function ContractRow({ contract }: { contract: ContractWithDetails }) {
           {contract.currency} {Number(contract.totalValue).toLocaleString()}
         </p>
         <p className="text-xs text-muted-foreground tabular-nums">
-          {Number(contract.recognizedRevenue).toLocaleString()} recognized
+          {contract.recognizedRevenue ? Number(contract.recognizedRevenue).toLocaleString() : "-"} recognized
         </p>
       </div>
       <ArrowRight weight="bold" className="h-4 w-4 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -210,7 +210,7 @@ export default function Dashboard() {
   
   // Fetch dashboard stats directly from Firestore
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats | null>({
-    queryKey: ["dashboard-stats", user?.tenantId],
+    queryKey: ["dashboard/stats", user?.tenantId],
     queryFn: async () => {
       if (!user?.tenantId) return null;
       return dashboardService.getStats(user.tenantId);
@@ -238,6 +238,25 @@ export default function Dashboard() {
     enabled: !!user?.tenantId,
   });
 
+  const { data: ledgerEntries, isLoading: ledgerEntriesLoading } = useQuery<RevenueLedgerEntry[]>({
+    queryKey: ["ledger-entries", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return revenueLedgerService.getAll(user.tenantId);
+    },
+    enabled: !!user?.tenantId,
+  });
+
+  const recognizedRevenueByContractId = useMemo(() => {
+    const map = new Map<string, number>();
+    (ledgerEntries || []).forEach((entry) => {
+      if (entry.entryType !== LedgerEntryType.REVENUE) return;
+      const amount = Number(entry.amount || 0);
+      map.set(entry.contractId, (map.get(entry.contractId) || 0) + amount);
+    });
+    return map;
+  }, [ledgerEntries]);
+
   // Create customer name lookup
   const customerMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -251,112 +270,101 @@ export default function Dashboard() {
   const recentContracts: ContractWithDetails[] = useMemo(() => {
     if (!contracts) return [];
     
-    return contracts.slice(0, 5).map((contract) => ({
-      id: contract.id,
-      contractNumber: contract.contractNumber,
-      title: contract.title,
-      status: contract.status,
-      customerName: customerMap.get(contract.customerId) || "Unknown",
-      totalValue: contract.totalValue?.toString() || "0",
-      currency: contract.currency,
-      startDate: toISOString(contract.startDate),
-      endDate: toISOString(contract.endDate) || null,
-      recognizedRevenue: "0",
-      deferredRevenue: contract.totalValue?.toString() || "0",
-    }));
-  }, [contracts, customerMap]);
+    return contracts.slice(0, 5).map((contract) => {
+      const recognizedAmount = recognizedRevenueByContractId.get(contract.id);
+      const totalValue = Number(contract.totalValue || 0);
+      const recognizedRevenue = recognizedAmount === undefined ? "" : recognizedAmount.toFixed(2);
+      const deferredRevenue =
+        recognizedAmount === undefined ? "" : Math.max(0, totalValue - recognizedAmount).toFixed(2);
 
-  // Fetch real revenue trend from revenue ledger entries
-  const { data: revenueData, isLoading: revenueLoading } = useQuery<RevenueByPeriod[]>({
-    queryKey: ["dashboard/revenue-trend", user?.tenantId],
-    queryFn: async () => {
-      if (!user?.tenantId) return [];
+      return {
+        id: contract.id,
+        contractNumber: contract.contractNumber,
+        title: contract.title,
+        status: contract.status,
+        customerName: customerMap.get(contract.customerId) || "Unknown",
+        totalValue: contract.totalValue?.toString() || "0",
+        currency: contract.currency,
+        startDate: toISOString(contract.startDate),
+        endDate: toISOString(contract.endDate) || null,
+        recognizedRevenue,
+        deferredRevenue,
+      };
+    });
+  }, [contracts, customerMap, recognizedRevenueByContractId]);
+
+  const revenueData: RevenueByPeriod[] = useMemo(() => {
+    if (!ledgerEntries || ledgerEntries.length === 0) return [];
+
+    const monthlyData = new Map<string, { recognized: number; deferred: number }>();
+
+    ledgerEntries.forEach((entry) => {
       try {
-        const { revenueLedgerService } = await import("@/lib/firestore-service");
-        const entries = await revenueLedgerService.getAll(user.tenantId);
-        
-        if (entries.length === 0) return [];
-        
-        // Group entries by month
-        const monthlyData = new Map<string, { recognized: number; deferred: number }>();
-        
-        entries.forEach((entry) => {
-          try {
-            // Handle Firestore Timestamp
-            let entryDate: Date;
-            if (entry.entryDate instanceof Date) {
-              entryDate = entry.entryDate;
-            } else if ((entry.entryDate as any)?.toDate) {
-              entryDate = (entry.entryDate as any).toDate();
-            } else if (typeof entry.entryDate === 'string') {
-              entryDate = new Date(entry.entryDate);
-            } else {
-              return;
-            }
-            
-            // Validate date
-            if (isNaN(entryDate.getTime())) {
-              return;
-            }
-            
-            const monthKey = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, "0")}`;
-            
-            if (!monthlyData.has(monthKey)) {
-              monthlyData.set(monthKey, { recognized: 0, deferred: 0 });
-            }
-            
-            const data = monthlyData.get(monthKey)!;
-            
-            // Sum recognized and deferred based on entry type
-            if (entry.entryType === LedgerEntryType.REVENUE) {
-              data.recognized += Number(entry.amount || 0);
-            } else if (entry.entryType === LedgerEntryType.DEFERRED_REVENUE) {
-              data.deferred += Number(entry.amount || 0);
-            }
-          } catch (error) {
-            console.warn("Error processing ledger entry:", entry.id, error);
-          }
-        });
-        
-        // Convert to array and sort by date
-        return Array.from(monthlyData.entries())
-          .map(([key, data]) => ({
-            period: key,
-            recognized: data.recognized,
-            deferred: data.deferred,
-          }))
-          .sort((a, b) => a.period.localeCompare(b.period))
-          .slice(-12) // Last 12 months
-          .map((item) => {
-            try {
-              const date = new Date(item.period + "-01");
-              if (isNaN(date.getTime())) {
-                return {
-                  period: item.period,
-                  recognized: item.recognized,
-                  deferred: item.deferred,
-                };
-              }
-              return {
-                period: date.toLocaleDateString("en-US", { month: "short" }),
-                recognized: item.recognized,
-                deferred: item.deferred,
-              };
-            } catch {
-              return {
-                period: item.period,
-                recognized: item.recognized,
-                deferred: item.deferred,
-              };
-            }
-          });
+        let entryDate: Date;
+        if (entry.entryDate instanceof Date) {
+          entryDate = entry.entryDate;
+        } else if ((entry.entryDate as any)?.toDate) {
+          entryDate = (entry.entryDate as any).toDate();
+        } else if (typeof entry.entryDate === "string") {
+          entryDate = new Date(entry.entryDate);
+        } else {
+          return;
+        }
+
+        if (isNaN(entryDate.getTime())) return;
+
+        const monthKey = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, "0")}`;
+
+        if (!monthlyData.has(monthKey)) {
+          monthlyData.set(monthKey, { recognized: 0, deferred: 0 });
+        }
+
+        const data = monthlyData.get(monthKey)!;
+
+        if (entry.entryType === LedgerEntryType.REVENUE) {
+          data.recognized += Number(entry.amount || 0);
+        } else if (entry.entryType === LedgerEntryType.DEFERRED_REVENUE) {
+          data.deferred += Number(entry.amount || 0);
+        }
       } catch (error) {
-        console.warn("Failed to load revenue trend:", error);
-        return [];
+        console.warn("Error processing ledger entry:", entry.id, error);
       }
-    },
-    enabled: !!user?.tenantId,
-  });
+    });
+
+    return Array.from(monthlyData.entries())
+      .map(([key, data]) => ({
+        period: key,
+        recognized: data.recognized,
+        deferred: data.deferred,
+      }))
+      .sort((a, b) => a.period.localeCompare(b.period))
+      .slice(-12) // Last 12 months
+      .map((item) => {
+        try {
+          const date = new Date(item.period + "-01");
+          if (isNaN(date.getTime())) {
+            return {
+              period: item.period,
+              recognized: item.recognized,
+              deferred: item.deferred,
+            };
+          }
+          return {
+            period: date.toLocaleDateString("en-US", { month: "short" }),
+            recognized: item.recognized,
+            deferred: item.deferred,
+          };
+        } catch {
+          return {
+            period: item.period,
+            recognized: item.recognized,
+            deferred: item.deferred,
+          };
+        }
+      });
+  }, [ledgerEntries]);
+
+  const revenueLoading = ledgerEntriesLoading;
 
   // Calculate real trends based on revenue data
   const revenueTrend = useMemo(() => {
@@ -370,7 +378,7 @@ export default function Dashboard() {
     
     const change = ((currentTotal - previousTotal) / previousTotal) * 100;
     return {
-      value: Math.abs(change).toFixed(1),
+      value: Number(Math.abs(change).toFixed(1)),
       direction: change >= 0 ? "up" as const : "down" as const,
     };
   }, [revenueData]);
@@ -384,7 +392,7 @@ export default function Dashboard() {
     
     const change = ((current.recognized - previous.recognized) / previous.recognized) * 100;
     return {
-      value: Math.abs(change).toFixed(1),
+      value: Number(Math.abs(change).toFixed(1)),
       direction: change >= 0 ? "up" as const : "down" as const,
     };
   }, [revenueData]);

@@ -276,6 +276,7 @@ export default function RevenueLedger() {
       
       const { Timestamp } = await import("firebase/firestore");
       return revenueLedgerService.create(user.tenantId, {
+        tenantId: user.tenantId,
         contractId: data.contractId,
         entryType: data.entryType,
         entryDate: Timestamp.fromDate((() => {
@@ -301,6 +302,7 @@ export default function RevenueLedger() {
         description: data.description || undefined,
         referenceNumber: data.referenceNumber || undefined,
         isPosted: false,
+        isReversed: false,
       });
     },
     onSuccess: () => {
@@ -326,7 +328,7 @@ export default function RevenueLedger() {
   const postEntryMutation = useMutation({
     mutationFn: async (id: string) => {
       if (!user?.tenantId) throw new Error("No tenant ID");
-      return revenueLedgerService.update(user.tenantId, id, { isPosted: true, postedAt: new Date().toISOString() });
+      return revenueLedgerService.update(user.tenantId, id, { isPosted: true, postedAt: new Date() });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId] });
@@ -354,7 +356,7 @@ export default function RevenueLedger() {
         unposted.map(entry => 
           revenueLedgerService.update(user.tenantId, entry.id, { 
             isPosted: true, 
-            postedAt: new Date().toISOString() 
+            postedAt: new Date() 
           })
         )
       );
@@ -406,9 +408,7 @@ export default function RevenueLedger() {
           <BookOpen className="h-4 w-4 text-muted-foreground" />
           <span className="font-medium">{(() => {
             try {
-              const date = row.entryDate instanceof Date 
-                ? row.entryDate 
-                : (row.entryDate as any)?.toDate?.() || new Date(row.entryDate);
+              const date = new Date(row.entryDate);
               return isNaN(date.getTime()) ? "-" : format(date, "MMM dd, yyyy");
             } catch {
               return "-";
@@ -913,9 +913,7 @@ export default function RevenueLedger() {
                       <p className="text-sm text-muted-foreground">
                         {(() => {
                           try {
-                            const date = entry.entryDate instanceof Date 
-                              ? entry.entryDate 
-                              : (entry.entryDate as any)?.toDate?.() || new Date(entry.entryDate);
+                            const date = new Date(entry.entryDate);
                             return isNaN(date.getTime()) ? "-" : format(date, "MMM dd, yyyy");
                           } catch {
                             return "-";

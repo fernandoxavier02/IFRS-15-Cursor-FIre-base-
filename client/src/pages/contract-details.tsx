@@ -170,18 +170,18 @@ export default function ContractDetails() {
       
       // Criar a versão inicial (versão 1)
       // Converter startDate para Timestamp
-      let effectiveDate: typeof Timestamp;
-      if (contract.startDate instanceof Date) {
-        effectiveDate = Timestamp.fromDate(contract.startDate);
-      } else if ((contract.startDate as any)?.toDate) {
-        // Firestore Timestamp
-        effectiveDate = contract.startDate as typeof Timestamp;
-      } else if (typeof contract.startDate === 'string') {
-        effectiveDate = Timestamp.fromDate(new Date(contract.startDate));
-      } else {
-        // Fallback para agora
-        effectiveDate = Timestamp.now();
-      }
+       let effectiveDate: import("firebase/firestore").Timestamp;
+       const startDateValue: unknown = (contract as any).startDate;
+       if (startDateValue instanceof Date) {
+         effectiveDate = Timestamp.fromDate(startDateValue);
+       } else if (startDateValue && typeof (startDateValue as any).toDate === "function") {
+         effectiveDate = startDateValue as import("firebase/firestore").Timestamp;
+       } else if (typeof startDateValue === "string") {
+         const parsed = new Date(startDateValue);
+         effectiveDate = isNaN(parsed.getTime()) ? Timestamp.now() : Timestamp.fromDate(parsed);
+       } else {
+         effectiveDate = Timestamp.now();
+       }
       
       const versionData = {
         contractId: id,
@@ -238,18 +238,18 @@ export default function ContractDetails() {
         
         // Criar a versão inicial (versão 1)
         // Converter startDate para Timestamp
-        let effectiveDate: typeof Timestamp;
-        if (contract.startDate instanceof Date) {
-          effectiveDate = Timestamp.fromDate(contract.startDate);
-        } else if ((contract.startDate as any)?.toDate) {
-          // Firestore Timestamp
-          effectiveDate = contract.startDate as typeof Timestamp;
-        } else if (typeof contract.startDate === 'string') {
-          effectiveDate = Timestamp.fromDate(new Date(contract.startDate));
-        } else {
-          // Fallback para agora
-          effectiveDate = Timestamp.now();
-        }
+         let effectiveDate: import("firebase/firestore").Timestamp;
+         const startDateValue: unknown = (contract as any).startDate;
+         if (startDateValue instanceof Date) {
+           effectiveDate = Timestamp.fromDate(startDateValue);
+         } else if (startDateValue && typeof (startDateValue as any).toDate === "function") {
+           effectiveDate = startDateValue as import("firebase/firestore").Timestamp;
+         } else if (typeof startDateValue === "string") {
+           const parsed = new Date(startDateValue);
+           effectiveDate = isNaN(parsed.getTime()) ? Timestamp.now() : Timestamp.fromDate(parsed);
+         } else {
+           effectiveDate = Timestamp.now();
+         }
         
         const versionData = {
           contractId: id,
