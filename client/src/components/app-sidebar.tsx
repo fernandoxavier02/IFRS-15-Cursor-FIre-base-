@@ -101,6 +101,12 @@ export function AppSidebar() {
       gradient: "from-indigo-500 to-violet-500",
     },
     {
+      titleKey: "nav.accountingReconciliation",
+      url: "/accounting-reconciliation",
+      icon: Scales,
+      gradient: "from-amber-500 to-yellow-500",
+    },
+    {
       titleKey: "nav.consolidatedBalances",
       url: "/consolidated-balances",
       icon: Scales,

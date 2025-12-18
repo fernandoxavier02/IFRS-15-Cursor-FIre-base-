@@ -156,7 +156,7 @@ app.post("/", async (req: any, res: any) => {
         customerId,
         contractNumber,
         title,
-        status: "draft",
+        status: "active",
         startDate: Timestamp.fromDate(new Date(startDate)),
         endDate: endDate ? Timestamp.fromDate(new Date(endDate)) : null,
         totalValue: Number(totalValue),
@@ -179,6 +179,11 @@ app.post("/", async (req: any, res: any) => {
         createdAt: now,
       });
 
+    // Keep contract pointing to current version
+    await contractRef.update({
+      currentVersionId: versionRef.id,
+    });
+
     // Create line items
     if (lineItems && lineItems.length > 0) {
       for (const item of lineItems) {
@@ -194,6 +199,19 @@ app.post("/", async (req: any, res: any) => {
           createdAt: now,
         });
       }
+    } else if (!performanceObligations || performanceObligations.length === 0) {
+      // Seed default line item so the IFRS 15 engine can generate POs/ledger entries
+      await db.collection(`${versionRef.path}/lineItems`).add({
+        contractVersionId: versionRef.id,
+        description: title || "Default line item",
+        quantity: 1,
+        unitPrice: Number(totalValue),
+        totalPrice: Number(totalValue),
+        recognitionMethod: "point_in_time",
+        isDistinct: true,
+        distinctWithinContext: true,
+        createdAt: now,
+      });
     }
 
     // Create performance obligations

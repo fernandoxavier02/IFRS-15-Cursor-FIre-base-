@@ -373,7 +373,7 @@ export const generateRemainingObligationsReport = functions.https.onCall(
       // Get all active contracts
       const contractsSnapshot = await db
         .collection(tenantCollection(tenantId, COLLECTIONS.CONTRACTS))
-        .where("status", "in", ["draft", "active", "modified"])
+            .where("status", "in", ["active", "modified"])
         .get();
 
       for (const contractDoc of contractsSnapshot.docs) {

@@ -40,6 +40,7 @@ export default function RevenueLedger() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [postedFilter, setPostedFilter] = useState<string>("all");
   const [contractFilter, setContractFilter] = useState<string>("all");
+  const [showAllVersions, setShowAllVersions] = useState(true); // Toggle para debug
 
   // Fetch ledger entries from Firestore
   const {
@@ -56,8 +57,16 @@ export default function RevenueLedger() {
       }
       console.log(`[revenue-ledger] Buscando ledger entries para tenant: ${user.tenantId}`);
       const entries = await revenueLedgerService.getAll(user.tenantId);
-      console.log(`[revenue-ledger] Entries retornados: ${entries.length}`, entries);
-      return entries;
+      console.log(`[revenue-ledger] Total entries retornados: ${entries.length}`);
+
+      // Filtro V2 opcional para diagnóstico
+      const v2Entries = (entries || []).filter((e: any) => {
+        const ref = e?.referenceNumber || e?.id || "";
+        return e?.ledgerVersion === 2 || (typeof ref === "string" && ref.startsWith("V2-"));
+      });
+      console.log(`[revenue-ledger] Entries V2: ${v2Entries.length}, Total: ${entries.length}`);
+
+      return entries; // Retorna TODOS os entries agora
     },
     enabled: !!user?.tenantId,
   });
@@ -67,7 +76,9 @@ export default function RevenueLedger() {
     queryKey: ["ledger-entries-unposted", user?.tenantId],
     queryFn: async () => {
       if (!user?.tenantId) return [];
-      return revenueLedgerService.getUnposted(user.tenantId);
+      const entries = await revenueLedgerService.getUnposted(user.tenantId);
+      // Retorna todos os entries sem filtro V2
+      return entries || [];
     },
     enabled: !!user?.tenantId,
   });
@@ -271,25 +282,23 @@ export default function RevenueLedger() {
     },
   });
 
-  const forceCreateEntryMutation = useMutation({
+  const calculateIFRS15Mutation = useMutation({
     mutationFn: async () => {
-      const contractId = contracts && contracts.length > 0 ? contracts[0].id : undefined;
-      return ifrs15Service.forceCreateLedgerEntry(contractId, 25000);
+      return ifrs15Service.calculateIFRS15All();
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries-unposted", user?.tenantId] });
       refetchLedger();
       toast({
-        title: result.success ? "Entry criado com sucesso!" : "Erro ao criar entry",
-        description: result.success 
-          ? `Entry ID: ${result.entryId}, Query retorna: ${result.queryResult} entries`
-          : result.error || "Erro desconhecido",
-        variant: result.success ? "default" : "destructive",
+        title: "Cálculo IFRS 15 concluído!",
+        description: `Processados ${result.processed} de ${result.total} contratos. Erros: ${result.errors}`,
+        variant: result.errors > 0 ? "destructive" : "default",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Erro ao criar entry",
+        title: "Erro ao calcular IFRS 15",
         description: error.message,
         variant: "destructive",
       });
@@ -481,12 +490,13 @@ export default function RevenueLedger() {
         )}
         <Button
           variant="outline"
-          onClick={() => forceCreateEntryMutation.mutate()}
-          disabled={forceCreateEntryMutation.isPending}
-          data-testid="button-force-create-entry"
+          onClick={() => calculateIFRS15Mutation.mutate()}
+          disabled={calculateIFRS15Mutation.isPending}
+          data-testid="button-calculate-ifrs15"
           className="border-orange-500 text-orange-600 hover:bg-orange-50"
+          title="Gera entries iniciais simplificados. Para cálculo completo, use Accounting Reconciliation."
         >
-          {forceCreateEntryMutation.isPending ? "Calculando..." : "Calculate"}
+          {calculateIFRS15Mutation.isPending ? "Gerando entries..." : "Generate Initial Entries"}
         </Button>
       </div>
 
@@ -494,10 +504,23 @@ export default function RevenueLedger() {
       <Alert>
         <Info className="h-4 w-4" />
         <AlertTitle>Entradas Automáticas</AlertTitle>
-        <AlertDescription>
-          Todas as entradas do Revenue Ledger são geradas automaticamente pelo sistema baseado em
-          eventos (Motor IFRS 15, faturamentos, pagamentos, etc.). Não é possível criar entradas
-          manualmente para garantir conformidade com IFRS 15.
+        <AlertDescription className="flex items-center justify-between">
+          <span>
+            Todas as entradas do Revenue Ledger são geradas automaticamente pelo sistema baseado em
+            eventos (Motor IFRS 15, faturamentos, pagamentos, etc.). Não é possível criar entradas
+            manualmente para garantir conformidade com IFRS 15.
+          </span>
+          <div className="flex items-center gap-2 ml-4">
+            <label className="text-xs whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={showAllVersions}
+                onChange={(e) => setShowAllVersions(e.target.checked)}
+                className="mr-1"
+              />
+              Mostrar todas as versões
+            </label>
+          </div>
         </AlertDescription>
       </Alert>
 
@@ -656,13 +679,13 @@ export default function RevenueLedger() {
             ? "Carregando lançamentos..."
             : `Nenhum lançamento encontrado para o tenant "${user?.tenantId}". 
 
-Para gerar lançamentos:
-1. Execute o Motor IFRS 15 em um contrato - isso criará automaticamente a Receita Diferida (Deferred Revenue) baseada no valor total do contrato
-2. Marque billing schedules como "invoiced" quando a fatura for emitida (isso reconhece a receita)
-3. Marque billing schedules como "paid" quando o pagamento for recebido (isso baixa o Accounts Receivable)
-4. Marque Performance Obligations como "satisfied" quando a obrigação for cumprida
+Para gerar lançamentos (Ledger v2):
+1. Execute o Motor IFRS 15 em um contrato (gera schedules e lançamentos v2 quando aplicável)
+2. Marque billings como "invoiced" (Dr AR / Cr Contract Liability ou reclass CA→AR)
+3. Marque billings como "paid" (Dr Cash / Cr AR; adiantamentos podem ir para Contract Liability)
+4. Para receita: over_time reconhece por período; point_in_time requer PO como "satisfied"
 
-Nota: A Receita Diferida é criada automaticamente pelo Motor IFRS 15, independente de faturamento ou satisfação de POs.
+Nota: "Receita diferida / Contract Liability" não nasce apenas por existir contrato; depende de faturamento/adiantamento.
 
 Verifique o console do navegador (F12) para logs detalhados.`
         }

@@ -138,7 +138,7 @@ export default function Contracts() {
         customerId: data.customerId,
         contractNumber: data.contractNumber,
         title: data.title,
-        status: ContractStatus.DRAFT,
+        status: ContractStatus.ACTIVE,
         startDate: Timestamp.fromDate(new Date(data.startDate)),
         endDate: data.endDate ? Timestamp.fromDate(new Date(data.endDate)) : undefined,
         totalValue: parseFloat(data.totalValue) || 0,
@@ -252,6 +252,22 @@ export default function Contracts() {
           </span>
         </div>
       ),
+    },
+    {
+      key: "contractPeriod",
+      header: "Contract Period",
+      cell: (row: ContractWithDetails) => {
+        const startDate = row.startDate ? new Date(row.startDate).toLocaleDateString() : "-";
+        const endDate = row.endDate ? new Date(row.endDate).toLocaleDateString() : "-";
+        return (
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Calendar className="h-3 w-3" />
+            <span className="text-sm">
+              {startDate} - {endDate}
+            </span>
+          </div>
+        );
+      },
     },
   ];
 
@@ -452,7 +468,6 @@ export default function Contracts() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="modified">Modified</SelectItem>
             <SelectItem value="terminated">Terminated</SelectItem>

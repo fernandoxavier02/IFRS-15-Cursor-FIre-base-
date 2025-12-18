@@ -38,6 +38,7 @@ export {
 } from "./ifrs15/engine";
 export { fixContractVersions } from "./maintenance/fix-contract-versions";
 export { forceCreateLedgerEntry } from "./maintenance/force-create-ledger-entry";
+export { calculateIFRS15All } from "./maintenance/calculate-ifrs15-all";
 export { syncTenantClaims } from "./maintenance/sync-tenant-claims";
 
 // ==================== REVENUE LEDGER TRIGGERS ====================

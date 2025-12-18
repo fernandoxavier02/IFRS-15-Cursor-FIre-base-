@@ -306,13 +306,11 @@ export default function IFRS15Engine() {
           </Select>
           <Button
             onClick={() => selectedContract && runEngineMutation.mutate(selectedContract)}
-            disabled={!selectedContract || !obligations?.length || runEngineMutation.isPending}
+            disabled={!selectedContract || runEngineMutation.isPending}
             data-testid="button-run-engine"
             title={
               !selectedContract 
                 ? "Selecione um contrato para executar o motor IFRS 15" 
-                : !obligations?.length 
-                ? "Adicione obrigações de performance ao contrato antes de executar o motor"
                 : ""
             }
           >

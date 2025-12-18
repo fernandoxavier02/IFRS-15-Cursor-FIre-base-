@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-firebase";
-import { tenantService, userService } from "@/lib/firestore-service";
+import { ifrs15Service, tenantService, userService } from "@/lib/firestore-service";
 import { Language, useI18n } from "@/lib/i18n";
 import { queryClient } from "@/lib/queryClient";
 import { toDate, type Tenant, type User } from "@shared/firestore-types";
@@ -85,6 +85,25 @@ export default function Settings() {
     onError: (error: Error) => {
       toast({
         title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const syncTenantClaimsMutation = useMutation({
+    mutationFn: async () => {
+      return ifrs15Service.syncTenantClaims();
+    },
+    onSuccess: (result) => {
+      toast({
+        title: "Sincronização concluída",
+        description: `Atualizados: ${result.updated}, Pulados: ${result.skipped}, Total: ${result.total}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro na sincronização",
         description: error.message,
         variant: "destructive",
       });
@@ -209,7 +228,7 @@ export default function Settings() {
                       />
                     </div>
                   </div>
-                  <div className="pt-4">
+                  <div className="pt-4 space-y-3">
                     <Button
                       onClick={() => updateTenantMutation.mutate(tenantForm)}
                       disabled={updateTenantMutation.isPending}
@@ -217,6 +236,22 @@ export default function Settings() {
                     >
                       {updateTenantMutation.isPending ? "Saving..." : "Save Changes"}
                     </Button>
+                    <Separator />
+                    <div>
+                      <p className="text-sm font-medium mb-2">Manutenção do Sistema</p>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Sincroniza os tenantIds dos usuários para os custom claims do Firebase Auth.
+                        Execute após criar novos usuários ou se houver problemas de autenticação.
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => syncTenantClaimsMutation.mutate()}
+                        disabled={syncTenantClaimsMutation.isPending}
+                        data-testid="button-sync-tenant-claims"
+                      >
+                        {syncTenantClaimsMutation.isPending ? "Sincronizando..." : "Sincronizar Tenant Claims"}
+                      </Button>
+                    </div>
                   </div>
                 </>
               )}

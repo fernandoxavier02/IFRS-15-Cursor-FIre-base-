@@ -31,6 +31,8 @@ export const forceCreateLedgerEntry = functions.https.onCall(async (data, contex
   const forcedEntry = {
     tenantId,
     contractId,
+    ledgerVersion: 2, // ← ADICIONADO: Marca como V2
+    source: "ifrs15-ledger-v2", // ← ADICIONADO: Identifica a fonte
     entryDate: now,
     periodStart: Timestamp.fromDate(contractStartDate),
     periodEnd: Timestamp.fromDate(contractEndDate),
@@ -41,8 +43,9 @@ export const forceCreateLedgerEntry = functions.https.onCall(async (data, contex
     currency: "BRL",
     exchangeRate: 1,
     description: `Receita diferida FORÇADA - Teste via callable`,
-    referenceNumber: `DEF-FORCE-CALLABLE-${Date.now()}`,
+    referenceNumber: `V2-DEF-FORCE-CALLABLE-${Date.now()}`, // ← ALTERADO: Prefixo V2
     isPosted: false,
+    isReversed: false, // ← ADICIONADO: Campo obrigatório
     createdAt: now,
   };
 

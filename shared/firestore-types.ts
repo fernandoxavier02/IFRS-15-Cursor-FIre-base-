@@ -462,6 +462,8 @@ export interface RevenueLedgerEntry extends BaseDocument {
   contractId: string;
   performanceObligationId?: string;
   billingScheduleId?: string;
+  ledgerVersion?: number;
+  source?: string;
   entryDate: FirestoreTimestamp;
   periodStart: FirestoreTimestamp;
   periodEnd: FirestoreTimestamp;
@@ -636,6 +638,8 @@ export const createRevenueLedgerEntrySchema = z.object({
   contractId: z.string(),
   performanceObligationId: z.string().optional(),
   billingScheduleId: z.string().optional(),
+  ledgerVersion: z.number().int().positive().optional(),
+  source: z.string().optional(),
   entryDate: z.date(),
   periodStart: z.date(),
   periodEnd: z.date(),

@@ -358,7 +358,7 @@ export const approveReviewAndCreateContract = functions.https.onCall(async (data
         customerId,
         contractNumber: reviewedData.contractNumber || `C-${Date.now()}`,
         title: reviewedData.title,
-        status: "draft",
+        status: "active",
         startDate: Timestamp.fromDate(new Date(reviewedData.startDate)),
         endDate: reviewedData.endDate ? Timestamp.fromDate(new Date(reviewedData.endDate)) : null,
         totalValue: reviewedData.totalValue,

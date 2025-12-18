@@ -83,6 +83,25 @@
       ]
     },
     {
+      "collectionGroup": "revenueLedgerEntries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "contractId", "order": "ASCENDING" },
+        { "fieldPath": "entryType", "order": "ASCENDING" },
+        { "fieldPath": "referenceNumber", "order": "ASCENDING" },
+        { "fieldPath": "periodStart", "order": "ASCENDING" },
+        { "fieldPath": "periodEnd", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "revenueLedgerEntries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isPosted", "order": "ASCENDING" },
+        { "fieldPath": "entryDate", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "licenses",
       "queryScope": "COLLECTION",
       "fields": [

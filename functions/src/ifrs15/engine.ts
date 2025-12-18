@@ -13,6 +13,8 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import { db, Timestamp } from "../utils/admin";
 import { COLLECTIONS, tenantCollection } from "../utils/collections";
+import { generateInitialDeferredRevenueEntries } from "./initial-ledger-entries";
+import { generateRevenueLedgerV2ForContract } from "./ledger-v2";
 
 // Types
 interface LineItem {
@@ -77,7 +79,7 @@ interface VariableConsideration {
   probability?: number;
 }
 
-interface IFRS15Result {
+export interface IFRS15Result {
   contractId: string;
   versionId: string;
   calculatedAt: admin.firestore.Timestamp;
@@ -173,6 +175,45 @@ function generateMonthlyPeriods(start: Date, end: Date): { start: Date; end: Dat
  * 3. Receita Diferida (Deferred Revenue) - Quando há receita diferida
  * 4. Custo (Cost) - Quando há custos do contrato amortizados
  */
+/**
+ * Check if a ledger entry already exists to prevent duplicates
+ */
+async function checkExistingEntry(
+  tenantId: string,
+  contractId: string,
+  entryType: string,
+  referenceNumber: string,
+  periodStart: Date,
+  periodEnd: Date
+): Promise<boolean> {
+  const periodStartTimestamp = Timestamp.fromDate(periodStart);
+  const periodEndTimestamp = Timestamp.fromDate(periodEnd);
+
+  const existing = await db
+    .collection(tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES))
+    .where("contractId", "==", contractId)
+    .where("entryType", "==", entryType)
+    .where("referenceNumber", "==", referenceNumber)
+    .where("periodStart", "==", periodStartTimestamp)
+    .where("periodEnd", "==", periodEndTimestamp)
+    .limit(1)
+    .get();
+
+  return !existing.empty;
+}
+
+/**
+ * Build a deterministic reference number to avoid duplicated entries across reruns.
+ */
+function buildReference(
+  prefix: string,
+  contractId: string,
+  periodStart: Date,
+  periodEnd: Date
+): string {
+  return `${prefix}-${contractId}-${periodStart.getTime()}-${periodEnd.getTime()}`;
+}
+
 async function generateAutomaticJournalEntries(
   tenantId: string,
   contractId: string,
@@ -185,6 +226,10 @@ async function generateAutomaticJournalEntries(
   periodEnd: Date
 ): Promise<void> {
   try {
+    console.log(`[generateAutomaticJournalEntries] Iniciando para contrato ${contractId}, tenant ${tenantId}`);
+    console.log(`[generateAutomaticJournalEntries] transactionPrice: ${ifrs15Result.transactionPrice}, totalRecognizedRevenue: ${ifrs15Result.totalRecognizedRevenue}, totalDeferredRevenue: ${ifrs15Result.totalDeferredRevenue}`);
+    console.log(`[generateAutomaticJournalEntries] totalBilled: ${totalBilled}, totalCashReceived: ${totalCashReceived}`);
+    
     const ledgerCollection = db.collection(tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES));
     const entryDateTimestamp = Timestamp.fromDate(entryDate.toDate());
     const periodStartTimestamp = Timestamp.fromDate(periodStart);
@@ -209,7 +254,18 @@ async function generateAutomaticJournalEntries(
     // Quando há faturamento não recebido em dinheiro
     const accountsReceivable = totalBilled - totalCashReceived;
     if (accountsReceivable > 0) {
-      await ledgerCollection.add({
+      const referenceNumber = buildReference("AR-AUTO", contractId, periodStart, periodEnd);
+      const exists = await checkExistingEntry(
+        tenantId,
+        contractId,
+        "receivable",
+        referenceNumber,
+        periodStart,
+        periodEnd
+      );
+
+      if (!exists) {
+        await ledgerCollection.add({
         tenantId,
         contractId,
         entryDate: entryDateTimestamp,
@@ -222,13 +278,14 @@ async function generateAutomaticJournalEntries(
         currency,
         exchangeRate: 1,
         description: `AR automático - Faturamento não recebido do contrato ${contractId}`,
-        referenceNumber: `AR-AUTO-${contractId}-${Date.now()}`,
+        referenceNumber: buildReference("AR-AUTO", contractId, periodStart, periodEnd),
         isPosted: false,
         createdAt: entryDateTimestamp,
-      });
+        });
+      }
     }
 
-    // 2. Receita (Revenue) - Receita Reconhecida
+    // 3. Receita (Revenue) - Receita Reconhecida
     // Quando há receita reconhecida pelo IFRS 15
     // Se há faturamento: Débito: AR | Crédito: Revenue
     // Se não há faturamento: Débito: Contract Asset | Crédito: Revenue
@@ -246,7 +303,18 @@ async function generateAutomaticJournalEntries(
         debitAccount = "1200 - Accounts Receivable (AR)";
       }
       
-      await ledgerCollection.add({
+      const referenceNumber = buildReference("REV-AUTO", contractId, periodStart, periodEnd);
+      const exists = await checkExistingEntry(
+        tenantId,
+        contractId,
+        "revenue",
+        referenceNumber,
+        periodStart,
+        periodEnd
+      );
+
+      if (!exists) {
+        await ledgerCollection.add({
         tenantId,
         contractId,
         entryDate: entryDateTimestamp,
@@ -259,46 +327,163 @@ async function generateAutomaticJournalEntries(
         currency,
         exchangeRate: 1,
         description: `Receita reconhecida automaticamente pelo IFRS 15 Engine`,
-        referenceNumber: `REV-AUTO-${contractId}-${Date.now()}`,
+        referenceNumber: buildReference("REV-AUTO", contractId, periodStart, periodEnd),
         isPosted: false,
         createdAt: entryDateTimestamp,
-      });
+        });
+      }
     }
 
-    // 3. Receita Diferida (Deferred Revenue) - Receita Diferida
+    // 4. Receita Diferida (Deferred Revenue) - Receita Diferida
     // Quando há receita que ainda não foi reconhecida
     // Débito: AR (se faturado) ou Contract Asset | Crédito: Deferred Revenue
-    if (ifrs15Result.totalDeferredRevenue > 0) {
-      // Determinar conta de débito baseado em se há faturamento ou não
-      let debitAccount: string;
-      if (totalBilled > 0) {
-        // Há faturamento, usar AR
-        debitAccount = "1200 - Accounts Receivable (AR)";
-      } else {
-        // Não há faturamento, usar Contract Asset
-        debitAccount = "1300 - Contract Asset";
-      }
-      
-      await ledgerCollection.add({
+    // IMPORTANTE: Se totalDeferredRevenue é 0, mas transactionPrice > 0 e totalRecognizedRevenue = 0,
+    // isso significa que temos receita total não reconhecida que deve aparecer como diferida
+    // CORREÇÃO: Se não há POs mas há transactionPrice, ainda devemos criar um entry de Deferred Revenue
+    let effectiveDeferredRevenue = ifrs15Result.totalDeferredRevenue > 0 
+      ? ifrs15Result.totalDeferredRevenue 
+      : (ifrs15Result.transactionPrice > 0 && ifrs15Result.totalRecognizedRevenue === 0 
+          ? ifrs15Result.transactionPrice 
+          : 0);
+    
+    // Se ainda é 0 mas transactionPrice > 0, usar transactionPrice diretamente
+    // Isso garante que contratos sem POs ainda gerem entries
+    if (effectiveDeferredRevenue === 0 && ifrs15Result.transactionPrice > 0) {
+      console.log(`[generateAutomaticJournalEntries] ⚠️ effectiveDeferredRevenue é 0 mas transactionPrice > 0. Usando transactionPrice como fallback.`);
+      effectiveDeferredRevenue = ifrs15Result.transactionPrice;
+    }
+    
+    console.log(`[generateAutomaticJournalEntries] effectiveDeferredRevenue: ${effectiveDeferredRevenue}`);
+    console.log(`[generateAutomaticJournalEntries] Condições para criar entry:`, {
+      totalDeferredRevenue: ifrs15Result.totalDeferredRevenue,
+      transactionPrice: ifrs15Result.transactionPrice,
+      totalRecognizedRevenue: ifrs15Result.totalRecognizedRevenue,
+      effectiveDeferredRevenue,
+      willCreateEntry: effectiveDeferredRevenue > 0,
+    });
+    
+    if (effectiveDeferredRevenue > 0) {
+      const referenceNumber = buildReference(
+        "DEF-AUTO",
+        contractId,
+        periodStart,
+        periodEnd
+      );
+      const exists = await checkExistingEntry(
         tenantId,
         contractId,
-        entryDate: entryDateTimestamp,
-        periodStart: periodStartTimestamp,
-        periodEnd: periodEndTimestamp,
-        entryType: "deferred_revenue",
-        debitAccount,
-        creditAccount: "2500 - Deferred Revenue",
-        amount: ifrs15Result.totalDeferredRevenue,
-        currency,
-        exchangeRate: 1,
-        description: `Receita diferida automaticamente pelo IFRS 15 Engine`,
-        referenceNumber: `DEF-AUTO-${contractId}-${Date.now()}`,
-        isPosted: false,
-        createdAt: entryDateTimestamp,
+        "deferred_revenue",
+        referenceNumber,
+        periodStart,
+        periodEnd
+      );
+
+      if (!exists) {
+        // Determinar conta de débito baseado em se há faturamento ou não
+        let debitAccount: string;
+        if (totalBilled > 0) {
+          // Há faturamento, usar AR
+          debitAccount = "1200 - Accounts Receivable (AR)";
+        } else {
+          // Não há faturamento, usar Contract Asset
+          debitAccount = "1300 - Contract Asset";
+        }
+
+        const entryData = {
+          tenantId,
+          contractId,
+          entryDate: entryDateTimestamp,
+          periodStart: periodStartTimestamp,
+          periodEnd: periodEndTimestamp,
+          entryType: "deferred_revenue",
+          debitAccount,
+          creditAccount: "2500 - Deferred Revenue",
+          amount: effectiveDeferredRevenue,
+          currency,
+          exchangeRate: 1,
+          description: `Receita diferida automaticamente pelo IFRS 15 Engine`,
+          referenceNumber,
+          isPosted: false,
+          createdAt: entryDateTimestamp,
+        };
+        
+        console.log(`[generateAutomaticJournalEntries] Criando entry de deferred_revenue:`, JSON.stringify(entryData, null, 2));
+        const docRef = await ledgerCollection.add(entryData);
+        console.log(`[generateAutomaticJournalEntries] Entry criado com ID: ${docRef.id}`);
+      } else {
+        console.log(`[generateAutomaticJournalEntries] Entry já existe, pulando criação`);
+      }
+    } else {
+      console.log(`[generateAutomaticJournalEntries] ⚠️ effectiveDeferredRevenue é 0, não criando entry`);
+      console.log(`[generateAutomaticJournalEntries] Valores:`, {
+        transactionPrice: ifrs15Result.transactionPrice,
+        totalDeferredRevenue: ifrs15Result.totalDeferredRevenue,
+        totalRecognizedRevenue: ifrs15Result.totalRecognizedRevenue,
+        totalBilled,
+        totalCashReceived,
       });
+      
+      // GARANTIR QUE SEMPRE CRIE UM ENTRY SE HOUVER VALOR NO CONTRATO
+      // Mesmo que effectiveDeferredRevenue seja 0, se transactionPrice > 0, criar entry
+      if (ifrs15Result.transactionPrice > 0) {
+        console.log(`[generateAutomaticJournalEntries] 🔧 FORÇANDO criação de entry mesmo com effectiveDeferredRevenue = 0`);
+        const referenceNumber = `DEF-FORCE-${contractId}-${periodStart.getTime()}-${periodEnd.getTime()}`;
+        
+        // Verificar se já existe um entry forçado para este período
+        const existingForced = await db
+          .collection(tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES))
+          .where("contractId", "==", contractId)
+          .where("entryType", "==", "deferred_revenue")
+          .where("referenceNumber", "==", referenceNumber)
+          .limit(1)
+          .get();
+
+        if (existingForced.empty) {
+          const entryData = {
+            tenantId,
+            contractId,
+            entryDate: entryDateTimestamp,
+            periodStart: periodStartTimestamp,
+            periodEnd: periodEndTimestamp,
+            entryType: "deferred_revenue",
+            debitAccount: totalBilled > 0 ? "1200 - Accounts Receivable (AR)" : "1300 - Contract Asset",
+            creditAccount: "2500 - Deferred Revenue",
+            amount: ifrs15Result.transactionPrice,
+            currency,
+            exchangeRate: 1,
+            description: `Receita diferida forçada (transactionPrice > 0 mas effectiveDeferredRevenue = 0)`,
+            referenceNumber,
+            isPosted: false,
+            createdAt: entryDateTimestamp,
+          };
+          
+          console.log(`[generateAutomaticJournalEntries] 📝 Criando entry FORÇADO:`, JSON.stringify(entryData, null, 2));
+          console.log(`[generateAutomaticJournalEntries] 📁 Collection: ${tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES)}`);
+          
+          try {
+            const docRef = await ledgerCollection.add(entryData);
+            console.log(`[generateAutomaticJournalEntries] ✅ Entry FORÇADO criado com ID: ${docRef.id}`);
+            console.log(`[generateAutomaticJournalEntries] ✅ Path completo: ${tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES)}/${docRef.id}`);
+            
+            // Verificar se foi realmente criado
+            const verifyDoc = await docRef.get();
+            if (verifyDoc.exists) {
+              console.log(`[generateAutomaticJournalEntries] ✅ Verificação: Entry existe no Firestore`);
+            } else {
+              console.error(`[generateAutomaticJournalEntries] ❌ ERRO CRÍTICO: Entry não foi encontrado após criação!`);
+            }
+          } catch (addError: any) {
+            console.error(`[generateAutomaticJournalEntries] ❌ ERRO ao adicionar entry forçado:`, addError);
+            console.error(`[generateAutomaticJournalEntries] Stack:`, addError.stack);
+            throw addError;
+          }
+        } else {
+          console.log(`[generateAutomaticJournalEntries] Entry FORÇADO já existe (${existingForced.docs[0].id}), pulando`);
+        }
+      }
     }
 
-    // 4. Custo (Cost) - Custos do Contrato Amortizados
+    // 5. Custo (Cost) - Custos do Contrato Amortizados
     // Buscar custos do contrato e gerar lançamento se houver amortização
     // Débito: Cost of Revenue | Crédito: Contract Costs Asset
     const contractCostsSnapshot = await db
@@ -316,75 +501,198 @@ async function generateAutomaticJournalEntries(
     }
 
     if (totalAmortizedCosts > 0) {
-      await ledgerCollection.add({
+      const referenceNumber = buildReference(
+        "COST-AUTO",
+        contractId,
+        periodStart,
+        periodEnd
+      );
+      const exists = await checkExistingEntry(
         tenantId,
         contractId,
-        entryDate: entryDateTimestamp,
-        periodStart: periodStartTimestamp,
-        periodEnd: periodEndTimestamp,
-        entryType: "commission_expense",
-        debitAccount: "5000 - Cost of Revenue",
-        creditAccount: "1500 - Contract Costs Asset",
-        amount: totalAmortizedCosts,
-        currency,
-        exchangeRate: 1,
-        description: `Custos do contrato amortizados automaticamente`,
-        referenceNumber: `COST-AUTO-${contractId}-${Date.now()}`,
-        isPosted: false,
-        createdAt: entryDateTimestamp,
-      });
+        "commission_expense",
+        referenceNumber,
+        periodStart,
+        periodEnd
+      );
+
+      if (!exists) {
+        await ledgerCollection.add({
+          tenantId,
+          contractId,
+          entryDate: entryDateTimestamp,
+          periodStart: periodStartTimestamp,
+          periodEnd: periodEndTimestamp,
+          entryType: "commission_expense",
+          debitAccount: "5000 - Cost of Revenue",
+          creditAccount: "1500 - Contract Costs Asset",
+          amount: totalAmortizedCosts,
+          currency,
+          exchangeRate: 1,
+          description: `Custos do contrato amortizados automaticamente`,
+          referenceNumber,
+          isPosted: false,
+          createdAt: entryDateTimestamp,
+        });
+      }
     }
 
-    // 5. Contract Asset - Se houver (Receita reconhecida > Faturamento)
+    // 6. Contract Asset - Se houver (Receita reconhecida > Faturamento)
     // Débito: Contract Asset | Crédito: Revenue
     if (ifrs15Result.contractAsset > 0) {
-      await ledgerCollection.add({
+      const referenceNumber = buildReference(
+        "CA-AUTO",
+        contractId,
+        periodStart,
+        periodEnd
+      );
+      const exists = await checkExistingEntry(
         tenantId,
         contractId,
-        entryDate: entryDateTimestamp,
-        periodStart: periodStartTimestamp,
-        periodEnd: periodEndTimestamp,
-        entryType: "contract_asset",
-        debitAccount: "1300 - Contract Asset",
-        creditAccount: "4000 - Revenue",
-        amount: ifrs15Result.contractAsset,
-        currency,
-        exchangeRate: 1,
-        description: `Contract Asset gerado automaticamente pelo IFRS 15`,
-        referenceNumber: `CA-AUTO-${contractId}-${Date.now()}`,
-        isPosted: false,
-        createdAt: entryDateTimestamp,
-      });
+        "contract_asset",
+        referenceNumber,
+        periodStart,
+        periodEnd
+      );
+
+      if (!exists) {
+        await ledgerCollection.add({
+          tenantId,
+          contractId,
+          entryDate: entryDateTimestamp,
+          periodStart: periodStartTimestamp,
+          periodEnd: periodEndTimestamp,
+          entryType: "contract_asset",
+          debitAccount: "1300 - Contract Asset",
+          creditAccount: "4000 - Revenue",
+          amount: ifrs15Result.contractAsset,
+          currency,
+          exchangeRate: 1,
+          description: `Contract Asset gerado automaticamente pelo IFRS 15`,
+          referenceNumber,
+          isPosted: false,
+          createdAt: entryDateTimestamp,
+        });
+      }
     }
 
-    // 6. Contract Liability - Se houver (Faturamento > Receita reconhecida)
+    // 7. Contract Liability - Se houver (Faturamento > Receita reconhecida)
     // Débito: Revenue | Crédito: Contract Liability
     if (ifrs15Result.contractLiability > 0) {
-      await ledgerCollection.add({
+      const referenceNumber = buildReference(
+        "CL-AUTO",
+        contractId,
+        periodStart,
+        periodEnd
+      );
+      const exists = await checkExistingEntry(
         tenantId,
         contractId,
-        entryDate: entryDateTimestamp,
-        periodStart: periodStartTimestamp,
-        periodEnd: periodEndTimestamp,
-        entryType: "contract_liability",
-        debitAccount: "4000 - Revenue",
-        creditAccount: "2600 - Contract Liability",
-        amount: ifrs15Result.contractLiability,
-        currency,
-        exchangeRate: 1,
-        description: `Contract Liability gerado automaticamente pelo IFRS 15`,
-        referenceNumber: `CL-AUTO-${contractId}-${Date.now()}`,
-        isPosted: false,
-        createdAt: entryDateTimestamp,
-      });
+        "contract_liability",
+        referenceNumber,
+        periodStart,
+        periodEnd
+      );
+
+      if (!exists) {
+        await ledgerCollection.add({
+          tenantId,
+          contractId,
+          entryDate: entryDateTimestamp,
+          periodStart: periodStartTimestamp,
+          periodEnd: periodEndTimestamp,
+          entryType: "contract_liability",
+          debitAccount: "4000 - Revenue",
+          creditAccount: "2600 - Contract Liability",
+          amount: ifrs15Result.contractLiability,
+          currency,
+          exchangeRate: 1,
+          description: `Contract Liability gerado automaticamente pelo IFRS 15`,
+          referenceNumber,
+          isPosted: false,
+          createdAt: entryDateTimestamp,
+        });
+      }
     }
 
-    console.log(`✅ Lançamentos contábeis automáticos gerados para contrato ${contractId}`);
+    // 8. Financing Income - Se houver componente de financiamento significativo
+    // Verificar se há componente de financiamento (contratos > 12 meses)
+    const contractStartDate = periodStart;
+    const contractEndDate = periodEnd;
+    const contractDurationMonths = monthsBetween(contractStartDate, contractEndDate);
+
+    if (contractDurationMonths > 12 && ifrs15Result.financingComponent > 0) {
+      const referenceNumber = buildReference(
+        "FIN-AUTO",
+        contractId,
+        periodStart,
+        periodEnd
+      );
+      const exists = await checkExistingEntry(
+        tenantId,
+        contractId,
+        "financing_income",
+        referenceNumber,
+        periodStart,
+        periodEnd
+      );
+
+      if (!exists) {
+        await ledgerCollection.add({
+          tenantId,
+          contractId,
+          entryDate: entryDateTimestamp,
+          periodStart: periodStartTimestamp,
+          periodEnd: periodEndTimestamp,
+          entryType: "financing_income",
+          debitAccount: "1300 - Contract Asset",
+          creditAccount: "4100 - Financing Income",
+          amount: ifrs15Result.financingComponent,
+          currency,
+          exchangeRate: 1,
+          description: `Financing income recognized for significant financing component`,
+          referenceNumber,
+          isPosted: false,
+          createdAt: entryDateTimestamp,
+        });
+      }
+    }
+
+    // Contar quantos entries foram criados
+    const entriesCount = await ledgerCollection
+      .where("contractId", "==", contractId)
+      .where("createdAt", ">=", entryDateTimestamp)
+      .get();
+    
+    console.log(`[generateAutomaticJournalEntries] ✅ Concluído com sucesso para contrato ${contractId}`);
+    console.log(`[generateAutomaticJournalEntries] Total de entries criados nesta execução: ${entriesCount.size}`);
+    console.log(`[generateAutomaticJournalEntries] Resumo final:`, {
+      effectiveDeferredRevenue,
+      accountsReceivable: totalBilled - totalCashReceived,
+      totalRecognizedRevenue: ifrs15Result.totalRecognizedRevenue,
+      contractAsset: ifrs15Result.contractAsset,
+      contractLiability: ifrs15Result.contractLiability,
+      entriesCreated: entriesCount.size,
+    });
   } catch (error: any) {
-    console.error(`❌ Erro ao gerar lançamentos contábeis automáticos: ${error.message}`);
+    console.error(`[generateAutomaticJournalEntries] ❌ Erro ao gerar lançamentos contábeis automáticos:`, error);
+    console.error(`[generateAutomaticJournalEntries] Stack trace:`, error.stack);
+    console.error(`[generateAutomaticJournalEntries] Detalhes:`, {
+      tenantId,
+      contractId,
+      transactionPrice: ifrs15Result.transactionPrice,
+      totalRecognizedRevenue: ifrs15Result.totalRecognizedRevenue,
+      totalDeferredRevenue: ifrs15Result.totalDeferredRevenue,
+      totalBilled,
+      totalCashReceived,
+    });
     // Não falhar o processo principal se a geração de lançamentos falhar
+    // Mas logar o erro para debug
   }
 }
+
+// Legacy generator kept for reference (Ledger v2 supersedes it).
+void generateAutomaticJournalEntries;
 
 /**
  * Main IFRS 15 Engine Cloud Function
@@ -402,7 +710,15 @@ export const runIFRS15Engine = functions.https.onCall(
     const tenantId = context.auth.token.tenantId;
     const userId = context.auth.uid;
 
+    console.log(`[runIFRS15Engine] 🚀 INICIANDO Motor IFRS 15`);
+    console.log(`[runIFRS15Engine] 👤 Usuário: ${userId}`);
+    console.log(`[runIFRS15Engine] 🏢 tenantId do token: ${context.auth.token.tenantId}`);
+    console.log(`[runIFRS15Engine] 🏢 tenantId usado: ${tenantId}`);
+    console.log(`[runIFRS15Engine] 📄 contractId: ${contractId}`);
+
     if (!tenantId) {
+      console.error(`[runIFRS15Engine] ❌ ERRO: tenantId não encontrado no token!`);
+      console.error(`[runIFRS15Engine] Token completo:`, JSON.stringify(context.auth.token, null, 2));
       throw new functions.https.HttpsError("failed-precondition", "No tenant associated");
     }
 
@@ -453,12 +769,59 @@ export const runIFRS15Engine = functions.https.onCall(
       const contract = { id: contractDoc.id, ...contractDoc.data() } as Contract;
       result.contractExists = true;
 
-      // Get version
-      const targetVersionId = versionId || contract.currentVersionId;
-      if (!targetVersionId) {
-        result.errors.push("No contract version found");
-        throw new functions.https.HttpsError("failed-precondition", "Contract has no versions");
-      }
+      // Helper: garantir que exista uma versão atual; se não houver, criar versão 1 automaticamente
+      const ensureCurrentVersion = async (): Promise<string> => {
+        let currentId = versionId || contract.currentVersionId;
+
+        if (currentId) {
+          const exists = await contractRef.collection("versions").doc(currentId).get();
+          if (exists.exists) {
+            return currentId;
+          }
+        }
+
+        // Buscar última versão existente
+        const versionsSnapshot = await contractRef
+          .collection("versions")
+          .orderBy("versionNumber", "desc")
+          .limit(1)
+          .get();
+
+        if (!versionsSnapshot.empty) {
+          currentId = versionsSnapshot.docs[0].id;
+          await contractRef.update({ currentVersionId: currentId });
+          console.warn(
+            `[runIFRS15Engine] currentVersionId ausente; usando versão ${currentId} e atualizando contrato`
+          );
+          return currentId;
+        }
+
+        // Criar versão inicial automaticamente
+        const nowTs = Timestamp.now();
+        const effectiveDate =
+          (contract.startDate && (contract.startDate as any).toDate?.()) ||
+          (contract.startDate ? new Date(contract.startDate as any) : new Date());
+
+        const versionRef = await contractRef.collection("versions").add({
+          contractId,
+          versionNumber: 1,
+          effectiveDate: Timestamp.fromDate(effectiveDate),
+          totalValue: Number(contract.totalValue || 0),
+          isProspective: true,
+          createdAt: nowTs,
+          createdBy: userId,
+          description: "Versão inicial (criada automaticamente pelo IFRS 15 Engine)",
+        } as Partial<ContractVersion>);
+
+        await contractRef.update({ currentVersionId: versionRef.id, status: contract.status || "active" });
+        console.warn(
+          `[runIFRS15Engine] Nenhuma versão encontrada para contrato ${contractId}; criada versão inicial ${versionRef.id}`
+        );
+        return versionRef.id;
+      };
+
+      // Get or create version
+      const targetVersionId = await ensureCurrentVersion();
 
       result.versionId = targetVersionId;
 
@@ -543,12 +906,25 @@ export const runIFRS15Engine = functions.https.onCall(
         justification: po.justification || "Deemed distinct",
       }));
 
+      console.log(`[runIFRS15Engine] STEP 2: Performance Obligations processadas: ${result.performanceObligations.length}`);
+      if (performanceObligations.length === 0) {
+        console.warn(`[runIFRS15Engine] ⚠️ NENHUMA Performance Obligation encontrada! O Motor não conseguirá calcular receita sem POs.`);
+        result.warnings.push("Nenhuma Performance Obligation encontrada. Crie pelo menos uma PO para calcular receita.");
+      }
+
       // ===============================
       // STEP 3: Determine Transaction Price
       // ===============================
       
+      console.log(`[runIFRS15Engine] STEP 3: Determinando Transaction Price`);
+      console.log(`[runIFRS15Engine] Performance Obligations encontradas: ${performanceObligations.length}`);
+      performanceObligations.forEach((po, idx) => {
+        console.log(`[runIFRS15Engine] PO ${idx + 1}: ${po.description}, allocatedPrice: ${po.allocatedPrice}, recognitionMethod: ${po.recognitionMethod}`);
+      });
+      
       // Fixed price from contract
       result.fixedPrice = version.totalValue;
+      console.log(`[runIFRS15Engine] Fixed price (version.totalValue): ${result.fixedPrice}`);
 
       // Get variable considerations
       const vcSnapshot = await versionRef.collection("variableConsiderations").get();
@@ -577,6 +953,12 @@ export const runIFRS15Engine = functions.https.onCall(
       }
 
       result.transactionPrice = result.fixedPrice + result.variableConsideration - result.constrainedAmount + result.financingComponent;
+      console.log(`[runIFRS15Engine] Transaction Price calculado: ${result.transactionPrice}`, {
+        fixedPrice: result.fixedPrice,
+        variableConsideration: result.variableConsideration,
+        constrainedAmount: result.constrainedAmount,
+        financingComponent: result.financingComponent,
+      });
 
       // ===============================
       // STEP 4: Allocate Transaction Price
@@ -614,6 +996,9 @@ export const runIFRS15Engine = functions.https.onCall(
       // ===============================
       // STEP 5: Recognize Revenue
       // ===============================
+      
+      console.log(`[runIFRS15Engine] STEP 5: Reconhecendo Receita`);
+      console.log(`[runIFRS15Engine] Processando ${performanceObligations.length} Performance Obligations`);
       
       for (const po of performanceObligations) {
         const allocation = result.allocations.find(a => a.poId === po.id);
@@ -742,6 +1127,13 @@ export const runIFRS15Engine = functions.https.onCall(
         }
       }
 
+      console.log(`[runIFRS15Engine] Resumo de receita:`, {
+        totalRecognizedRevenue: result.totalRecognizedRevenue,
+        totalDeferredRevenue: result.totalDeferredRevenue,
+        totalBilled,
+        totalCashReceived,
+      });
+
       if (result.totalRecognizedRevenue > totalBilled) {
         result.contractAsset = result.totalRecognizedRevenue - totalBilled;
         result.contractLiability = 0;
@@ -749,6 +1141,11 @@ export const runIFRS15Engine = functions.https.onCall(
         result.contractAsset = 0;
         result.contractLiability = totalBilled - result.totalRecognizedRevenue;
       }
+      
+      console.log(`[runIFRS15Engine] Contract balances:`, {
+        contractAsset: result.contractAsset,
+        contractLiability: result.contractLiability,
+      });
 
       // Save contract balance
       await contractRef.collection("balances").add({
@@ -779,21 +1176,141 @@ export const runIFRS15Engine = functions.https.onCall(
       });
 
       // Gerar lançamentos contábeis automaticamente
-      await generateAutomaticJournalEntries(
-        tenantId,
-        contractId,
-        result,
+      console.log(`[runIFRS15Engine] Chamando generateAutomaticJournalEntries para contrato ${contractId}`);
+      console.log(`[runIFRS15Engine] Valores antes de gerar entries:`, {
+        transactionPrice: result.transactionPrice,
+        totalRecognizedRevenue: result.totalRecognizedRevenue,
+        totalDeferredRevenue: result.totalDeferredRevenue,
         totalBilled,
         totalCashReceived,
-        contract.currency || "BRL",
-        now,
-        contractStartDate,
-        contractEndDate
-      );
+        contractValue: version.totalValue,
+      });
+      try {
+        // Gerar ledger entries baseados em eventos (billing, payment, etc)
+        await generateRevenueLedgerV2ForContract({
+          tenantId,
+          contractId,
+          upTo: now.toDate(),
+        });
+        console.log(`[runIFRS15Engine] Ledger v2 gerado com sucesso`);
+
+        // NOVO: Gerar entries iniciais de deferred revenue
+        // Isso garante que sempre haverá entries, mesmo sem billing
+        console.log(`[runIFRS15Engine] 🎬 Gerando entries iniciais de deferred revenue...`);
+        const initialResult = await generateInitialDeferredRevenueEntries({
+          tenantId,
+          contractId,
+          ifrs15Result: result,
+          contractStartDate,
+          contractEndDate,
+          currency: contract.currency || "BRL",
+        });
+        console.log(`[runIFRS15Engine] Initial entries: criados=${initialResult.created}, pulados=${initialResult.skipped}`);
+
+        console.log(`[runIFRS15Engine] ✅ generateAutomaticJournalEntries concluído com sucesso`);
+        
+        // VERIFICAÇÃO CRÍTICA: Se transactionPrice > 0 mas nenhum entry foi criado, FORÇAR criação
+        console.log(`[runIFRS15Engine] 🔍 Verificando se entries foram criados...`);
+        console.log(`[runIFRS15Engine] Path da coleção: ${tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES)}`);
+        console.log(`[runIFRS15Engine] contractId: ${contractId}, tenantId: ${tenantId}`);
+        
+        const ledgerSnapshot = await db
+          .collection(tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES))
+          .where("contractId", "==", contractId)
+          .get();
+        
+        console.log(`[runIFRS15Engine] 📊 Entries existentes para este contrato: ${ledgerSnapshot.size}`);
+        console.log(`[runIFRS15Engine] transactionPrice: ${result.transactionPrice}, empty: ${ledgerSnapshot.empty}`);
+        
+        if (false && ledgerSnapshot.empty && result.transactionPrice > 0) {
+          console.log(`[runIFRS15Engine] ⚠️ CRÍTICO: Nenhum entry foi criado mas transactionPrice > 0. FORÇANDO criação...`);
+          const forcedEntry = {
+            tenantId,
+            contractId,
+            entryDate: now,
+            periodStart: Timestamp.fromDate(contractStartDate),
+            periodEnd: Timestamp.fromDate(contractEndDate),
+            entryType: "deferred_revenue",
+            debitAccount: totalBilled > 0 ? "1200 - Accounts Receivable (AR)" : "1300 - Contract Asset",
+            creditAccount: "2500 - Deferred Revenue",
+            amount: result.transactionPrice,
+            currency: contract.currency || "BRL",
+            exchangeRate: 1,
+            description: `Receita diferida FORÇADA - Motor IFRS 15 (transactionPrice > 0 mas nenhum entry foi criado)`,
+            referenceNumber: `DEF-FORCE-${contractId}-${Date.now()}`,
+            isPosted: false,
+            createdAt: now,
+          };
+          
+          console.log(`[runIFRS15Engine] 📝 Dados do entry forçado:`, JSON.stringify(forcedEntry, null, 2));
+          
+          try {
+            const forcedDocRef = await db
+              .collection(tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES))
+              .add(forcedEntry);
+            console.log(`[runIFRS15Engine] ✅ Entry FORÇADO criado com ID: ${forcedDocRef.id}`);
+            console.log(`[runIFRS15Engine] ✅ Path completo: ${tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES)}/${forcedDocRef.id}`);
+          } catch (forceError: any) {
+            console.error(`[runIFRS15Engine] ❌ ERRO ao criar entry forçado:`, forceError);
+            console.error(`[runIFRS15Engine] Stack:`, forceError.stack);
+            throw forceError;
+          }
+        } else if (!ledgerSnapshot.empty) {
+          console.log(`[runIFRS15Engine] ✅ Entries já existem para este contrato (${ledgerSnapshot.size} encontrados)`);
+        } else if (result.transactionPrice === 0) {
+          console.log(`[runIFRS15Engine] ⚠️ transactionPrice é 0, não criando entry forçado`);
+        }
+      } catch (journalError: any) {
+        console.error(`[runIFRS15Engine] ❌ ERRO ao gerar journal entries:`, journalError);
+        console.error(`[runIFRS15Engine] Stack trace:`, journalError.stack);
+        // Não falhar o engine por causa de journal entries, mas tentar criar um entry básico
+        if (false && result.transactionPrice > 0) {
+          try {
+            console.log(`[runIFRS15Engine] Tentando criar entry básico após erro...`);
+            const basicEntry = {
+              tenantId,
+              contractId,
+              entryDate: now,
+              periodStart: Timestamp.fromDate(contractStartDate),
+              periodEnd: Timestamp.fromDate(contractEndDate),
+              entryType: "deferred_revenue",
+              debitAccount: "1300 - Contract Asset",
+              creditAccount: "2500 - Deferred Revenue",
+              amount: result.transactionPrice,
+              currency: contract.currency || "BRL",
+              exchangeRate: 1,
+              description: `Receita diferida criada após erro no generateAutomaticJournalEntries`,
+              referenceNumber: `DEF-ERROR-${contractId}-${Date.now()}`,
+              isPosted: false,
+              createdAt: now,
+            };
+            const basicDocRef = await db
+              .collection(tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES))
+              .add(basicEntry);
+            console.log(`[runIFRS15Engine] ✅ Entry básico criado após erro com ID: ${basicDocRef.id}`);
+          } catch (basicError: any) {
+            console.error(`[runIFRS15Engine] ❌ ERRO ao criar entry básico:`, basicError);
+          }
+        }
+        result.warnings.push(`Erro ao gerar lançamentos contábeis: ${journalError.message}`);
+      }
+
+      // Log final do resultado
+      console.log(`[runIFRS15Engine] ✅ Motor IFRS 15 concluído para contrato ${contractId}`);
+      console.log(`[runIFRS15Engine] Resultado final:`, {
+        transactionPrice: result.transactionPrice,
+        totalRecognizedRevenue: result.totalRecognizedRevenue,
+        totalDeferredRevenue: result.totalDeferredRevenue,
+        contractAsset: result.contractAsset,
+        contractLiability: result.contractLiability,
+        errors: result.errors.length,
+        warnings: result.warnings.length,
+      });
 
       return result;
     } catch (error: any) {
-      console.error("IFRS 15 Engine error:", error);
+      console.error("[runIFRS15Engine] Erro no IFRS 15 Engine:", error);
+      console.error("[runIFRS15Engine] Stack trace:", error.stack);
       result.errors.push(error.message || "Unknown error");
       
       if (error instanceof functions.https.HttpsError) {

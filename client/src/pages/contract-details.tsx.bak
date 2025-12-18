@@ -25,17 +25,19 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
     ArrowLeft,
     Calendar,
+    ChartLineUp,
     ClockCounterClockwise,
     CurrencyDollar,
     FileText,
     Plus,
+    Receipt,
     Target,
-    TrendUp
+    TrendUp,
 } from "@phosphor-icons/react";
 import type { PerformanceObligation } from "@shared/firestore-types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useLocation, useParams } from "wouter";
 import { z } from "zod";
@@ -122,26 +124,12 @@ export default function ContractDetails() {
     enabled: !!id && !!user?.tenantId,
   });
 
-  const {
-    data: ledgerEntries,
-    isLoading: ledgerLoading,
-    error: ledgerError,
-  } = useQuery<LedgerEntryWithDetails[]>({
+  const { data: ledgerEntries, isLoading: ledgerLoading } = useQuery<LedgerEntryWithDetails[]>({
     queryKey: ["ledger-entries", user?.tenantId, id],
     queryFn: async () => {
-      if (!user?.tenantId || !id) {
-        console.log("[contract-details] Query ledger entries: tenantId ou id ausente", { tenantId: user?.tenantId, id });
-        return [];
-      }
-      console.log("[contract-details] Buscando ledger entries para contrato", { tenantId: user.tenantId, contractId: id });
+      if (!user?.tenantId || !id) return [];
       const { revenueLedgerService } = await import("@/lib/firestore-service");
-      const entries = await revenueLedgerService.getByContract(user.tenantId, id) as any;
-      const v2Entries = (entries || []).filter((e: any) => {
-        const ref = e?.referenceNumber || e?.id || "";
-        return e?.ledgerVersion === 2 || (typeof ref === "string" && ref.startsWith("V2-"));
-      });
-      console.log("[contract-details] Ledger entries encontrados (v2):", v2Entries.length, v2Entries);
-      return v2Entries;
+      return revenueLedgerService.getByContract(user.tenantId, id) as any;
     },
     enabled: !!id && !!user?.tenantId,
   });
@@ -149,113 +137,12 @@ export default function ContractDetails() {
   const { toast } = useToast();
   const [poDialogOpen, setPoDialogOpen] = useState(false);
 
-  const runEngineMutation = useMutation({
-    mutationFn: async () => {
-      if (!id) throw new Error("Contract ID not found");
-      const { ifrs15Service } = await import("@/lib/firestore-service");
-      return ifrs15Service.runEngine(id);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contract", user?.tenantId, id] });
-      queryClient.invalidateQueries({ queryKey: ["performance-obligations", user?.tenantId, id] });
-      queryClient.invalidateQueries({ queryKey: ["billing-schedules", user?.tenantId, id] });
-      queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId, id] });
-      toast({
-        title: "Motor IFRS 15 executado",
-        description: "Lançamentos contábeis e saldos foram recalculados para este contrato.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Erro",
-        description: error.message || "Falha ao executar o Motor IFRS 15",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const markPOSatisfiedMutation = useMutation({
-    mutationFn: async (poId: string) => {
-      if (!user?.tenantId) throw new Error("No tenant ID");
-      if (!id) throw new Error("Contract ID not found");
-      if (!currentVersionId) throw new Error("No current contract version");
-
-      const { performanceObligationService } = await import("@/lib/firestore-service");
-      await performanceObligationService.update(user.tenantId, id, currentVersionId, poId, {
-        isSatisfied: true,
-        satisfiedDate: new Date(),
-      } as any);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["performance-obligations", user?.tenantId, id, currentVersionId] });
-      queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId, id] });
-      toast({
-        title: "PO marcada como satisfied",
-        description: "A receita será reconhecida conforme IFRS 15 (Ledger v2).",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Erro",
-        description: error.message || "Falha ao marcar PO como satisfied",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Se o ledger vier vazio, tenta rodar o motor automaticamente uma vez
-  useEffect(() => {
-    if (!id || ledgerLoading || runEngineMutation.isPending) return;
-    if (ledgerEntries && ledgerEntries.length > 0) return;
-    if (!contract) return;
-    // Evita reentradas: marca no state local
-    if ((runEngineMutation as any)._autoTriggered) return;
-    (runEngineMutation as any)._autoTriggered = true;
-    runEngineMutation.mutate();
-  }, [id, contract, ledgerEntries, ledgerLoading, runEngineMutation]);
-
   const poFormSchema = z.object({
     description: z.string().min(1, "Description is required"),
     allocatedPrice: z.string().min(1, "Allocated price is required").refine(v => !isNaN(parseFloat(v)) && parseFloat(v) > 0, "Must be a positive number"),
     recognitionMethod: z.enum(["over_time", "point_in_time"]),
     measurementMethod: z.enum(["input", "output"]).optional(),
     percentComplete: z.string().optional().default("0"),
-    // Campos condicionais baseados no recognitionMethod
-    dueDate: z.string().optional(), // Para point_in_time
-    startDate: z.string().optional(), // Para over_time
-    endDate: z.string().optional(), // Para over_time
-    frequency: z.enum(["monthly", "quarterly", "semi_annual", "annual"]).optional(), // Para over_time
-  }).refine((data) => {
-    // Validação: point_in_time exige dueDate
-    if (data.recognitionMethod === "point_in_time") {
-      return !!data.dueDate && data.dueDate.trim() !== "";
-    }
-    return true;
-  }, {
-    message: "Due date is required for point in time recognition",
-    path: ["dueDate"],
-  }).refine((data) => {
-    // Validação: over_time exige startDate, endDate e frequency
-    if (data.recognitionMethod === "over_time") {
-      return !!data.startDate && data.startDate.trim() !== "" &&
-             !!data.endDate && data.endDate.trim() !== "" &&
-             !!data.frequency;
-    }
-    return true;
-  }, {
-    message: "Start date, end date, and frequency are required for over time recognition",
-    path: ["startDate"],
-  }).refine((data) => {
-    // Validação: endDate deve ser após startDate para over_time
-    if (data.recognitionMethod === "over_time" && data.startDate && data.endDate) {
-      const start = new Date(data.startDate);
-      const end = new Date(data.endDate);
-      return end > start;
-    }
-    return true;
-  }, {
-    message: "End date must be after start date",
-    path: ["endDate"],
   });
 
   type POFormValues = z.infer<typeof poFormSchema>;
@@ -268,10 +155,6 @@ export default function ContractDetails() {
       recognitionMethod: "over_time",
       measurementMethod: undefined,
       percentComplete: "0",
-      dueDate: "",
-      startDate: "",
-      endDate: "",
-      frequency: undefined,
     },
   });
 
@@ -314,7 +197,7 @@ export default function ContractDetails() {
       // Atualizar o contrato com a versão atual
       await contractService.update(user.tenantId, id, {
         currentVersionId: versionId,
-        status: contract.status,
+        status: contract.status === "draft" ? "active" : contract.status,
       });
       
       return versionId;
@@ -342,32 +225,14 @@ export default function ContractDetails() {
         throw new Error("Dados do contrato ausentes");
       }
       
-      if (!contract) {
-        throw new Error("Dados do contrato não disponíveis");
-      }
-      
-      // VALIDAÇÃO 1: Soma dos allocatedPrice ≤ totalValue do contrato
-      const { performanceObligationService } = await import("@/lib/firestore-service");
-      const existingPOs = currentVersionId 
-        ? await performanceObligationService.getAll(user.tenantId, id, currentVersionId)
-        : [];
-      
-      const totalAllocated = existingPOs.reduce((sum, po) => sum + (po.allocatedPrice || 0), 0);
-      const newAllocatedPrice = parseFloat(data.allocatedPrice);
-      const totalAfterAdd = totalAllocated + newAllocatedPrice;
-      const contractTotalValue = Number(contract.totalValue || 0);
-      
-      if (totalAfterAdd > contractTotalValue) {
-        throw new Error(
-          `A soma dos preços alocados (${totalAfterAdd.toFixed(2)}) excede o valor total do contrato (${contractTotalValue.toFixed(2)}). ` +
-          `Máximo permitido: ${(contractTotalValue - totalAllocated).toFixed(2)}`
-        );
-      }
-      
       let versionId = currentVersionId;
       
       // Se não houver versão, criar a primeira versão automaticamente
       if (!versionId) {
+        if (!contract) {
+          throw new Error("Dados do contrato não disponíveis");
+        }
+        
         const { contractVersionService, contractService } = await import("@/lib/firestore-service");
         const { Timestamp } = await import("firebase/firestore");
         
@@ -391,7 +256,7 @@ export default function ContractDetails() {
           versionNumber: 1,
           effectiveDate,
           description: "Versão inicial do contrato",
-          totalValue: contractTotalValue,
+          totalValue: Number(contract.totalValue || 0),
           isProspective: true,
         };
         
@@ -400,7 +265,7 @@ export default function ContractDetails() {
         // Atualizar o contrato com a versão atual
         await contractService.update(user.tenantId, id, {
           currentVersionId: versionId,
-          status: contract.status,
+          status: contract.status === "draft" ? "active" : contract.status,
         });
       }
       
@@ -426,6 +291,8 @@ export default function ContractDetails() {
       const recognizedAmount = (parsedAllocatedPrice * finalPercent) / 100;
       const deferredAmount = parsedAllocatedPrice - recognizedAmount;
       
+      const { performanceObligationService } = await import("@/lib/firestore-service");
+      
       // Preparar dados com tipos corretos (PerformanceObligation interface)
       const poData: Omit<PerformanceObligation, "id" | "createdAt"> = {
         contractVersionId: versionId,
@@ -443,174 +310,17 @@ export default function ContractDetails() {
         poData.measurementMethod = data.measurementMethod as "input" | "output";
       }
       
-      // Criar a PO
-      const poId = await performanceObligationService.create(user.tenantId, id, versionId, poData);
-      
-      // GERAR BILLING SCHEDULES AUTOMATICAMENTE
-      const { billingScheduleService, revenueLedgerService } = await import("@/lib/firestore-service");
-      const { Timestamp } = await import("firebase/firestore");
-      
-      if (data.recognitionMethod === "point_in_time" && data.dueDate) {
-        // Point in time: parcela única na dueDate
-        const dueDate = new Date(data.dueDate);
-        if (isNaN(dueDate.getTime())) {
-          throw new Error("Data de vencimento inválida. Por favor, verifique a data informada.");
-        }
-        
-        const billingDate = new Date(dueDate);
-        billingDate.setDate(billingDate.getDate() - 7); // 7 dias antes da dueDate
-        
-        if (isNaN(billingDate.getTime())) {
-          throw new Error("Erro ao calcular data de faturamento. Por favor, verifique a data de vencimento.");
-        }
-        
-        await billingScheduleService.create(user.tenantId, {
-          tenantId: user.tenantId,
-          contractId: id,
-          performanceObligationId: poId,
-          billingDate: Timestamp.fromDate(billingDate),
-          dueDate: Timestamp.fromDate(dueDate),
-          amount: parsedAllocatedPrice,
-          currency: contract.currency || "BRL",
-          frequency: "one_time",
-          status: "scheduled",
-          notes: `Auto-generated for PO: ${data.description.trim()}`,
-        });
-      } else if (data.recognitionMethod === "over_time" && data.startDate && data.endDate && data.frequency) {
-        // Over time: parcelas por período do CONTRATO (não da PO) para cobrir todo o período
-        // IMPORTANTE: Usar datas do contrato para garantir que todos os billings sejam gerados
-        const getContractDate = (dateValue: any, fallbackDate: string): Date => {
-          if (!dateValue) return new Date(fallbackDate);
-          
-          // Se for Date
-          if (dateValue instanceof Date) {
-            return dateValue;
-          }
-          
-          // Se for Timestamp do Firestore (tem método toDate)
-          if (dateValue && typeof dateValue === "object" && typeof (dateValue as any).toDate === "function") {
-            return (dateValue as any).toDate();
-          }
-          
-          // Se for string
-          if (typeof dateValue === "string") {
-            const parsed = new Date(dateValue);
-            if (!isNaN(parsed.getTime())) {
-              return parsed;
-            }
-          }
-          
-          // Fallback
-          return new Date(fallbackDate);
-        };
-        
-        const contractStartDate = getContractDate(contract.startDate, data.startDate);
-        const contractEndDate = contract.endDate 
-          ? getContractDate(contract.endDate, data.endDate)
-          : new Date(data.endDate);
-        
-        // Validar datas do contrato
-        if (isNaN(contractStartDate.getTime()) || isNaN(contractEndDate.getTime())) {
-          throw new Error("Datas do contrato inválidas. Verifique as datas de início e fim do contrato.");
-        }
-        
-        // Calcular número de períodos baseado na frequência
-        const getPeriodMonths = (freq: string): number => {
-          switch (freq) {
-            case "monthly": return 1;
-            case "quarterly": return 3;
-            case "semi_annual": return 6;
-            case "annual": return 12;
-            default: return 1;
-          }
-        };
-        
-        const periodMonths = getPeriodMonths(data.frequency);
-        const monthsBetween = (start: Date, end: Date): number => {
-          const total = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-          return total <= 0 ? 1 : total;
-        };
-        
-        // Usar período do CONTRATO, não da PO
-        const totalMonths = monthsBetween(contractStartDate, contractEndDate);
-        const numberOfPeriods = Math.max(1, Math.ceil(totalMonths / periodMonths));
-        
-        // Distribuir o allocatedPrice da PO proporcionalmente ao período do contrato
-        // Se a PO cobre apenas parte do período, calcular proporção
-        const poStartDate = new Date(data.startDate);
-        const poEndDate = new Date(data.endDate);
-        const poMonths = monthsBetween(poStartDate, poEndDate);
-        const contractMonths = totalMonths;
-        
-        // Calcular valor proporcional baseado na cobertura da PO no período do contrato
-        // Se PO cobre todo o período do contrato, usar allocatedPrice completo
-        // Se PO cobre apenas parte, distribuir proporcionalmente
-        const poCoverageRatio = contractMonths > 0 ? Math.min(1, poMonths / contractMonths) : 1;
-        const amountPerPeriod = Math.round((parsedAllocatedPrice / numberOfPeriods) * 100) / 100;
-        
-        // Criar parcelas para TODO o período do contrato
-        let currentDate = new Date(contractStartDate);
-        let remainingAmount = parsedAllocatedPrice;
-        
-        for (let i = 0; i < numberOfPeriods; i++) {
-          const billingDate = new Date(currentDate);
-          const dueDate = new Date(currentDate);
-          dueDate.setDate(dueDate.getDate() + 30); // 30 dias de prazo de pagamento
-          
-          // Validar datas antes de criar
-          if (isNaN(billingDate.getTime()) || isNaN(dueDate.getTime())) {
-            console.error(`Invalid dates for period ${i + 1}: billingDate=${billingDate}, dueDate=${dueDate}`);
-            throw new Error(`Erro ao gerar billing schedule para período ${i + 1}. Datas inválidas.`);
-          }
-          
-          const isLastPeriod = i === numberOfPeriods - 1;
-          const amount = isLastPeriod ? remainingAmount : amountPerPeriod;
-          
-          // Garantir que amount é válido
-          if (isNaN(amount) || amount <= 0) {
-            console.error(`Invalid amount for period ${i + 1}: ${amount}`);
-            throw new Error(`Erro ao calcular valor para período ${i + 1}. Valor inválido.`);
-          }
-          
-          // Criar billing schedule para garantir que todos os períodos do contrato tenham billing
-          await billingScheduleService.create(user.tenantId, {
-            tenantId: user.tenantId,
-            contractId: id,
-            performanceObligationId: poId,
-            billingDate: Timestamp.fromDate(billingDate),
-            dueDate: Timestamp.fromDate(dueDate),
-            amount,
-            currency: contract.currency || "BRL",
-            frequency: data.frequency as any,
-            status: "scheduled",
-            notes: `Auto-generated for PO: ${data.description.trim()} - Period ${i + 1}/${numberOfPeriods} (Contract: ${contractStartDate.toLocaleDateString()} - ${contractEndDate.toLocaleDateString()})`,
-          });
-          
-          remainingAmount -= amountPerPeriod;
-          currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + periodMonths, currentDate.getDate());
-          
-          // Validar próxima data
-          if (isNaN(currentDate.getTime())) {
-            console.error(`Invalid next date calculated: ${currentDate}`);
-            break; // Parar se a próxima data for inválida
-          }
-        }
-      }
-      
-      return poId;
+      return performanceObligationService.create(user.tenantId, id, versionId, poData);
     },
     onSuccess: () => {
-      // Invalidar todos os caches relacionados
       queryClient.invalidateQueries({ queryKey: ["performance-obligations", user?.tenantId, id] });
       queryClient.invalidateQueries({ queryKey: ["contract", user?.tenantId, id] });
       queryClient.invalidateQueries({ queryKey: ["contracts", user?.tenantId] });
-      queryClient.invalidateQueries({ queryKey: ["billing-schedules", user?.tenantId, id] });
-      queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId, id] });
       setPoDialogOpen(false);
       poForm.reset();
       toast({
         title: "Sucesso",
-        description: "Obrigação de performance criada com sucesso. Billing schedules gerados automaticamente.",
+        description: "Obrigação de performance criada com sucesso",
       });
     },
     onError: (error: Error) => {
@@ -625,7 +335,6 @@ export default function ContractDetails() {
   const handleCreatePO = (data: POFormValues) => {
     createPOMutation.mutate(data);
   };
-
 
   const formatCurrency = (amount: string | number | undefined | null, currency: string = "USD") => {
     // Tratar valores undefined, null ou vazios
@@ -652,34 +361,10 @@ export default function ContractDetails() {
     }).format(numValue);
   };
 
-  const formatDate = (value: unknown) => {
-    if (!value) return "-";
-
-    const toDate = (input: unknown): Date | null => {
-      if (!input) return null;
-
-      if (input instanceof Date) {
-        return isNaN(input.getTime()) ? null : input;
-      }
-
-      if (typeof input === "string" || typeof input === "number") {
-        const parsed = new Date(input);
-        return isNaN(parsed.getTime()) ? null : parsed;
-      }
-
-      if (typeof input === "object" && typeof (input as any).toDate === "function") {
-        const parsed = (input as any).toDate();
-        return parsed instanceof Date && !isNaN(parsed.getTime()) ? parsed : null;
-      }
-
-      return null;
-    };
-
-    const date = toDate(value);
-    if (!date) return "-";
-
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "-";
     try {
-      return format(date, "MMM dd, yyyy");
+      return format(new Date(dateStr), "MMM dd, yyyy");
     } catch {
       return "-";
     }
@@ -768,27 +453,6 @@ export default function ContractDetails() {
         </Badge>
       ),
     },
-    {
-      key: "actions",
-      header: "Ações",
-      cell: (row: PerformanceObligationSummary) => {
-        const isPointInTime = row.recognitionMethod === "point_in_time";
-        if (!isPointInTime) return <span className="text-xs text-muted-foreground">-</span>;
-        if (row.isSatisfied) return <span className="text-xs text-muted-foreground">-</span>;
-
-        return (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => markPOSatisfiedMutation.mutate(row.id)}
-            disabled={markPOSatisfiedMutation.isPending}
-            data-testid={`button-po-satisfy-${row.id}`}
-          >
-            Marcar satisfied
-          </Button>
-        );
-      },
-    },
   ];
 
   const billingColumns = [
@@ -812,7 +476,7 @@ export default function ContractDetails() {
       header: "Frequency",
       cell: (row: BillingScheduleWithDetails) => (
         <Badge variant="outline" className="capitalize text-xs">
-          {formatFrequency(row.frequency)}
+          {row.frequency.replace("_", " ")}
         </Badge>
       ),
     },
@@ -839,7 +503,7 @@ export default function ContractDetails() {
       header: "Type",
       cell: (row: LedgerEntryWithDetails) => (
         <Badge variant="outline" className="capitalize text-xs">
-          {formatEntryType(row.entryType)}
+          {row.entryType.replace("_", " ")}
         </Badge>
       ),
     },
@@ -879,34 +543,6 @@ export default function ContractDetails() {
     
     return (recognizedRevenue / totalValue) * 100;
   })();
-
-  const normalizeFrequency = (value?: string | null) => {
-    switch (value) {
-      case "monthly":
-      case "quarterly":
-      case "one_time":
-        return value;
-      case "semi_annual":
-      case "semi_annually":
-        return "semi_annual";
-      case "annual":
-      case "annually":
-        return "annual";
-      default:
-        return "";
-    }
-  };
-
-  const formatFrequency = (value?: string | null) => {
-    const normalized = normalizeFrequency(value);
-    if (!normalized) return "N/A";
-    return normalized.replace(/_/g, " ");
-  };
-
-  const formatEntryType = (value?: string | null) => {
-    if (!value) return "N/A";
-    return value.replace(/_/g, " ");
-  };
 
   return (
     <div className="p-8 space-y-6 max-w-[1600px] mx-auto">
@@ -1022,10 +658,18 @@ export default function ContractDetails() {
       </div>
 
       <Tabs defaultValue="obligations" className="w-full">
-        <TabsList className="w-auto">
+        <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
           <TabsTrigger value="obligations" data-testid="tab-obligations" className="gap-2">
             <Target className="h-4 w-4" />
             Obligations
+          </TabsTrigger>
+          <TabsTrigger value="billing" data-testid="tab-billing" className="gap-2">
+            <Receipt className="h-4 w-4" />
+            Billing
+          </TabsTrigger>
+          <TabsTrigger value="ledger" data-testid="tab-ledger" className="gap-2">
+            <ChartLineUp className="h-4 w-4" />
+            Ledger
           </TabsTrigger>
         </TabsList>
 
@@ -1120,101 +764,23 @@ export default function ContractDetails() {
                           )}
                         />
                         {poForm.watch("recognitionMethod") === "over_time" && (
-                          <>
-                            <FormField
-                              control={poForm.control}
-                              name="measurementMethod"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Measurement Method</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger data-testid="select-measurement-method">
-                                        <SelectValue placeholder="Select measurement" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="input">Input Method</SelectItem>
-                                      <SelectItem value="output">Output Method</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={poForm.control}
-                              name="startDate"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Start Date *</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      data-testid="input-po-start-date"
-                                      type="date"
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={poForm.control}
-                              name="endDate"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>End Date *</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      data-testid="input-po-end-date"
-                                      type="date"
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={poForm.control}
-                              name="frequency"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Frequency *</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger data-testid="select-po-frequency">
-                                        <SelectValue placeholder="Select frequency" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="monthly">Monthly</SelectItem>
-                                      <SelectItem value="quarterly">Quarterly</SelectItem>
-                                      <SelectItem value="semi_annual">Semi-Annual</SelectItem>
-                                      <SelectItem value="annual">Annual</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </>
-                        )}
-                        {poForm.watch("recognitionMethod") === "point_in_time" && (
                           <FormField
                             control={poForm.control}
-                            name="dueDate"
+                            name="measurementMethod"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Due Date *</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    data-testid="input-po-due-date"
-                                    type="date"
-                                    {...field}
-                                  />
-                                </FormControl>
+                                <FormLabel>Measurement Method</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-measurement-method">
+                                      <SelectValue placeholder="Select measurement" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="input">Input Method</SelectItem>
+                                    <SelectItem value="output">Output Method</SelectItem>
+                                  </SelectContent>
+                                </Select>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -1275,6 +841,70 @@ export default function ContractDetails() {
                 <div className="h-32 flex flex-col items-center justify-center text-muted-foreground gap-2">
                   <Target weight="duotone" className="h-10 w-10 text-muted-foreground/30" />
                   <p className="text-sm">No performance obligations found</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="billing" className="mt-6">
+          <Card className="card-premium border-0">
+            <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500/10 to-cyan-500/10">
+                  <Receipt weight="duotone" className="h-4 w-4 text-teal-500" />
+                </div>
+                <CardTitle className="text-base font-semibold">Billing Schedule</CardTitle>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                {billingSchedules?.length ?? 0} entries
+              </Badge>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {billingLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : billingSchedules && billingSchedules.length > 0 ? (
+                <DataTable columns={billingColumns} data={billingSchedules} />
+              ) : (
+                <div className="h-32 flex flex-col items-center justify-center text-muted-foreground gap-2">
+                  <Receipt weight="duotone" className="h-10 w-10 text-muted-foreground/30" />
+                  <p className="text-sm">No billing schedules found</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ledger" className="mt-6">
+          <Card className="card-premium border-0">
+            <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500/10 to-violet-500/10">
+                  <ChartLineUp weight="duotone" className="h-4 w-4 text-indigo-500" />
+                </div>
+                <CardTitle className="text-base font-semibold">Revenue Ledger Entries</CardTitle>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                {ledgerEntries?.length ?? 0} entries
+              </Badge>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {ledgerLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : ledgerEntries && ledgerEntries.length > 0 ? (
+                <DataTable columns={ledgerColumns} data={ledgerEntries} />
+              ) : (
+                <div className="h-32 flex flex-col items-center justify-center text-muted-foreground gap-2">
+                  <ChartLineUp weight="duotone" className="h-10 w-10 text-muted-foreground/30" />
+                  <p className="text-sm">No ledger entries found</p>
                 </div>
               )}
             </CardContent>

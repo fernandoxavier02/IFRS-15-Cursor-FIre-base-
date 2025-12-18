@@ -18,6 +18,7 @@ export const translations = {
     "nav.aiSettings": "AI Settings",
     "nav.billingSchedules": "Billing Schedules",
     "nav.revenueLedger": "Revenue Ledger",
+    "nav.accountingReconciliation": "Accounting Reconciliation",
     "nav.consolidatedBalances": "Consolidated Balances",
     "nav.revenueWaterfall": "Revenue Waterfall",
     "nav.contractCosts": "Contract Costs",
@@ -287,12 +288,12 @@ export const translations = {
     "nav.aiSettings": "Configurações de IA",
     "nav.billingSchedules": "Cronograma de Faturamento",
     "nav.revenueLedger": "Livro de Receitas",
+    "nav.accountingReconciliation": "Reconciliação Contábil",
     "nav.consolidatedBalances": "Saldos Consolidados",
     "nav.revenueWaterfall": "Cascata de Receita",
     "nav.contractCosts": "Custos de Contrato",
     "nav.ifrs15AccountingControl": "Controle Contábil",
     "nav.deleteManagement": "Gerenciamento de Exclusões",
-    
     // Painel
     "dashboard.title": "Painel",
     "dashboard.totalContracts": "Total de Contratos",
@@ -556,12 +557,12 @@ export const translations = {
     "nav.aiSettings": "Configuración de IA",
     "nav.billingSchedules": "Programación de Facturación",
     "nav.revenueLedger": "Libro de Ingresos",
+    "nav.accountingReconciliation": "Conciliación Contable",
     "nav.consolidatedBalances": "Saldos Consolidados",
     "nav.revenueWaterfall": "Cascada de Ingresos",
     "nav.contractCosts": "Costos de Contrato",
     "nav.ifrs15AccountingControl": "Control Contable",
     "nav.deleteManagement": "Gestión de Eliminaciones",
-    
     // Panel
     "dashboard.title": "Panel",
     "dashboard.totalContracts": "Total de Contratos",

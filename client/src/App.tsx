@@ -36,6 +36,7 @@ import RevenueWaterfall from "@/pages/revenue-waterfall";
 import Settings from "@/pages/settings";
 import Showcase from "@/pages/showcase";
 import Subscribe from "@/pages/subscribe";
+import AccountingReconciliation from "@/pages/accounting-reconciliation";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Redirect, Route, Switch, useLocation } from "wouter";
@@ -114,6 +115,7 @@ function MainRouter() {
         <Route path="/ifrs15" component={IFRS15Engine} />
         <Route path="/billing-schedules" component={BillingSchedules} />
         <Route path="/revenue-ledger" component={RevenueLedger} />
+        <Route path="/accounting-reconciliation" component={AccountingReconciliation} />
         <Route path="/consolidated-balances" component={ConsolidatedBalances} />
         <Route path="/revenue-waterfall" component={RevenueWaterfall} />
         <Route path="/contract-costs" component={ContractCosts} />
