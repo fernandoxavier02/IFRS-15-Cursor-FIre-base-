@@ -9,21 +9,21 @@ admin.initializeApp();
 
 // ==================== AUTH TRIGGERS ====================
 export {
-  activateUserLicense, createUserWithTenant, onUserCreated,
-  onUserDeleted,
-  setUserClaims
+    activateUserLicense, createUserWithTenant, onUserCreated,
+    onUserDeleted,
+    setUserClaims
 } from "./auth/triggers";
 
 // ==================== STRIPE ====================
 export {
-  cancelSubscription, createCheckoutSession,
-  createPortalSession, getStripePublishableKey, getSubscriptionPlans, resumeSubscription
+    cancelSubscription, createCheckoutSession,
+    createPortalSession, getStripePublishableKey, getSubscriptionPlans, resumeSubscription
 } from "./stripe/checkout";
 export { stripeWebhook } from "./stripe/webhooks";
 
 // ==================== AI ====================
 export {
-  approveReviewAndCreateContract, processIngestionJob
+    approveReviewAndCreateContract, processIngestionJob
 } from "./ai/contract-extraction";
 
 // ==================== REST APIs ====================
@@ -33,13 +33,24 @@ export { dashboardApi } from "./api/dashboard";
 
 // ==================== IFRS 15 ENGINE ====================
 export {
-  createContractVersion,
-  generateBillingSchedule, runIFRS15Engine
+    createContractVersion,
+    generateBillingSchedule, runIFRS15Engine
 } from "./ifrs15/engine";
+export { fixContractVersions } from "./maintenance/fix-contract-versions";
+export { forceCreateLedgerEntry } from "./maintenance/force-create-ledger-entry";
+export { syncTenantClaims } from "./maintenance/sync-tenant-claims";
+
+// ==================== REVENUE LEDGER TRIGGERS ====================
+export {
+    monthlyRevenueRecognition, onBillingInvoiced, onBillingPaid, onPOSatisfied
+} from "./ifrs15/revenue-ledger-triggers";
+
+// ==================== BILLING SCHEDULES TRIGGERS ====================
+// Desabilitado para evitar geração duplicada de billings no nível do contrato.
 
 // ==================== REPORTS ====================
 export {
-  generateContractBalancesReport, generateDisaggregatedRevenueReport, generateRemainingObligationsReport
+    generateContractBalancesReport, generateDisaggregatedRevenueReport, generateRemainingObligationsReport
 } from "./reports/index";
 
 // ==================== SCHEDULED FUNCTIONS ====================

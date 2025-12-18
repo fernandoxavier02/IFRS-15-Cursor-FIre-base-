@@ -10,6 +10,7 @@ import type {
     ContractLineItem,
     ContractVersion,
     Customer,
+    LedgerEntryType,
     License,
     PerformanceObligation,
     RevenueLedgerEntry
@@ -50,9 +51,28 @@ async function getCollection<T>(
   path: string,
   ...constraints: QueryConstraint[]
 ): Promise<T[]> {
-  const q = query(collection(db, path), ...constraints);
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as T);
+  console.log(`[getCollection] Buscando na coleção: ${path}`, constraints);
+  try {
+    const q = query(collection(db, path), ...constraints);
+    const snapshot = await getDocs(q);
+    const results = snapshot.docs.map((doc) => {
+      const data = { id: doc.id, ...doc.data() } as T;
+      console.log(`[getCollection] Documento encontrado: ${doc.id}`, data);
+      return data;
+    });
+    console.log(`[getCollection] Total de documentos encontrados: ${results.length}`);
+    return results;
+  } catch (error: any) {
+    console.error(`[getCollection] ERRO ao buscar coleção ${path}:`, error);
+    console.error(`[getCollection] Código do erro:`, error.code);
+    console.error(`[getCollection] Mensagem:`, error.message);
+    console.error(`[getCollection] Stack:`, error.stack);
+    // Se for erro de índice faltando, mostrar mensagem mais clara
+    if (error.code === 'failed-precondition' || error.message?.includes('index')) {
+      console.error(`[getCollection] ⚠️ ERRO DE ÍNDICE: A query requer um índice composto que pode não existir. Verifique o Firebase Console.`);
+    }
+    throw error;
+  }
 }
 
 // Helper para remover campos undefined (Firestore não aceita undefined)
@@ -60,6 +80,38 @@ function removeUndefinedFields(obj: Record<string, any>): Record<string, any> {
   return Object.fromEntries(
     Object.entries(obj).filter(([_, value]) => value !== undefined)
   );
+}
+
+function normalizeBillingFrequency(value: any): BillingSchedule["frequency"] {
+  switch (value) {
+    case "monthly":
+    case "quarterly":
+    case "milestone":
+    case "one_time":
+      return value;
+    case "semi_annual":
+    case "semi_annually":
+      return "semi_annual";
+    case "annual":
+    case "annually":
+      return "annual";
+    default:
+      return "monthly";
+  }
+}
+
+function normalizeLedgerEntryType(value: any): LedgerEntryType {
+  const allowed: LedgerEntryType[] = [
+    "revenue",
+    "deferred_revenue",
+    "contract_asset",
+    "contract_liability",
+    "receivable",
+    "cash",
+    "financing_income",
+    "commission_expense",
+  ];
+  return allowed.includes(value as LedgerEntryType) ? (value as LedgerEntryType) : "revenue";
 }
 
 async function addDocument<T>(path: string, data: Omit<T, "id" | "createdAt">): Promise<string> {
@@ -181,10 +233,15 @@ export const contractService = {
     tenantId: string,
     data: Omit<Contract, "id" | "createdAt" | "updatedAt" | "tenantId">
   ): Promise<string> {
+    const now = Timestamp.now();
+    const status = (data as any).status ?? "active";
+
     const contractId = await addDocument<Contract>(tenantCollection(tenantId, "contracts"), {
       ...data,
+      status,
       tenantId,
-      updatedAt: Timestamp.now(),
+      createdAt: now,
+      updatedAt: now,
     } as any);
     
     // Criar versão inicial automaticamente
@@ -478,14 +535,23 @@ export const billingScheduleService = {
   },
 
   async create(tenantId: string, data: Omit<BillingSchedule, "id" | "createdAt">): Promise<string> {
+    const payload = {
+      ...data,
+      frequency: normalizeBillingFrequency((data as any).frequency),
+    } as any;
+
     return addDocument<BillingSchedule>(
       tenantCollection(tenantId, "billingSchedules"),
-      data as any
+      payload
     );
   },
 
   async update(tenantId: string, id: string, data: Partial<BillingSchedule>): Promise<void> {
-    await updateDocument(tenantCollection(tenantId, "billingSchedules"), id, data);
+    const payload = { ...data } as any;
+    if (payload.frequency !== undefined) {
+      payload.frequency = normalizeBillingFrequency(payload.frequency);
+    }
+    await updateDocument(tenantCollection(tenantId, "billingSchedules"), id, payload);
   },
 
   async delete(tenantId: string, id: string): Promise<void> {
@@ -497,18 +563,56 @@ export const billingScheduleService = {
 
 export const revenueLedgerService = {
   async getAll(tenantId: string): Promise<RevenueLedgerEntry[]> {
-    return getCollection<RevenueLedgerEntry>(
-      tenantCollection(tenantId, "revenueLedgerEntries"),
-      orderBy("entryDate", "desc")
-    );
+    console.log(`[revenueLedgerService.getAll] Buscando ledger entries para tenant: ${tenantId}`);
+    const path = tenantCollection(tenantId, "revenueLedgerEntries");
+    console.log(`[revenueLedgerService.getAll] Path da coleção: ${path}`);
+    try {
+      // Tentar primeiro com orderBy, se falhar, buscar sem orderBy
+      let entries: RevenueLedgerEntry[];
+      try {
+        entries = await getCollection<RevenueLedgerEntry>(
+          path,
+          orderBy("entryDate", "desc")
+        );
+      } catch (orderByError: any) {
+        console.warn(`[revenueLedgerService.getAll] Erro com orderBy, tentando sem ordenação:`, orderByError.message);
+        // Se falhar por índice, buscar sem orderBy e ordenar no cliente
+        entries = await getCollection<RevenueLedgerEntry>(path);
+        // Ordenar por entryDate desc no cliente
+        entries.sort((a, b) => {
+          const dateA = (a.entryDate as any)?.toDate ? (a.entryDate as any).toDate().getTime() : 
+                       (a.entryDate instanceof Date ? a.entryDate.getTime() : 0);
+          const dateB = (b.entryDate as any)?.toDate ? (b.entryDate as any).toDate().getTime() : 
+                       (b.entryDate instanceof Date ? b.entryDate.getTime() : 0);
+          return dateB - dateA;
+        });
+      }
+      console.log(`[revenueLedgerService.getAll] Entries encontrados: ${entries.length}`, entries);
+      return entries;
+    } catch (error: any) {
+      console.error(`[revenueLedgerService.getAll] ERRO ao buscar entries:`, error);
+      console.error(`[revenueLedgerService.getAll] Stack:`, error.stack);
+      throw error;
+    }
   },
 
   async getByContract(tenantId: string, contractId: string): Promise<RevenueLedgerEntry[]> {
-    return getCollection<RevenueLedgerEntry>(
-      tenantCollection(tenantId, "revenueLedgerEntries"),
-      where("contractId", "==", contractId),
-      orderBy("entryDate", "desc")
-    );
+    console.log(`[revenueLedgerService.getByContract] Buscando entries para contrato: ${contractId}, tenant: ${tenantId}`);
+    const path = tenantCollection(tenantId, "revenueLedgerEntries");
+    console.log(`[revenueLedgerService.getByContract] Path: ${path}`);
+    try {
+      const entries = await getCollection<RevenueLedgerEntry>(
+        path,
+        where("contractId", "==", contractId),
+        orderBy("entryDate", "desc")
+      );
+      console.log(`[revenueLedgerService.getByContract] Entries encontrados: ${entries.length}`, entries);
+      return entries;
+    } catch (error: any) {
+      console.error(`[revenueLedgerService.getByContract] ERRO:`, error);
+      console.error(`[revenueLedgerService.getByContract] Stack:`, error.stack);
+      throw error;
+    }
   },
 
   async getUnposted(tenantId: string): Promise<RevenueLedgerEntry[]> {
@@ -520,14 +624,23 @@ export const revenueLedgerService = {
   },
 
   async create(tenantId: string, data: Omit<RevenueLedgerEntry, "id" | "createdAt">): Promise<string> {
+    const payload = {
+      ...data,
+      entryType: normalizeLedgerEntryType((data as any).entryType),
+    } as any;
+
     return addDocument<RevenueLedgerEntry>(
       tenantCollection(tenantId, "revenueLedgerEntries"),
-      data as any
+      payload
     );
   },
 
   async update(tenantId: string, id: string, data: Partial<RevenueLedgerEntry>): Promise<void> {
-    await updateDocument(tenantCollection(tenantId, "revenueLedgerEntries"), id, data);
+    const payload = { ...data } as any;
+    if (payload.entryType !== undefined) {
+      payload.entryType = normalizeLedgerEntryType(payload.entryType);
+    }
+    await updateDocument(tenantCollection(tenantId, "revenueLedgerEntries"), id, payload);
   },
 
   async delete(tenantId: string, id: string): Promise<void> {
@@ -701,6 +814,34 @@ export const ifrs15Service = {
     const generateSchedule = httpsCallable(functions, "generateBillingSchedule");
     const result = await generateSchedule({ contractId, frequency, startDate });
     return result.data as { success: boolean; schedules?: any[] };
+  },
+
+  async syncTenantClaims() {
+    const syncClaims = httpsCallable(functions, "syncTenantClaims");
+    const result = await syncClaims();
+    return result.data as { updated: number; skipped: number; total: number };
+  },
+
+  async forceCreateLedgerEntry(contractId?: string, amount?: number) {
+    const forceCreate = httpsCallable(functions, "forceCreateLedgerEntry");
+    const result = await forceCreate({ contractId, amount });
+    return result.data as { success: boolean; entryId?: string; path?: string; tenantId?: string; contractId?: string; queryResult?: number; error?: string };
+  },
+};
+
+// ==================== MAINTENANCE ====================
+
+export const maintenanceService = {
+  async fixContractVersions() {
+    const fn = httpsCallable(functions, "fixContractVersions");
+    const result = await fn({});
+    return result.data as any;
+  },
+
+  async syncTenantClaims() {
+    const fn = httpsCallable(functions, "syncTenantClaims");
+    const result = await fn({});
+    return result.data as any;
   },
 };
 
@@ -964,4 +1105,5 @@ export default {
   exchangeRates: exchangeRateService,
   financingComponents: financingComponentService,
   consolidatedBalances: consolidatedBalanceService,
+  maintenance: maintenanceService,
 };
