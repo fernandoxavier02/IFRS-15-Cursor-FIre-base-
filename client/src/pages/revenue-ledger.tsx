@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-firebase";
-import { contractService, customerService, revenueLedgerService } from "@/lib/firestore-service";
+import { contractService, customerService, ifrs15Service, revenueLedgerService } from "@/lib/firestore-service";
 import { queryClient } from "@/lib/queryClient";
 import type { LedgerEntryWithDetails } from "@/lib/types";
 import type { Contract, Customer, RevenueLedgerEntry } from "@shared/firestore-types";
@@ -111,6 +111,11 @@ export default function RevenueLedger() {
 
   // Transform ledger entries with details
   const entriesWithDetails: LedgerEntryWithDetails[] = useMemo(() => {
+    console.log(`[revenue-ledger] Transformando entries: ${ledgerEntries?.length || 0} entries`);
+    if (!ledgerEntries || ledgerEntries.length === 0) {
+      console.log(`[revenue-ledger] ⚠️ Nenhum ledger entry encontrado para transformar`);
+      return [];
+    }
     return (ledgerEntries || []).map((entry) => {
       const contract = contractMap.get(entry.contractId);
       const customerName = contract ? customerMap.get(contract.customerId) || "Unknown" : "Unknown";
@@ -266,7 +271,38 @@ export default function RevenueLedger() {
     },
   });
 
+  const forceCreateEntryMutation = useMutation({
+    mutationFn: async () => {
+      const contractId = contracts && contracts.length > 0 ? contracts[0].id : undefined;
+      return ifrs15Service.forceCreateLedgerEntry(contractId, 25000);
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId] });
+      refetchLedger();
+      toast({
+        title: result.success ? "Entry criado com sucesso!" : "Erro ao criar entry",
+        description: result.success 
+          ? `Entry ID: ${result.entryId}, Query retorna: ${result.queryResult} entries`
+          : result.error || "Erro desconhecido",
+        variant: result.success ? "default" : "destructive",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao criar entry",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Filter entries
+  console.log(`[revenue-ledger] Filtrando entries: ${entriesWithDetails.length} entries, filtros:`, {
+    searchQuery,
+    typeFilter,
+    postedFilter,
+    contractFilter,
+  });
   const filteredEntries = entriesWithDetails.filter((entry) => {
     const matchesSearch =
       entry.contractNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -281,8 +317,21 @@ export default function RevenueLedger() {
       (postedFilter === "posted" && entry.isPosted) ||
       (postedFilter === "unposted" && !entry.isPosted);
     const matchesContract = contractFilter === "all" || entry.contractId === contractFilter;
-    return matchesSearch && matchesType && matchesPosted && matchesContract;
+    const result = matchesSearch && matchesType && matchesPosted && matchesContract;
+    if (!result) {
+      console.log(`[revenue-ledger] Entry ${entry.id} filtrado:`, {
+        matchesSearch,
+        matchesType,
+        matchesPosted,
+        matchesContract,
+        entryType: entry.entryType,
+        isPosted: entry.isPosted,
+        contractId: entry.contractId,
+      });
+    }
+    return result;
   });
+  console.log(`[revenue-ledger] Entries após filtro: ${filteredEntries.length} de ${entriesWithDetails.length}`);
 
   // Statistics
   const totalPosted = entriesWithDetails.filter((e) => e.isPosted).length;
@@ -430,6 +479,15 @@ export default function RevenueLedger() {
             Post All ({totalUnposted})
           </Button>
         )}
+        <Button
+          variant="outline"
+          onClick={() => forceCreateEntryMutation.mutate()}
+          disabled={forceCreateEntryMutation.isPending}
+          data-testid="button-force-create-entry"
+          className="border-orange-500 text-orange-600 hover:bg-orange-50"
+        >
+          {forceCreateEntryMutation.isPending ? "Calculando..." : "Calculate"}
+        </Button>
       </div>
 
       {/* Info Alert */}
@@ -469,6 +527,27 @@ export default function RevenueLedger() {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Debug Info - Sempre visível para diagnóstico */}
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>🔍 Estado da Query</AlertTitle>
+        <AlertDescription className="space-y-1 text-xs">
+          <div><strong>Tenant ID:</strong> {user?.tenantId || "N/A"}</div>
+          <div><strong>Loading:</strong> {isLoading ? "Sim" : "Não"}</div>
+          <div><strong>Entries brutos:</strong> {ledgerEntries?.length || 0}</div>
+          <div><strong>Entries transformados:</strong> {entriesWithDetails.length}</div>
+          <div><strong>Entries filtrados:</strong> {filteredEntries.length}</div>
+          <div><strong>Erro:</strong> {ledgerEntriesError ? "Sim" : "Não"}</div>
+          <div><strong>Filtros ativos:</strong> type={typeFilter}, posted={postedFilter}, contract={contractFilter}, search="{searchQuery}"</div>
+          <div><strong>Path esperado:</strong> tenants/{user?.tenantId}/revenueLedgerEntries</div>
+          {ledgerEntriesError && (
+            <div className="mt-2 p-2 bg-destructive/10 rounded text-xs">
+              <strong>Erro detalhado:</strong> {(ledgerEntriesError as any)?.message || String(ledgerEntriesError)}
+            </div>
+          )}
+        </AlertDescription>
+      </Alert>
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
