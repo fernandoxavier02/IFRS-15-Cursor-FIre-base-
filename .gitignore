@@ -32,3 +32,5 @@ functions/*.log
 
 # OS
 Thumbs.db
+playwright-report/
+test-results/
