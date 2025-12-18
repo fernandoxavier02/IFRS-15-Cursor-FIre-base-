@@ -9,15 +9,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-firebase";
-import { queryClient } from "@/lib/queryClient";
 import { contractCostService, contractService, ifrs15Service, maintenanceService, revenueLedgerService } from "@/lib/firestore-service";
+import { queryClient } from "@/lib/queryClient";
 import type { LedgerEntryWithDetails } from "@/lib/types";
+import type { Contract, RevenueLedgerEntry } from "@shared/firestore-types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { addMonths, endOfMonth, format, parseISO, startOfMonth } from "date-fns";
 import { BookOpen, CalendarDays, Gauge, Receipt, Scale } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { Contract, RevenueLedgerEntry } from "@shared/firestore-types";
-import { toISOString } from "@shared/firestore-types";
 
 type BalanceSide = "debit" | "credit";
 
@@ -60,6 +59,18 @@ function formatDate(value: string | Date | null | undefined) {
   } catch {
     return "-";
   }
+}
+
+// Helper function to convert Firestore timestamp to ISO string
+function toISOString(timestamp: any): string {
+  if (!timestamp) return "";
+  if (timestamp instanceof Date) return isNaN(timestamp.getTime()) ? "" : timestamp.toISOString();
+  if (typeof timestamp === "string") return timestamp;
+  if (typeof timestamp === "object" && typeof timestamp.toDate === "function") {
+    const d = timestamp.toDate();
+    return d instanceof Date && !isNaN(d.getTime()) ? d.toISOString() : "";
+  }
+  return "";
 }
 
 export default function AccountingReconciliation() {

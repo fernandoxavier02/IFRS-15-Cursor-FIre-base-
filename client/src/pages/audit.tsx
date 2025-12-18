@@ -19,7 +19,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-firebase";
 import { auditLogService } from "@/lib/firestore-service";
-import { toDate, type AuditLog } from "@shared/firestore-types";
+import type { AuditLog } from "@shared/firestore-types";
 import { useQuery } from "@tanstack/react-query";
 import {
     Calculator,
@@ -55,6 +55,21 @@ const entityIcons: Record<string, React.ReactNode> = {
   customer: <User className="h-4 w-4" />,
 };
 
+// Helper function to convert Firestore timestamp to Date
+function toDate(timestamp: any): Date | null {
+  if (!timestamp) return null;
+  if (timestamp instanceof Date) return isNaN(timestamp.getTime()) ? null : timestamp;
+  if (typeof timestamp === "string" || typeof timestamp === "number") {
+    const parsed = new Date(timestamp);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof timestamp === "object" && typeof timestamp.toDate === "function") {
+    const d = timestamp.toDate();
+    return d instanceof Date && !isNaN(d.getTime()) ? d : null;
+  }
+  return null;
+}
+
 export default function AuditTrail() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
@@ -66,7 +81,6 @@ export default function AuditTrail() {
     queryKey: ["audit-logs", user?.tenantId],
     queryFn: async () => {
       if (!user?.tenantId) return [];
-      const { toDate } = await import("@shared/firestore-types");
       const logs = await auditLogService.getAll(user.tenantId);
       // Convert Firestore timestamps to Date objects safely
       return logs.map(log => {

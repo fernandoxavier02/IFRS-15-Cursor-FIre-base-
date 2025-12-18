@@ -18,7 +18,6 @@ import { billingScheduleService, contractService, customerService, performanceOb
 import { queryClient } from "@/lib/queryClient";
 import type { BillingScheduleWithDetails, ContractWithDetails } from "@/lib/types";
 import type { BillingSchedule, Contract, Customer } from "@shared/firestore-types";
-import { toDate, toISOString } from "@shared/firestore-types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { addMonths, eachDayOfInterval, endOfMonth, format, isSameDay, startOfMonth, subMonths } from "date-fns";
 import { Timestamp } from "firebase/firestore";
@@ -36,6 +35,26 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+// Helper function to convert Firestore timestamp to Date
+function toDate(timestamp: any): Date | null {
+  if (!timestamp) return null;
+  if (timestamp instanceof Date) return isNaN(timestamp.getTime()) ? null : timestamp;
+  if (typeof timestamp === "string" || typeof timestamp === "number") {
+    const parsed = new Date(timestamp);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof timestamp === "object" && typeof timestamp.toDate === "function") {
+    const d = timestamp.toDate();
+    return d instanceof Date && !isNaN(d.getTime()) ? d : null;
+  }
+  return null;
+}
+
+// Helper function to convert Firestore timestamp to ISO string
+function toISOString(timestamp: any): string {
+  const date = toDate(timestamp);
+  return date ? date.toISOString() : "";
+}
 
 export default function BillingSchedules() {
   const { toast } = useToast();

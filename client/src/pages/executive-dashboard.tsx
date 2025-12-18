@@ -18,7 +18,7 @@ import {
     TrendUp,
     UsersThree
 } from "@phosphor-icons/react";
-import { LedgerEntryType, type Contract as FirestoreContract } from "@shared/firestore-types";
+import type { Contract as FirestoreContract } from "@shared/firestore-types";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import {
@@ -36,6 +36,18 @@ import {
     XAxis,
     YAxis,
 } from "recharts";
+
+// Local constant to avoid import issues
+const LedgerEntryType = {
+  REVENUE: "revenue",
+  DEFERRED_REVENUE: "deferred_revenue",
+  CONTRACT_ASSET: "contract_asset",
+  CONTRACT_LIABILITY: "contract_liability",
+  RECEIVABLE: "receivable",
+  CASH: "cash",
+  FINANCING_INCOME: "financing_income",
+  COMMISSION_EXPENSE: "commission_expense",
+} as const;
 
 interface ExecutiveKPIs {
   mrr: number;

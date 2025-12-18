@@ -24,7 +24,6 @@ import { licenseService } from "@/lib/firestore-service";
 import { queryClient } from "@/lib/queryClient";
 import type { LicenseWithSession } from "@/lib/types";
 import type { License } from "@shared/firestore-types";
-import { toISOString } from "@shared/firestore-types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
     Ban,
@@ -39,6 +38,18 @@ import {
     WifiOff,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+
+// Helper function to convert Firestore timestamp to ISO string
+function toISOString(timestamp: any): string {
+  if (!timestamp) return "";
+  if (timestamp instanceof Date) return isNaN(timestamp.getTime()) ? "" : timestamp.toISOString();
+  if (typeof timestamp === "string") return timestamp;
+  if (typeof timestamp === "object" && typeof timestamp.toDate === "function") {
+    const d = timestamp.toDate();
+    return d instanceof Date && !isNaN(d.getTime()) ? d.toISOString() : "";
+  }
+  return "";
+}
 
 export default function Licenses() {
   const { toast } = useToast();

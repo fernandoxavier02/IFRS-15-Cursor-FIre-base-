@@ -27,12 +27,30 @@ import { useI18n } from "@/lib/i18n";
 import { queryClient } from "@/lib/queryClient";
 import type { ContractWithDetails } from "@/lib/types";
 import type { Contract, Customer, RevenueLedgerEntry } from "@shared/firestore-types";
-import { ContractStatus, LedgerEntryType, toISOString } from "@shared/firestore-types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Timestamp } from "firebase/firestore";
 import { Calendar, FileText, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
+// Local constants to avoid import issues
+const ContractStatus = {
+  DRAFT: "draft",
+  ACTIVE: "active",
+  MODIFIED: "modified",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
+} as const;
+
+const LedgerEntryType = {
+  REVENUE: "revenue",
+  DEFERRED_REVENUE: "deferred_revenue",
+  CONTRACT_ASSET: "contract_asset",
+  CONTRACT_LIABILITY: "contract_liability",
+  RECEIVABLE: "receivable",
+  CASH: "cash",
+  FINANCING_INCOME: "financing_income",
+  COMMISSION_EXPENSE: "commission_expense",
+} as const;
 
 export default function Contracts() {
   const [, setLocation] = useLocation();
@@ -42,6 +60,18 @@ export default function Contracts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Helper function to convert Firestore timestamp to ISO string
+  const toISOString = (timestamp: any): string => {
+    if (!timestamp) return "";
+    if (timestamp instanceof Date) return isNaN(timestamp.getTime()) ? "" : timestamp.toISOString();
+    if (typeof timestamp === "string") return timestamp;
+    if (typeof timestamp === "object" && typeof timestamp.toDate === "function") {
+      const d = timestamp.toDate();
+      return d instanceof Date && !isNaN(d.getTime()) ? d.toISOString() : "";
+    }
+    return "";
+  };
 
   const [formData, setFormData] = useState({
     customerId: "",

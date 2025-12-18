@@ -88,11 +88,9 @@ async function createLedgerEntry(params: {
   const periodEndTs = Timestamp.fromDate(params.periodEnd);
 
   try {
-    await docRef.create({
+    const entryData: any = {
       tenantId: params.tenantId,
       contractId: params.contractId,
-      billingScheduleId: params.billingScheduleId,
-      performanceObligationId: params.performanceObligationId,
       ledgerVersion: LEDGER_VERSION,
       source: "ifrs15-ledger-v2",
       entryDate: entryDateTs,
@@ -109,7 +107,17 @@ async function createLedgerEntry(params: {
       isPosted: false,
       isReversed: false,
       createdAt: entryDateTs,
-    });
+    };
+    
+    // Adicionar campos opcionais apenas se definidos
+    if (params.billingScheduleId !== undefined) {
+      entryData.billingScheduleId = params.billingScheduleId;
+    }
+    if (params.performanceObligationId !== undefined) {
+      entryData.performanceObligationId = params.performanceObligationId;
+    }
+    
+    await docRef.create(entryData);
     return "created";
   } catch (error: any) {
     // Firestore "already exists" is gRPC status code 6

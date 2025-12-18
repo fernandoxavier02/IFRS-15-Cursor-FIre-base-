@@ -20,7 +20,6 @@ import {
     Warning,
 } from "@phosphor-icons/react";
 import type { Contract, Customer, RevenueLedgerEntry } from "@shared/firestore-types";
-import { LedgerEntryType, toISOString } from "@shared/firestore-types";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import {
@@ -32,6 +31,29 @@ import {
     XAxis,
     YAxis,
 } from "recharts";
+// Local constants to avoid import issues
+const LedgerEntryType = {
+  REVENUE: "revenue",
+  DEFERRED_REVENUE: "deferred_revenue",
+  CONTRACT_ASSET: "contract_asset",
+  CONTRACT_LIABILITY: "contract_liability",
+  RECEIVABLE: "receivable",
+  CASH: "cash",
+  FINANCING_INCOME: "financing_income",
+  COMMISSION_EXPENSE: "commission_expense",
+} as const;
+
+// Helper function to convert Firestore timestamp to ISO string
+function toISOString(timestamp: any): string {
+  if (!timestamp) return "";
+  if (timestamp instanceof Date) return isNaN(timestamp.getTime()) ? "" : timestamp.toISOString();
+  if (typeof timestamp === "string") return timestamp;
+  if (typeof timestamp === "object" && typeof timestamp.toDate === "function") {
+    const d = timestamp.toDate();
+    return d instanceof Date && !isNaN(d.getTime()) ? d.toISOString() : "";
+  }
+  return "";
+}
 
 interface MetricCardProps {
   title: string;

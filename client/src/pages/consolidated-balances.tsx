@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/auth-firebase";
 import { consolidatedBalanceService } from "@/lib/firestore-service";
 import { queryClient } from "@/lib/queryClient";
 import type { ConsolidatedBalanceData } from "@/lib/types";
-import { toISOString, type ConsolidatedBalance } from "@shared/firestore-types";
+import type { ConsolidatedBalance } from "@shared/firestore-types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -27,6 +27,18 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+
+// Helper function to convert Firestore timestamp to ISO string
+function toISOString(timestamp: any): string {
+  if (!timestamp) return new Date().toISOString();
+  if (timestamp instanceof Date) return isNaN(timestamp.getTime()) ? new Date().toISOString() : timestamp.toISOString();
+  if (typeof timestamp === "string") return timestamp;
+  if (typeof timestamp === "object" && typeof timestamp.toDate === "function") {
+    const d = timestamp.toDate();
+    return d instanceof Date && !isNaN(d.getTime()) ? d.toISOString() : new Date().toISOString();
+  }
+  return new Date().toISOString();
+}
 
 export default function ConsolidatedBalances() {
   const { toast } = useToast();

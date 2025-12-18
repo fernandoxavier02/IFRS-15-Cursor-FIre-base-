@@ -58,7 +58,7 @@ export async function generateInitialDeferredRevenueEntries(
 
   // 3. Criar entry de Deferred Revenue
   // Representa o valor total do contrato que será reconhecido
-  const deferredRevenueEntry = {
+  const deferredRevenueEntry: any = {
     tenantId,
     contractId,
     ledgerVersion: 2,
@@ -78,6 +78,13 @@ export async function generateInitialDeferredRevenueEntries(
     isReversed: false,
     createdAt: now,
   };
+  
+  // Remover campos undefined para evitar erro do Firestore
+  Object.keys(deferredRevenueEntry).forEach(key => {
+    if (deferredRevenueEntry[key] === undefined) {
+      delete deferredRevenueEntry[key];
+    }
+  });
 
   try {
     const docRef = await db.collection(ledgerPath).add(deferredRevenueEntry);
@@ -124,7 +131,7 @@ export async function generateRevenueRecognitionEntries(
 
   // Entry de reconhecimento de receita
   // Dr Deferred Revenue / Cr Revenue
-  const revenueEntry = {
+  const revenueEntry: any = {
     tenantId,
     contractId,
     performanceObligationId,
@@ -145,6 +152,13 @@ export async function generateRevenueRecognitionEntries(
     isReversed: false,
     createdAt: now,
   };
+  
+  // Remover campos undefined para evitar erro do Firestore
+  Object.keys(revenueEntry).forEach(key => {
+    if (revenueEntry[key] === undefined) {
+      delete revenueEntry[key];
+    }
+  });
 
   try {
     const docRef = await db.collection(ledgerPath).add(revenueEntry);

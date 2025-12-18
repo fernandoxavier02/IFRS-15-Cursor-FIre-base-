@@ -19,7 +19,7 @@ import { useAuth } from "@/lib/auth-firebase";
 import { ifrs15Service, tenantService, userService } from "@/lib/firestore-service";
 import { Language, useI18n } from "@/lib/i18n";
 import { queryClient } from "@/lib/queryClient";
-import { toDate, type Tenant, type User } from "@shared/firestore-types";
+import type { Tenant, User } from "@shared/firestore-types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
     Bell,
@@ -32,6 +32,21 @@ import {
     Users
 } from "lucide-react";
 import { useState } from "react";
+
+// Helper function to convert Firestore timestamp to Date
+function toDate(timestamp: any): Date | null {
+  if (!timestamp) return null;
+  if (timestamp instanceof Date) return isNaN(timestamp.getTime()) ? null : timestamp;
+  if (typeof timestamp === "string" || typeof timestamp === "number") {
+    const parsed = new Date(timestamp);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof timestamp === "object" && typeof timestamp.toDate === "function") {
+    const d = timestamp.toDate();
+    return d instanceof Date && !isNaN(d.getTime()) ? d : null;
+  }
+  return null;
+}
 
 export default function Settings() {
   const { toast } = useToast();
