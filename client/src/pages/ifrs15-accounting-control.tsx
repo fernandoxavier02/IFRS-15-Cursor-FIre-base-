@@ -1,4 +1,5 @@
 import { DataTable } from "@/components/data-table";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Select,
@@ -8,8 +9,11 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-firebase";
-import { useQuery } from "@tanstack/react-query";
+import { ifrs15Service } from "@/lib/firestore-service";
+import { queryClient } from "@/lib/queryClient";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
     ArrowDownRight,
     ArrowUpRight,
@@ -56,6 +60,32 @@ export default function IFRS15AccountingControl() {
   const [selectedMonth, setSelectedMonth] = useState((currentDate.getMonth() + 1).toString().padStart(2, "0"));
 
   const { user } = useAuth();
+  const { toast } = useToast();
+
+  const deleteBalancesMutation = useMutation({
+    mutationFn: async () => {
+      if (!confirm("⚠️ ATENÇÃO: Esta ação irá apagar TODOS os balances de contratos do seu tenant. Esta ação é irreversível. Deseja continuar?")) {
+        throw new Error("Operação cancelada pelo usuário");
+      }
+      return ifrs15Service.deleteAllContractBalances();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["ifrs15-accounting-control", user?.tenantId] });
+      toast({
+        title: "Balances apagados!",
+        description: result.message || `${result.deleted} balances foram deletados de ${result.contractsProcessed} contratos`,
+        variant: "default",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao apagar balances",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const { data, isLoading } = useQuery<AccountingControlData | null>({
     queryKey: ["ifrs15-accounting-control", user?.tenantId, selectedYear, selectedMonth],
     queryFn: async () => {
@@ -339,6 +369,15 @@ export default function IFRS15AccountingControl() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            variant="destructive"
+            onClick={() => deleteBalancesMutation.mutate()}
+            disabled={deleteBalancesMutation.isPending}
+            data-testid="button-delete-all-balances"
+            title="⚠️ ATENÇÃO: Apaga TODOS os balances de contratos. Use apenas para limpar dados incorretos."
+          >
+            {deleteBalancesMutation.isPending ? "Apagando..." : "🗑️ Apagar Balances"}
+          </Button>
         </div>
       </div>
 

@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-firebase";
-import { contractService, customerService, dashboardService, revenueLedgerService } from "@/lib/firestore-service";
+import { consolidatedBalanceService, contractService, customerService, dashboardService, revenueLedgerService } from "@/lib/firestore-service";
 import { useI18n } from "@/lib/i18n";
 import type { ContractWithDetails, DashboardStats, RevenueByPeriod } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,7 @@ import {
     TrendUp,
     Warning,
 } from "@phosphor-icons/react";
-import type { Contract, Customer, RevenueLedgerEntry } from "@shared/firestore-types";
+import type { ConsolidatedBalance, Contract, Customer, RevenueLedgerEntry } from "@shared/firestore-types";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import {
@@ -269,6 +269,20 @@ export default function Dashboard() {
     enabled: !!user?.tenantId,
   });
 
+  // Fetch consolidated balances as alternative data source for revenue chart
+  const { data: consolidatedBalances, isLoading: consolidatedBalancesLoading } = useQuery<ConsolidatedBalance[]>({
+    queryKey: ["consolidated-balances", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      // Get last 12 months of consolidated balances
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - 12);
+      return consolidatedBalanceService.getByPeriod(user.tenantId, startDate, endDate);
+    },
+    enabled: !!user?.tenantId,
+  });
+
   const recognizedRevenueByContractId = useMemo(() => {
     const map = new Map<string, number>();
     (ledgerEntries || []).forEach((entry) => {
@@ -316,77 +330,108 @@ export default function Dashboard() {
   }, [contracts, customerMap, recognizedRevenueByContractId]);
 
   const revenueData: RevenueByPeriod[] = useMemo(() => {
-    if (!ledgerEntries || ledgerEntries.length === 0) return [];
+    // Priority 1: Use Consolidated Balances if available (most accurate)
+    if (consolidatedBalances && consolidatedBalances.length > 0) {
+      return consolidatedBalances
+        .slice(-12) // Last 12 months
+        .map((balance) => {
+          let periodDate: Date;
+          if (balance.periodDate instanceof Date) {
+            periodDate = balance.periodDate;
+          } else if ((balance.periodDate as any)?.toDate) {
+            periodDate = (balance.periodDate as any).toDate();
+          } else if (typeof balance.periodDate === "string") {
+            periodDate = new Date(balance.periodDate);
+          } else {
+            return null;
+          }
 
-    const monthlyData = new Map<string, { recognized: number; deferred: number }>();
+          if (isNaN(periodDate.getTime())) return null;
 
-    ledgerEntries.forEach((entry) => {
-      try {
-        let entryDate: Date;
-        if (entry.entryDate instanceof Date) {
-          entryDate = entry.entryDate;
-        } else if ((entry.entryDate as any)?.toDate) {
-          entryDate = (entry.entryDate as any).toDate();
-        } else if (typeof entry.entryDate === "string") {
-          entryDate = new Date(entry.entryDate);
-        } else {
-          return;
-        }
+          return {
+            period: periodDate.toLocaleDateString("en-US", { month: "short" }),
+            recognized: Number(balance.totalRecognizedRevenue || 0),
+            deferred: Number(balance.totalDeferredRevenue || 0),
+          };
+        })
+        .filter((item): item is RevenueByPeriod => item !== null);
+    }
 
-        if (isNaN(entryDate.getTime())) return;
+    // Priority 2: Use Ledger Entries if available
+    if (ledgerEntries && ledgerEntries.length > 0) {
+      const monthlyData = new Map<string, { recognized: number; deferred: number }>();
 
-        const monthKey = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, "0")}`;
-
-        if (!monthlyData.has(monthKey)) {
-          monthlyData.set(monthKey, { recognized: 0, deferred: 0 });
-        }
-
-        const data = monthlyData.get(monthKey)!;
-
-        if (entry.entryType === LedgerEntryType.REVENUE) {
-          data.recognized += Number(entry.amount || 0);
-        } else if (entry.entryType === LedgerEntryType.DEFERRED_REVENUE) {
-          data.deferred += Number(entry.amount || 0);
-        }
-      } catch (error) {
-        console.warn("Error processing ledger entry:", entry.id, error);
-      }
-    });
-
-    return Array.from(monthlyData.entries())
-      .map(([key, data]) => ({
-        period: key,
-        recognized: data.recognized,
-        deferred: data.deferred,
-      }))
-      .sort((a, b) => a.period.localeCompare(b.period))
-      .slice(-12) // Last 12 months
-      .map((item) => {
+      ledgerEntries.forEach((entry) => {
         try {
-          const date = new Date(item.period + "-01");
-          if (isNaN(date.getTime())) {
+          let entryDate: Date;
+          if (entry.entryDate instanceof Date) {
+            entryDate = entry.entryDate;
+          } else if ((entry.entryDate as any)?.toDate) {
+            entryDate = (entry.entryDate as any).toDate();
+          } else if (typeof entry.entryDate === "string") {
+            entryDate = new Date(entry.entryDate);
+          } else {
+            return;
+          }
+
+          if (isNaN(entryDate.getTime())) return;
+
+          const monthKey = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, "0")}`;
+
+          if (!monthlyData.has(monthKey)) {
+            monthlyData.set(monthKey, { recognized: 0, deferred: 0 });
+          }
+
+          const data = monthlyData.get(monthKey)!;
+
+          if (entry.entryType === LedgerEntryType.REVENUE) {
+            data.recognized += Number(entry.amount || 0);
+          } else if (entry.entryType === LedgerEntryType.DEFERRED_REVENUE) {
+            data.deferred += Number(entry.amount || 0);
+          }
+        } catch (error) {
+          console.warn("Error processing ledger entry:", entry.id, error);
+        }
+      });
+
+      return Array.from(monthlyData.entries())
+        .map(([key, data]) => ({
+          period: key,
+          recognized: data.recognized,
+          deferred: data.deferred,
+        }))
+        .sort((a, b) => a.period.localeCompare(b.period))
+        .slice(-12) // Last 12 months
+        .map((item) => {
+          try {
+            const date = new Date(item.period + "-01");
+            if (isNaN(date.getTime())) {
+              return {
+                period: item.period,
+                recognized: item.recognized,
+                deferred: item.deferred,
+              };
+            }
+            return {
+              period: date.toLocaleDateString("en-US", { month: "short" }),
+              recognized: item.recognized,
+              deferred: item.deferred,
+            };
+          } catch {
             return {
               period: item.period,
               recognized: item.recognized,
               deferred: item.deferred,
             };
           }
-          return {
-            period: date.toLocaleDateString("en-US", { month: "short" }),
-            recognized: item.recognized,
-            deferred: item.deferred,
-          };
-        } catch {
-          return {
-            period: item.period,
-            recognized: item.recognized,
-            deferred: item.deferred,
-          };
-        }
-      });
-  }, [ledgerEntries]);
+        });
+    }
 
-  const revenueLoading = ledgerEntriesLoading;
+    // No data available
+    return [];
+  }, [ledgerEntries, consolidatedBalances]);
+
+  const revenueLoading = ledgerEntriesLoading || consolidatedBalancesLoading;
 
   // Calculate real trends based on revenue data
   const revenueTrend = useMemo(() => {
@@ -622,9 +667,14 @@ export default function Dashboard() {
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-64 flex flex-col items-center justify-center text-muted-foreground gap-3">
+              <div className="h-64 flex flex-col items-center justify-center text-muted-foreground gap-3 px-4">
                 <ChartLineUp weight="duotone" className="h-12 w-12 text-muted-foreground/30" />
-                <p>No revenue data available</p>
+                <p className="font-medium">No revenue data available</p>
+                <p className="text-xs text-center max-w-md">
+                  {contracts && contracts.length > 0
+                    ? "Execute the IFRS 15 Engine on your contracts to generate revenue recognition data and view the revenue trend chart."
+                    : "Create contracts and execute the IFRS 15 Engine to generate revenue recognition data."}
+                </p>
               </div>
             )}
           </CardContent>

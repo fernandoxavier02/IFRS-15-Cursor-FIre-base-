@@ -250,238 +250,50 @@ async function generateAutomaticJournalEntries(
     // 4. Custo - Quando há custos do contrato amortizados
     //    Débito: Cost of Revenue | Crédito: Contract Costs Asset
 
-    // 1. AR (Accounts Receivable) - Contas a Receber
-    // Quando há faturamento não recebido em dinheiro
-    const accountsReceivable = totalBilled - totalCashReceived;
-    if (accountsReceivable > 0) {
-      const referenceNumber = buildReference("AR-AUTO", contractId, periodStart, periodEnd);
-      const exists = await checkExistingEntry(
-        tenantId,
-        contractId,
-        "receivable",
-        referenceNumber,
-        periodStart,
-        periodEnd
-      );
+    // 1. AR (Accounts Receivable) - DESABILITADO
+    // CONFORME IFRS 15: Entries de AR são criados pelo Ledger V2 baseado em eventos individuais de billing
+    // Esta função (generateAutomaticJournalEntries) é LEGACY e não deve criar entries agregados de AR
+    // Entries são criados por generateRevenueLedgerV2ForContract baseado em cada billing individual
+    // Criar entry agregado aqui causaria DUPLICAÇÃO dos entries individuais já criados pelo Ledger V2
+    console.log(`[generateAutomaticJournalEntries] ⚠️ Esta função é LEGACY - entries de AR são criados pelo Ledger V2`);
+    console.log(`[generateAutomaticJournalEntries] Pulando criação de AR agregado (Ledger V2 já cria entries individuais por billing)`);
+    console.log(`[generateAutomaticJournalEntries] Total Billed: ${totalBilled}, Total Cash Received: ${totalCashReceived}, AR Calculado: ${totalBilled - totalCashReceived}`);
+    
+    // NOTA: Se houver necessidade de entry agregado de AR, ele deve ser calculado dinamicamente
+    // na apresentação (reconciliation page) baseado nos entries individuais, não criado aqui
 
-      if (!exists) {
-        await ledgerCollection.add({
-        tenantId,
-        contractId,
-        entryDate: entryDateTimestamp,
-        periodStart: periodStartTimestamp,
-        periodEnd: periodEndTimestamp,
-        entryType: "receivable",
-        debitAccount: "1200 - Accounts Receivable (AR)",
-        creditAccount: "4000 - Revenue",
-        amount: accountsReceivable,
-        currency,
-        exchangeRate: 1,
-        description: `AR automático - Faturamento não recebido do contrato ${contractId}`,
-        referenceNumber: buildReference("AR-AUTO", contractId, periodStart, periodEnd),
-        isPosted: false,
-        createdAt: entryDateTimestamp,
-        });
-      }
-    }
-
-    // 3. Receita (Revenue) - Receita Reconhecida
-    // Quando há receita reconhecida pelo IFRS 15
-    // Se há faturamento: Débito: AR | Crédito: Revenue
-    // Se não há faturamento: Débito: Contract Asset | Crédito: Revenue
-    if (ifrs15Result.totalRecognizedRevenue > 0) {
-      // Determinar conta de débito baseado em se há faturamento ou não
-      let debitAccount: string;
-      if (totalBilled >= ifrs15Result.totalRecognizedRevenue) {
-        // Há faturamento suficiente, usar AR
-        debitAccount = "1200 - Accounts Receivable (AR)";
-      } else if (ifrs15Result.contractAsset > 0) {
-        // Não há faturamento suficiente, usar Contract Asset
-        debitAccount = "1300 - Contract Asset";
-      } else {
-        // Fallback para AR
-        debitAccount = "1200 - Accounts Receivable (AR)";
-      }
-      
-      const referenceNumber = buildReference("REV-AUTO", contractId, periodStart, periodEnd);
-      const exists = await checkExistingEntry(
-        tenantId,
-        contractId,
-        "revenue",
-        referenceNumber,
-        periodStart,
-        periodEnd
-      );
-
-      if (!exists) {
-        await ledgerCollection.add({
-        tenantId,
-        contractId,
-        entryDate: entryDateTimestamp,
-        periodStart: periodStartTimestamp,
-        periodEnd: periodEndTimestamp,
-        entryType: "revenue",
-        debitAccount,
-        creditAccount: "4000 - Revenue",
-        amount: ifrs15Result.totalRecognizedRevenue,
-        currency,
-        exchangeRate: 1,
-        description: `Receita reconhecida automaticamente pelo IFRS 15 Engine`,
-        referenceNumber: buildReference("REV-AUTO", contractId, periodStart, periodEnd),
-        isPosted: false,
-        createdAt: entryDateTimestamp,
-        });
-      }
-    }
+    // 3. Receita (Revenue) - DESABILITADO
+    // CONFORME IFRS 15: Entries de Revenue são criados pelo Ledger V2 baseado em revenue recognition events
+    // Esta função (generateAutomaticJournalEntries) é LEGACY e não deve criar entries agregados de Revenue
+    // Entries são criados por generateRevenueLedgerV2ForContract baseado em cada revenue recognition event
+    // Criar entry agregado aqui causaria DUPLICAÇÃO dos entries individuais já criados pelo Ledger V2
+    console.log(`[generateAutomaticJournalEntries] ⚠️ Esta função é LEGACY - entries de Revenue são criados pelo Ledger V2`);
+    console.log(`[generateAutomaticJournalEntries] Pulando criação de Revenue agregado (Ledger V2 já cria entries individuais por revenue recognition)`);
+    console.log(`[generateAutomaticJournalEntries] Total Recognized Revenue: ${ifrs15Result.totalRecognizedRevenue}`);
 
     // 4. Receita Diferida (Deferred Revenue) - Receita Diferida
-    // Quando há receita que ainda não foi reconhecida
-    // Débito: AR (se faturado) ou Contract Asset | Crédito: Deferred Revenue
-    // IMPORTANTE: Se totalDeferredRevenue é 0, mas transactionPrice > 0 e totalRecognizedRevenue = 0,
-    // isso significa que temos receita total não reconhecida que deve aparecer como diferida
-    // CORREÇÃO: Se não há POs mas há transactionPrice, ainda devemos criar um entry de Deferred Revenue
-    let effectiveDeferredRevenue = ifrs15Result.totalDeferredRevenue > 0 
-      ? ifrs15Result.totalDeferredRevenue 
-      : (ifrs15Result.transactionPrice > 0 && ifrs15Result.totalRecognizedRevenue === 0 
-          ? ifrs15Result.transactionPrice 
-          : 0);
+    // CONFORME IFRS 15: Deferred Revenue só surge quando há billing ou payment ANTES da performance
+    // Esta função (generateAutomaticJournalEntries) é LEGACY - entries são criados pelo Ledger V2
+    // Manter código apenas para compatibilidade, mas não criar entries aqui
+    // Entries são criados por generateRevenueLedgerV2ForContract baseado em eventos reais
     
-    // Se ainda é 0 mas transactionPrice > 0, usar transactionPrice diretamente
-    // Isso garante que contratos sem POs ainda gerem entries
-    if (effectiveDeferredRevenue === 0 && ifrs15Result.transactionPrice > 0) {
-      console.log(`[generateAutomaticJournalEntries] ⚠️ effectiveDeferredRevenue é 0 mas transactionPrice > 0. Usando transactionPrice como fallback.`);
-      effectiveDeferredRevenue = ifrs15Result.transactionPrice;
-    }
+    // NOTA: Esta seção está desabilitada porque entries são criados pelo Ledger V2
+    // que processa eventos reais (billing, payment, revenue recognition)
+    const effectiveDeferredRevenue = ifrs15Result.totalDeferredRevenue;
     
-    console.log(`[generateAutomaticJournalEntries] effectiveDeferredRevenue: ${effectiveDeferredRevenue}`);
-    console.log(`[generateAutomaticJournalEntries] Condições para criar entry:`, {
-      totalDeferredRevenue: ifrs15Result.totalDeferredRevenue,
+    // NOTA: Entries de deferred revenue são criados pelo Ledger V2 quando há billing/payment
+    // Esta função (generateAutomaticJournalEntries) é LEGACY e não deve criar entries
+    // Entries são criados por generateRevenueLedgerV2ForContract baseado em eventos reais
+    console.log(`[generateAutomaticJournalEntries] ⚠️ Esta função é LEGACY - entries são criados pelo Ledger V2`);
+    console.log(`[generateAutomaticJournalEntries] Pulando criação de deferred revenue entry (Ledger V2 já cria quando apropriado)`);
+    console.log(`[generateAutomaticJournalEntries] CONFORME IFRS 15: Entries são criados apenas quando há eventos reais (billing, payment, performance)`);
+    console.log(`[generateAutomaticJournalEntries] Valores:`, {
       transactionPrice: ifrs15Result.transactionPrice,
+      totalDeferredRevenue: ifrs15Result.totalDeferredRevenue,
       totalRecognizedRevenue: ifrs15Result.totalRecognizedRevenue,
-      effectiveDeferredRevenue,
-      willCreateEntry: effectiveDeferredRevenue > 0,
+      totalBilled,
+      totalCashReceived,
     });
-    
-    if (effectiveDeferredRevenue > 0) {
-      const referenceNumber = buildReference(
-        "DEF-AUTO",
-        contractId,
-        periodStart,
-        periodEnd
-      );
-      const exists = await checkExistingEntry(
-        tenantId,
-        contractId,
-        "deferred_revenue",
-        referenceNumber,
-        periodStart,
-        periodEnd
-      );
-
-      if (!exists) {
-        // Determinar conta de débito baseado em se há faturamento ou não
-        let debitAccount: string;
-        if (totalBilled > 0) {
-          // Há faturamento, usar AR
-          debitAccount = "1200 - Accounts Receivable (AR)";
-        } else {
-          // Não há faturamento, usar Contract Asset
-          debitAccount = "1300 - Contract Asset";
-        }
-
-        const entryData = {
-          tenantId,
-          contractId,
-          entryDate: entryDateTimestamp,
-          periodStart: periodStartTimestamp,
-          periodEnd: periodEndTimestamp,
-          entryType: "deferred_revenue",
-          debitAccount,
-          creditAccount: "2500 - Deferred Revenue",
-          amount: effectiveDeferredRevenue,
-          currency,
-          exchangeRate: 1,
-          description: `Receita diferida automaticamente pelo IFRS 15 Engine`,
-          referenceNumber,
-          isPosted: false,
-          createdAt: entryDateTimestamp,
-        };
-        
-        console.log(`[generateAutomaticJournalEntries] Criando entry de deferred_revenue:`, JSON.stringify(entryData, null, 2));
-        const docRef = await ledgerCollection.add(entryData);
-        console.log(`[generateAutomaticJournalEntries] Entry criado com ID: ${docRef.id}`);
-      } else {
-        console.log(`[generateAutomaticJournalEntries] Entry já existe, pulando criação`);
-      }
-    } else {
-      console.log(`[generateAutomaticJournalEntries] ⚠️ effectiveDeferredRevenue é 0, não criando entry`);
-      console.log(`[generateAutomaticJournalEntries] Valores:`, {
-        transactionPrice: ifrs15Result.transactionPrice,
-        totalDeferredRevenue: ifrs15Result.totalDeferredRevenue,
-        totalRecognizedRevenue: ifrs15Result.totalRecognizedRevenue,
-        totalBilled,
-        totalCashReceived,
-      });
-      
-      // GARANTIR QUE SEMPRE CRIE UM ENTRY SE HOUVER VALOR NO CONTRATO
-      // Mesmo que effectiveDeferredRevenue seja 0, se transactionPrice > 0, criar entry
-      if (ifrs15Result.transactionPrice > 0) {
-        console.log(`[generateAutomaticJournalEntries] 🔧 FORÇANDO criação de entry mesmo com effectiveDeferredRevenue = 0`);
-        const referenceNumber = `DEF-FORCE-${contractId}-${periodStart.getTime()}-${periodEnd.getTime()}`;
-        
-        // Verificar se já existe um entry forçado para este período
-        const existingForced = await db
-          .collection(tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES))
-          .where("contractId", "==", contractId)
-          .where("entryType", "==", "deferred_revenue")
-          .where("referenceNumber", "==", referenceNumber)
-          .limit(1)
-          .get();
-
-        if (existingForced.empty) {
-          const entryData = {
-            tenantId,
-            contractId,
-            entryDate: entryDateTimestamp,
-            periodStart: periodStartTimestamp,
-            periodEnd: periodEndTimestamp,
-            entryType: "deferred_revenue",
-            debitAccount: totalBilled > 0 ? "1200 - Accounts Receivable (AR)" : "1300 - Contract Asset",
-            creditAccount: "2500 - Deferred Revenue",
-            amount: ifrs15Result.transactionPrice,
-            currency,
-            exchangeRate: 1,
-            description: `Receita diferida forçada (transactionPrice > 0 mas effectiveDeferredRevenue = 0)`,
-            referenceNumber,
-            isPosted: false,
-            createdAt: entryDateTimestamp,
-          };
-          
-          console.log(`[generateAutomaticJournalEntries] 📝 Criando entry FORÇADO:`, JSON.stringify(entryData, null, 2));
-          console.log(`[generateAutomaticJournalEntries] 📁 Collection: ${tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES)}`);
-          
-          try {
-            const docRef = await ledgerCollection.add(entryData);
-            console.log(`[generateAutomaticJournalEntries] ✅ Entry FORÇADO criado com ID: ${docRef.id}`);
-            console.log(`[generateAutomaticJournalEntries] ✅ Path completo: ${tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES)}/${docRef.id}`);
-            
-            // Verificar se foi realmente criado
-            const verifyDoc = await docRef.get();
-            if (verifyDoc.exists) {
-              console.log(`[generateAutomaticJournalEntries] ✅ Verificação: Entry existe no Firestore`);
-            } else {
-              console.error(`[generateAutomaticJournalEntries] ❌ ERRO CRÍTICO: Entry não foi encontrado após criação!`);
-            }
-          } catch (addError: any) {
-            console.error(`[generateAutomaticJournalEntries] ❌ ERRO ao adicionar entry forçado:`, addError);
-            console.error(`[generateAutomaticJournalEntries] Stack:`, addError.stack);
-            throw addError;
-          }
-        } else {
-          console.log(`[generateAutomaticJournalEntries] Entry FORÇADO já existe (${existingForced.docs[0].id}), pulando`);
-        }
-      }
-    }
 
     // 5. Custo (Cost) - Custos do Contrato Amortizados
     // Buscar custos do contrato e gerar lançamento se houver amortização
@@ -537,83 +349,23 @@ async function generateAutomaticJournalEntries(
       }
     }
 
-    // 6. Contract Asset - Se houver (Receita reconhecida > Faturamento)
-    // Débito: Contract Asset | Crédito: Revenue
-    if (ifrs15Result.contractAsset > 0) {
-      const referenceNumber = buildReference(
-        "CA-AUTO",
-        contractId,
-        periodStart,
-        periodEnd
-      );
-      const exists = await checkExistingEntry(
-        tenantId,
-        contractId,
-        "contract_asset",
-        referenceNumber,
-        periodStart,
-        periodEnd
-      );
+    // 6. Contract Asset - DESABILITADO
+    // CONFORME IFRS 15: Entries de Contract Asset são criados pelo Ledger V2 baseado em revenue recognition events
+    // Esta função (generateAutomaticJournalEntries) é LEGACY e não deve criar entries agregados de Contract Asset
+    // Entries são criados por generateRevenueLedgerV2ForContract quando há revenue recognition sem billing correspondente
+    // Criar entry agregado aqui causaria DUPLICAÇÃO dos entries individuais já criados pelo Ledger V2
+    console.log(`[generateAutomaticJournalEntries] ⚠️ Esta função é LEGACY - entries de Contract Asset são criados pelo Ledger V2`);
+    console.log(`[generateAutomaticJournalEntries] Pulando criação de Contract Asset agregado (Ledger V2 já cria entries individuais)`);
+    console.log(`[generateAutomaticJournalEntries] Contract Asset calculado: ${ifrs15Result.contractAsset}`);
 
-      if (!exists) {
-        await ledgerCollection.add({
-          tenantId,
-          contractId,
-          entryDate: entryDateTimestamp,
-          periodStart: periodStartTimestamp,
-          periodEnd: periodEndTimestamp,
-          entryType: "contract_asset",
-          debitAccount: "1300 - Contract Asset",
-          creditAccount: "4000 - Revenue",
-          amount: ifrs15Result.contractAsset,
-          currency,
-          exchangeRate: 1,
-          description: `Contract Asset gerado automaticamente pelo IFRS 15`,
-          referenceNumber,
-          isPosted: false,
-          createdAt: entryDateTimestamp,
-        });
-      }
-    }
-
-    // 7. Contract Liability - Se houver (Faturamento > Receita reconhecida)
-    // Débito: Revenue | Crédito: Contract Liability
-    if (ifrs15Result.contractLiability > 0) {
-      const referenceNumber = buildReference(
-        "CL-AUTO",
-        contractId,
-        periodStart,
-        periodEnd
-      );
-      const exists = await checkExistingEntry(
-        tenantId,
-        contractId,
-        "contract_liability",
-        referenceNumber,
-        periodStart,
-        periodEnd
-      );
-
-      if (!exists) {
-        await ledgerCollection.add({
-          tenantId,
-          contractId,
-          entryDate: entryDateTimestamp,
-          periodStart: periodStartTimestamp,
-          periodEnd: periodEndTimestamp,
-          entryType: "contract_liability",
-          debitAccount: "4000 - Revenue",
-          creditAccount: "2600 - Contract Liability",
-          amount: ifrs15Result.contractLiability,
-          currency,
-          exchangeRate: 1,
-          description: `Contract Liability gerado automaticamente pelo IFRS 15`,
-          referenceNumber,
-          isPosted: false,
-          createdAt: entryDateTimestamp,
-        });
-      }
-    }
+    // 7. Contract Liability - DESABILITADO
+    // CONFORME IFRS 15: Entries de Contract Liability são criados pelo Ledger V2 baseado em billing/payment events
+    // Esta função (generateAutomaticJournalEntries) é LEGACY e não deve criar entries agregados de Contract Liability
+    // Entries são criados por generateRevenueLedgerV2ForContract quando há billing/payment antes de revenue recognition
+    // Criar entry agregado aqui causaria DUPLICAÇÃO dos entries individuais já criados pelo Ledger V2
+    console.log(`[generateAutomaticJournalEntries] ⚠️ Esta função é LEGACY - entries de Contract Liability são criados pelo Ledger V2`);
+    console.log(`[generateAutomaticJournalEntries] Pulando criação de Contract Liability agregado (Ledger V2 já cria entries individuais)`);
+    console.log(`[generateAutomaticJournalEntries] Contract Liability calculado: ${ifrs15Result.contractLiability}`);
 
     // 8. Financing Income - Se houver componente de financiamento significativo
     // Verificar se há componente de financiamento (contratos > 12 meses)
@@ -1194,9 +946,9 @@ export const runIFRS15Engine = functions.https.onCall(
         });
         console.log(`[runIFRS15Engine] Ledger v2 gerado com sucesso`);
 
-        // NOVO: Gerar entries iniciais de deferred revenue
-        // Isso garante que sempre haverá entries, mesmo sem billing
-        console.log(`[runIFRS15Engine] 🎬 Gerando entries iniciais de deferred revenue...`);
+        // Gerar entries iniciais de deferred revenue APENAS quando há billing ou payment
+        // CONFORME IFRS 15: Contract Liability só surge quando há consideração recebida/faturada antes da performance
+        console.log(`[runIFRS15Engine] 🎬 Gerando entries iniciais de deferred revenue (se houver billing/payment)...`);
         const initialResult = await generateInitialDeferredRevenueEntries({
           tenantId,
           contractId,
@@ -1205,60 +957,26 @@ export const runIFRS15Engine = functions.https.onCall(
           contractEndDate,
           currency: contract.currency || "BRL",
         });
-        console.log(`[runIFRS15Engine] Initial entries: criados=${initialResult.created}, pulados=${initialResult.skipped}`);
+        console.log(`[runIFRS15Engine] Initial entries: criados=${initialResult.created}, pulados=${initialResult.skipped}, motivo: ${initialResult.reason || "N/A"}`);
 
         console.log(`[runIFRS15Engine] ✅ generateAutomaticJournalEntries concluído com sucesso`);
         
-        // VERIFICAÇÃO CRÍTICA: Se transactionPrice > 0 mas nenhum entry foi criado, FORÇAR criação
-        console.log(`[runIFRS15Engine] 🔍 Verificando se entries foram criados...`);
-        console.log(`[runIFRS15Engine] Path da coleção: ${tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES)}`);
-        console.log(`[runIFRS15Engine] contractId: ${contractId}, tenantId: ${tenantId}`);
-        
+        // Verificação: Log dos entries criados (sem forçar criação)
+        // CONFORME IFRS 15: Entries são criados apenas quando há eventos reais (billing, payment, performance)
+        console.log(`[runIFRS15Engine] 🔍 Verificando entries criados...`);
         const ledgerSnapshot = await db
           .collection(tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES))
           .where("contractId", "==", contractId)
           .get();
         
         console.log(`[runIFRS15Engine] 📊 Entries existentes para este contrato: ${ledgerSnapshot.size}`);
-        console.log(`[runIFRS15Engine] transactionPrice: ${result.transactionPrice}, empty: ${ledgerSnapshot.empty}`);
+        console.log(`[runIFRS15Engine] transactionPrice: ${result.transactionPrice}`);
         
-        if (false && ledgerSnapshot.empty && result.transactionPrice > 0) {
-          console.log(`[runIFRS15Engine] ⚠️ CRÍTICO: Nenhum entry foi criado mas transactionPrice > 0. FORÇANDO criação...`);
-          const forcedEntry = {
-            tenantId,
-            contractId,
-            entryDate: now,
-            periodStart: Timestamp.fromDate(contractStartDate),
-            periodEnd: Timestamp.fromDate(contractEndDate),
-            entryType: "deferred_revenue",
-            debitAccount: totalBilled > 0 ? "1200 - Accounts Receivable (AR)" : "1300 - Contract Asset",
-            creditAccount: "2500 - Deferred Revenue",
-            amount: result.transactionPrice,
-            currency: contract.currency || "BRL",
-            exchangeRate: 1,
-            description: `Receita diferida FORÇADA - Motor IFRS 15 (transactionPrice > 0 mas nenhum entry foi criado)`,
-            referenceNumber: `DEF-FORCE-${contractId}-${Date.now()}`,
-            isPosted: false,
-            createdAt: now,
-          };
-          
-          console.log(`[runIFRS15Engine] 📝 Dados do entry forçado:`, JSON.stringify(forcedEntry, null, 2));
-          
-          try {
-            const forcedDocRef = await db
-              .collection(tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES))
-              .add(forcedEntry);
-            console.log(`[runIFRS15Engine] ✅ Entry FORÇADO criado com ID: ${forcedDocRef.id}`);
-            console.log(`[runIFRS15Engine] ✅ Path completo: ${tenantCollection(tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES)}/${forcedDocRef.id}`);
-          } catch (forceError: any) {
-            console.error(`[runIFRS15Engine] ❌ ERRO ao criar entry forçado:`, forceError);
-            console.error(`[runIFRS15Engine] Stack:`, forceError.stack);
-            throw forceError;
-          }
+        if (ledgerSnapshot.empty && result.transactionPrice > 0) {
+          console.log(`[runIFRS15Engine] ℹ️ Nenhum entry criado - isso é NORMAL se não houver billing/payment/performance ainda`);
+          console.log(`[runIFRS15Engine] IFRS 15: Entries são criados quando há eventos reais, não apenas por existir contrato`);
         } else if (!ledgerSnapshot.empty) {
-          console.log(`[runIFRS15Engine] ✅ Entries já existem para este contrato (${ledgerSnapshot.size} encontrados)`);
-        } else if (result.transactionPrice === 0) {
-          console.log(`[runIFRS15Engine] ⚠️ transactionPrice é 0, não criando entry forçado`);
+          console.log(`[runIFRS15Engine] ✅ Entries existem para este contrato (${ledgerSnapshot.size} encontrados)`);
         }
       } catch (journalError: any) {
         console.error(`[runIFRS15Engine] ❌ ERRO ao gerar journal entries:`, journalError);
@@ -1275,7 +993,7 @@ export const runIFRS15Engine = functions.https.onCall(
               periodEnd: Timestamp.fromDate(contractEndDate),
               entryType: "deferred_revenue",
               debitAccount: "1300 - Contract Asset",
-              creditAccount: "2500 - Deferred Revenue",
+              creditAccount: "2600 - Contract Liability",
               amount: result.transactionPrice,
               currency: contract.currency || "BRL",
               exchangeRate: 1,

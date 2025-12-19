@@ -141,11 +141,19 @@ describe('addSeatsToSubscription', () => {
     return wrappedFunction(data, context);
   };
 
+  // Helper para verificar código do erro HttpsError
+  const expectHttpsError = async (promise: Promise<any>, expectedCode: string) => {
+    await expect(promise).rejects.toMatchObject({
+      code: expectedCode,
+    });
+  };
+
   describe('✅ Validações de Autenticação', () => {
     it('deve rejeitar quando usuário não está autenticado', async () => {
-      await expect(
-        callFunction({ quantity: 1 }, { auth: undefined })
-      ).rejects.toThrow('unauthenticated');
+      await expectHttpsError(
+        callFunction({ quantity: 1 }, { auth: undefined }),
+        'unauthenticated'
+      );
     });
 
     it('deve aceitar quando usuário está autenticado', async () => {
@@ -167,9 +175,10 @@ describe('addSeatsToSubscription', () => {
         },
       };
 
-      await expect(
-        callFunction({ quantity: 1 }, nonAdminContext)
-      ).rejects.toThrow('permission-denied');
+      await expectHttpsError(
+        callFunction({ quantity: 1 }, nonAdminContext),
+        'permission-denied'
+      );
     });
 
     it('deve aceitar quando usuário é admin', async () => {
@@ -197,13 +206,15 @@ describe('addSeatsToSubscription', () => {
 
   describe('✅ Validações de Dados (quantity >= 1)', () => {
     it('deve rejeitar quando quantity é menor que 1', async () => {
-      await expect(
-        callFunction({ quantity: 0 }, mockContext)
-      ).rejects.toThrow('invalid-argument');
+      await expectHttpsError(
+        callFunction({ quantity: 0 }, mockContext),
+        'invalid-argument'
+      );
 
-      await expect(
-        callFunction({ quantity: -1 }, mockContext)
-      ).rejects.toThrow('invalid-argument');
+      await expectHttpsError(
+        callFunction({ quantity: -1 }, mockContext),
+        'invalid-argument'
+      );
     });
 
     it('deve aceitar quando quantity é 1 ou maior', async () => {
@@ -230,9 +241,10 @@ describe('addSeatsToSubscription', () => {
     it('deve rejeitar quando tenant não existe', async () => {
       mockTenantDoc.exists = false;
 
-      await expect(
-        callFunction({ quantity: 1 }, mockContext)
-      ).rejects.toThrow('not-found');
+      await expectHttpsError(
+        callFunction({ quantity: 1 }, mockContext),
+        'not-found'
+      );
     });
 
     it('deve aceitar quando tenant existe', async () => {
@@ -250,9 +262,10 @@ describe('addSeatsToSubscription', () => {
         maxLicenses: 5,
       }));
 
-      await expect(
-        callFunction({ quantity: 1 }, mockContext)
-      ).rejects.toThrow('failed-precondition');
+      await expectHttpsError(
+        callFunction({ quantity: 1 }, mockContext),
+        'failed-precondition'
+      );
     });
 
     it('deve rejeitar quando subscriptionStatus é "canceled"', async () => {
@@ -263,9 +276,10 @@ describe('addSeatsToSubscription', () => {
         maxLicenses: 5,
       }));
 
-      await expect(
-        callFunction({ quantity: 1 }, mockContext)
-      ).rejects.toThrow('failed-precondition');
+      await expectHttpsError(
+        callFunction({ quantity: 1 }, mockContext),
+        'failed-precondition'
+      );
     });
 
     it('deve aceitar quando subscriptionStatus é "active"', async () => {
@@ -283,9 +297,10 @@ describe('addSeatsToSubscription', () => {
         maxLicenses: 5,
       }));
 
-      await expect(
-        callFunction({ quantity: 1 }, mockContext)
-      ).rejects.toThrow('failed-precondition');
+      await expectHttpsError(
+        callFunction({ quantity: 1 }, mockContext),
+        'failed-precondition'
+      );
     });
 
     it('deve aceitar quando stripeSubscriptionId existe', async () => {
@@ -323,9 +338,10 @@ describe('addSeatsToSubscription', () => {
         maxLicenses: 5,
       }));
 
-      await expect(
-        callFunction({ quantity: 1 }, mockContext)
-      ).rejects.toThrow('failed-precondition');
+      await expectHttpsError(
+        callFunction({ quantity: 1 }, mockContext),
+        'failed-precondition'
+      );
     });
 
     it('deve rejeitar quando subscriptionItem.quantity é inválido (null)', async () => {
@@ -342,9 +358,10 @@ describe('addSeatsToSubscription', () => {
         },
       });
 
-      await expect(
-        callFunction({ quantity: 1 }, mockContext)
-      ).rejects.toThrow('failed-precondition');
+      await expectHttpsError(
+        callFunction({ quantity: 1 }, mockContext),
+        'failed-precondition'
+      );
     });
 
     it('deve rejeitar quando subscriptionItem.quantity é inválido (undefined)', async () => {
@@ -361,9 +378,10 @@ describe('addSeatsToSubscription', () => {
         },
       });
 
-      await expect(
-        callFunction({ quantity: 1 }, mockContext)
-      ).rejects.toThrow('failed-precondition');
+      await expectHttpsError(
+        callFunction({ quantity: 1 }, mockContext),
+        'failed-precondition'
+      );
     });
 
     it('deve atualizar quantity na subscription do Stripe', async () => {

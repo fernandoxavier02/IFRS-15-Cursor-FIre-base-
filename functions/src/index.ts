@@ -36,6 +36,8 @@ export {
     generateBillingSchedule, runIFRS15Engine
 } from "./ifrs15/engine";
 export { calculateIFRS15All } from "./maintenance/calculate-ifrs15-all";
+export { deleteAllContractBalances } from "./maintenance/delete-all-contract-balances";
+export { deleteAllLedgerEntries } from "./maintenance/delete-all-ledger-entries";
 export { fixContractVersions } from "./maintenance/fix-contract-versions";
 export { forceCreateLedgerEntry } from "./maintenance/force-create-ledger-entry";
 export { syncTenantClaims } from "./maintenance/sync-tenant-claims";

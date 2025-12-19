@@ -114,6 +114,23 @@ export default function AccountingReconciliation() {
     mutationFn: async () => {
       if (!tenantId) throw new Error("No tenant ID");
 
+      // Confirmação antes de executar (prevenir execução acidental)
+      const confirmed = window.confirm(
+        "⚠️ ATENÇÃO: Recálculo Manual\n\n" +
+        "Este botão é apenas para recálculo manual quando necessário.\n" +
+        "O motor IFRS 15 já roda automaticamente via triggers mensais.\n\n" +
+        "Use apenas se:\n" +
+        "• Os triggers automáticos falharam\n" +
+        "• Há necessidade de saneamento inicial\n" +
+        "• Há dados corrompidos que precisam ser recalculados\n\n" +
+        "Executar agora pode criar duplicatas se os triggers já rodaram.\n\n" +
+        "Deseja continuar?"
+      );
+      
+      if (!confirmed) {
+        throw new Error("Operação cancelada pelo usuário");
+      }
+
       setRecalcProgress({ phase: "fixing", total: 0, done: 0, errors: 0 });
       const fixResult = await maintenanceService.fixContractVersions();
 
@@ -154,6 +171,11 @@ export default function AccountingReconciliation() {
       });
     },
     onError: (error: Error) => {
+      // Não mostrar toast se foi cancelado pelo usuário
+      if (error.message === "Operação cancelada pelo usuário") {
+        setRecalcProgress((prev) => ({ ...prev, phase: "idle" }));
+        return;
+      }
       setRecalcProgress((prev) => ({ ...prev, phase: "idle" }));
       toast({
         title: "Erro ao recalcular",
@@ -388,6 +410,8 @@ export default function AccountingReconciliation() {
       if (debit === "1300") bucket.contractAssetNet += amount;
       if (credit === "1300") bucket.contractAssetNet -= amount;
 
+      // Contract Liability = Deferred Revenue (mesmo conceito)
+      // Padronizado para usar apenas 2600, mas mantendo compatibilidade com 2500 (dados antigos)
       if (credit === "2600" || credit === "2500") bucket.contractLiabilityNet += amount;
       if (debit === "2600" || debit === "2500") bucket.contractLiabilityNet -= amount;
 
@@ -534,10 +558,11 @@ export default function AccountingReconciliation() {
             onClick={() => recalcAllMutation.mutate()}
             disabled={recalcAllMutation.isPending}
             data-testid="button-recalc-ifrs15-all"
+            title="⚠️ RECÁLCULO MANUAL: Use apenas se os triggers automáticos falharam. O motor roda automaticamente no dia 1 de cada mês. Executar agora pode criar duplicatas."
           >
             {recalcAllMutation.isPending
               ? `Recalculando... (${recalcProgress.done}/${recalcProgress.total || 0})`
-              : "Calcular IFRS 15 (Gerar Ledger)"}
+              : "⚠️ Calcular IFRS 15 (Gerar Ledger)"}
           </Button>
           <Button variant="outline" size="sm" onClick={() => changePeriod(-1)}>
             Mês anterior

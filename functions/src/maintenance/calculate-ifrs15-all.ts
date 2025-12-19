@@ -17,6 +17,8 @@ export const calculateIFRS15All = functions.https.onCall(async (data, context) =
 
   const tenantId = context.auth.token.tenantId || "default";
   console.log(`[calculateIFRS15All] 🚀 Iniciando cálculo IFRS 15 para tenant: ${tenantId}`);
+  console.log(`[calculateIFRS15All] ⚠️ ATENÇÃO: Esta função é para recálculo manual. O motor roda automaticamente via triggers.`);
+  console.log(`[calculateIFRS15All] ⚠️ Use apenas se os triggers automáticos falharam ou para saneamento inicial.`);
 
   try {
     // 1. Buscar todos os contratos do tenant

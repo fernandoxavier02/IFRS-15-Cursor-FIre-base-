@@ -26,7 +26,6 @@ import {
     CheckCircle,
     Clock,
     FileText,
-    Info,
     Search,
     Send,
 } from "lucide-react";
@@ -62,7 +61,6 @@ export default function RevenueLedger() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [postedFilter, setPostedFilter] = useState<string>("all");
   const [contractFilter, setContractFilter] = useState<string>("all");
-  const [showAllVersions, setShowAllVersions] = useState(true); // Toggle para debug
 
   // Fetch ledger entries from Firestore
   const {
@@ -304,23 +302,26 @@ export default function RevenueLedger() {
     },
   });
 
-  const calculateIFRS15Mutation = useMutation({
+  const deleteAllLedgerEntriesMutation = useMutation({
     mutationFn: async () => {
-      return ifrs15Service.calculateIFRS15All();
+      if (!confirm("⚠️ ATENÇÃO: Esta ação irá apagar TODOS os lançamentos contábeis do seu tenant. Esta ação é irreversível. Deseja continuar?")) {
+        throw new Error("Operação cancelada pelo usuário");
+      }
+      return ifrs15Service.deleteAllLedgerEntries();
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["ledger-entries", user?.tenantId] });
       queryClient.invalidateQueries({ queryKey: ["ledger-entries-unposted", user?.tenantId] });
       refetchLedger();
       toast({
-        title: "Cálculo IFRS 15 concluído!",
-        description: `Processados ${result.processed} de ${result.total} contratos. Erros: ${result.errors}`,
-        variant: result.errors > 0 ? "destructive" : "default",
+        title: "Lançamentos apagados!",
+        description: result.message || `${result.deleted} lançamentos foram deletados`,
+        variant: "default",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Erro ao calcular IFRS 15",
+        title: "Erro ao apagar lançamentos",
         description: error.message,
         variant: "destructive",
       });
@@ -511,40 +512,15 @@ export default function RevenueLedger() {
           </Button>
         )}
         <Button
-          variant="outline"
-          onClick={() => calculateIFRS15Mutation.mutate()}
-          disabled={calculateIFRS15Mutation.isPending}
-          data-testid="button-calculate-ifrs15"
-          className="border-orange-500 text-orange-600 hover:bg-orange-50"
-          title="Gera entries iniciais simplificados. Para cálculo completo, use Accounting Reconciliation."
+          variant="destructive"
+          onClick={() => deleteAllLedgerEntriesMutation.mutate()}
+          disabled={deleteAllLedgerEntriesMutation.isPending}
+          data-testid="button-delete-all-ledger-entries"
+          title="⚠️ ATENÇÃO: Apaga TODOS os lançamentos contábeis. Use apenas para limpar dados incorretos."
         >
-          {calculateIFRS15Mutation.isPending ? "Gerando entries..." : "Generate Initial Entries"}
+          {deleteAllLedgerEntriesMutation.isPending ? "Apagando..." : "🗑️ Apagar Todos os Lançamentos"}
         </Button>
       </div>
-
-      {/* Info Alert */}
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertTitle>Entradas Automáticas</AlertTitle>
-        <AlertDescription className="flex items-center justify-between">
-          <span>
-            Todas as entradas do Revenue Ledger são geradas automaticamente pelo sistema baseado em
-            eventos (Motor IFRS 15, faturamentos, pagamentos, etc.). Não é possível criar entradas
-            manualmente para garantir conformidade com IFRS 15.
-          </span>
-          <div className="flex items-center gap-2 ml-4">
-            <label className="text-xs whitespace-nowrap">
-              <input
-                type="checkbox"
-                checked={showAllVersions}
-                onChange={(e) => setShowAllVersions(e.target.checked)}
-                className="mr-1"
-              />
-              Mostrar todas as versões
-            </label>
-          </div>
-        </AlertDescription>
-      </Alert>
 
       {/* Error Alert */}
       {(ledgerEntriesError || unpostedEntriesError) && (
@@ -572,27 +548,6 @@ export default function RevenueLedger() {
           </AlertDescription>
         </Alert>
       )}
-
-      {/* Debug Info - Sempre visível para diagnóstico */}
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertTitle>🔍 Estado da Query</AlertTitle>
-        <AlertDescription className="space-y-1 text-xs">
-          <div><strong>Tenant ID:</strong> {user?.tenantId || "N/A"}</div>
-          <div><strong>Loading:</strong> {isLoading ? "Sim" : "Não"}</div>
-          <div><strong>Entries brutos:</strong> {ledgerEntries?.length || 0}</div>
-          <div><strong>Entries transformados:</strong> {entriesWithDetails.length}</div>
-          <div><strong>Entries filtrados:</strong> {filteredEntries.length}</div>
-          <div><strong>Erro:</strong> {ledgerEntriesError ? "Sim" : "Não"}</div>
-          <div><strong>Filtros ativos:</strong> type={typeFilter}, posted={postedFilter}, contract={contractFilter}, search="{searchQuery}"</div>
-          <div><strong>Path esperado:</strong> tenants/{user?.tenantId}/revenueLedgerEntries</div>
-          {ledgerEntriesError && (
-            <div className="mt-2 p-2 bg-destructive/10 rounded text-xs">
-              <strong>Erro detalhado:</strong> {(ledgerEntriesError as any)?.message || String(ledgerEntriesError)}
-            </div>
-          )}
-        </AlertDescription>
-      </Alert>
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

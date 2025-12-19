@@ -80,8 +80,37 @@ async function createLedgerEntry(params: {
   referenceNumber: string;
   description: string;
 }): Promise<"created" | "exists"> {
+  // VALIDAÇÃO 1: Garantir que débito = crédito (double-entry accounting)
+  // Em um lançamento contábil, o valor do débito DEVE ser igual ao valor do crédito
+  if (params.amount <= 0) {
+    throw new Error(`[createLedgerEntry] ❌ Valor inválido: ${params.amount}. O valor deve ser maior que zero.`);
+  }
+
+  // VALIDAÇÃO 2: Verificar se contas de débito e crédito são diferentes
+  if (params.debitAccount === params.creditAccount) {
+    throw new Error(
+      `[createLedgerEntry] ❌ Contas iguais: débito e crédito não podem ser a mesma conta (${params.debitAccount})`
+    );
+  }
+
+  // VALIDAÇÃO 3: Verificar se referenceNumber está definido (usado para prevenir duplicatas)
+  if (!params.referenceNumber || params.referenceNumber.trim() === "") {
+    throw new Error(
+      `[createLedgerEntry] ❌ referenceNumber não pode estar vazio. É necessário para prevenir duplicatas.`
+    );
+  }
+
   const collectionPath = tenantCollection(params.tenantId, COLLECTIONS.REVENUE_LEDGER_ENTRIES);
   const docRef = db.collection(collectionPath).doc(params.referenceNumber);
+
+  // VALIDAÇÃO 4: Verificar se entry já existe ANTES de tentar criar (prevenir duplicatas)
+  const existingDoc = await docRef.get();
+  if (existingDoc.exists) {
+    console.log(
+      `[createLedgerEntry] ⏭️ Entry já existe com referenceNumber ${params.referenceNumber}, pulando criação`
+    );
+    return "exists";
+  }
 
   const entryDateTs = Timestamp.fromDate(params.entryDate);
   const periodStartTs = Timestamp.fromDate(params.periodStart);

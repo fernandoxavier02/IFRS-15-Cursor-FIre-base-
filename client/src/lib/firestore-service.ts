@@ -833,6 +833,18 @@ export const ifrs15Service = {
     const result = await calculate({});
     return result.data as { success: boolean; processed: number; errors: number; total: number; errorDetails?: Array<{ contractId: string; error: string }> };
   },
+
+  async deleteAllLedgerEntries() {
+    const deleteFn = httpsCallable(functions, "deleteAllLedgerEntries");
+    const result = await deleteFn({});
+    return result.data as { success: boolean; deleted: number; message: string };
+  },
+
+  async deleteAllContractBalances() {
+    const deleteFn = httpsCallable(functions, "deleteAllContractBalances");
+    const result = await deleteFn({});
+    return result.data as { success: boolean; deleted: number; contractsProcessed: number; message: string };
+  },
 };
 
 // ==================== MAINTENANCE ====================
