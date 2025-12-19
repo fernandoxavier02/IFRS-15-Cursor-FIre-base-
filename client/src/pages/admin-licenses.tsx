@@ -79,6 +79,8 @@ export default function AdminLicenses() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newLicense, setNewLicense] = useState({
     email: "",
+    fullName: "",
+    companyName: "", // Nome da empresa
     seatCount: "1",
     planType: "professional",
   });
@@ -111,13 +113,20 @@ export default function AdminLicenses() {
   };
 
   const createLicenseMutation = useMutation({
-    mutationFn: async (data: { email: string; seatCount: number; planType: string }) => {
+    mutationFn: async (data: { email: string; fullName: string; companyName: string; seatCount: number; planType: string }) => {
       // Use createUserWithTenant Cloud Function
       const createUser = httpsCallable(functions, "createUserWithTenant");
+      
+      // Generate company name suggestion from email domain if not provided
+      const emailDomain = data.email.split("@")[1] || "";
+      const suggestedCompanyName = emailDomain.split(".")[0]; // First part of domain
+      const finalCompanyName = data.companyName || suggestedCompanyName;
+      
       const result = await createUser({
         email: data.email,
+        fullName: data.fullName || data.email.split("@")[0], // Use email prefix if name not provided
         password: undefined, // Will be auto-generated
-        tenantName: data.email.split("@")[0],
+        tenantName: finalCompanyName, // Use provided company name or suggestion
         planType: data.planType,
         seatCount: data.seatCount,
       });
@@ -126,7 +135,7 @@ export default function AdminLicenses() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["admin-licenses"] });
       setIsCreateOpen(false);
-      setNewLicense({ email: "", seatCount: "1", planType: "professional" });
+      setNewLicense({ email: "", fullName: "", companyName: "", seatCount: "1", planType: "professional" });
       
       if (data.credentials) {
         setCreatedCredentials({
@@ -278,6 +287,8 @@ export default function AdminLicenses() {
   const handleCreate = () => {
     createLicenseMutation.mutate({
       email: newLicense.email,
+      fullName: newLicense.fullName,
+      companyName: newLicense.companyName,
       seatCount: parseInt(newLicense.seatCount),
       planType: newLicense.planType,
     });
@@ -334,6 +345,41 @@ export default function AdminLicenses() {
                   placeholder="user@company.com"
                   data-testid="input-license-email"
                 />
+              </div>
+              <div>
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  value={newLicense.fullName}
+                  onChange={(e) => setNewLicense({ ...newLicense, fullName: e.target.value })}
+                  placeholder="John Doe"
+                  data-testid="input-license-fullname"
+                />
+              </div>
+              <div>
+                <Label htmlFor="companyName">Company Name</Label>
+                <Input
+                  id="companyName"
+                  type="text"
+                  value={newLicense.companyName}
+                  onChange={(e) => setNewLicense({ ...newLicense, companyName: e.target.value })}
+                  placeholder="My Company"
+                  data-testid="input-license-company"
+                  onBlur={(e) => {
+                    // Auto-fill company name from email domain if empty
+                    if (!e.target.value && newLicense.email) {
+                      const domain = newLicense.email.split("@")[1];
+                      if (domain) {
+                        const suggested = domain.split(".")[0];
+                        setNewLicense({ ...newLicense, companyName: suggested });
+                      }
+                    }
+                  }}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Will be auto-filled from email domain if left empty
+                </p>
               </div>
               <div>
                 <Label htmlFor="planType">Plan Type</Label>

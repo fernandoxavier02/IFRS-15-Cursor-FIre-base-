@@ -10,8 +10,7 @@ admin.initializeApp();
 // ==================== AUTH TRIGGERS ====================
 export {
     activateUserLicense, createUserWithTenant, onUserCreated,
-    onUserDeleted,
-    setUserClaims
+    onUserDeleted, registerCompany, setUserClaims
 } from "./auth/triggers";
 
 // ==================== STRIPE ====================
@@ -36,9 +35,9 @@ export {
     createContractVersion,
     generateBillingSchedule, runIFRS15Engine
 } from "./ifrs15/engine";
+export { calculateIFRS15All } from "./maintenance/calculate-ifrs15-all";
 export { fixContractVersions } from "./maintenance/fix-contract-versions";
 export { forceCreateLedgerEntry } from "./maintenance/force-create-ledger-entry";
-export { calculateIFRS15All } from "./maintenance/calculate-ifrs15-all";
 export { syncTenantClaims } from "./maintenance/sync-tenant-claims";
 
 // ==================== REVENUE LEDGER TRIGGERS ====================

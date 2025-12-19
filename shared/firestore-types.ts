@@ -166,6 +166,8 @@ export interface Tenant extends BaseDocument {
   country: string;
   currency: string;
   taxId?: string;
+  address?: string; // Company address
+  phone?: string; // Company phone
   planType: PlanType;
   maxContracts: number;
   maxLicenses: number;

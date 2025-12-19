@@ -17,13 +17,26 @@ export const getStripePublishableKey = functions.https.onCall(async () => {
 
 // Create checkout session
 export const createCheckoutSession = functions.https.onCall(async (data, context) => {
-  const { priceId, email, successUrl, cancelUrl } = data;
+  const { priceId, planId, email, successUrl, cancelUrl, tenantId } = data;
 
-  if (!priceId || !email) {
-    throw new functions.https.HttpsError("invalid-argument", "Missing required fields");
+  if ((!priceId && !planId) || !email) {
+    throw new functions.https.HttpsError("invalid-argument", "Missing required fields: priceId or planId, and email");
   }
 
   try {
+    let finalPriceId = priceId;
+
+    // If planId provided, find priceId from subscription plans
+    if (!finalPriceId && planId) {
+      const plansSnapshot = await db.collection(COLLECTIONS.SUBSCRIPTION_PLANS).get();
+      const plans = plansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const plan = plans.find((p: any) => p.id === planId);
+      if (!plan || !plan.priceId) {
+        throw new functions.https.HttpsError("not-found", `Plan ${planId} not found or has no priceId`);
+      }
+      finalPriceId = plan.priceId;
+    }
+
     // Check if customer exists
     const customers = await stripe.customers.list({
       email,
@@ -35,6 +48,12 @@ export const createCheckoutSession = functions.https.onCall(async (data, context
       customerId = customers.data[0].id;
     }
 
+    // Get tenantId from auth if not provided
+    let finalTenantId = tenantId;
+    if (!finalTenantId && context.auth) {
+      finalTenantId = context.auth.token.tenantId;
+    }
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -43,14 +62,16 @@ export const createCheckoutSession = functions.https.onCall(async (data, context
       customer_email: customerId ? undefined : email,
       line_items: [
         {
-          price: priceId,
+          price: finalPriceId,
           quantity: 1,
         },
       ],
-      success_url: successUrl || `${process.env.APP_URL}/subscribe?success=true`,
-      cancel_url: cancelUrl || `${process.env.APP_URL}/subscribe?canceled=true`,
+      success_url: successUrl || `${process.env.APP_URL || "https://ifrs15-revenue-manager.web.app"}/customer-area?success=true`,
+      cancel_url: cancelUrl || `${process.env.APP_URL || "https://ifrs15-revenue-manager.web.app"}/customer-area?canceled=true`,
       metadata: {
         email,
+        ...(finalTenantId && { tenantId: finalTenantId }),
+        ...(planId && { planId }),
       },
     });
 
@@ -58,6 +79,8 @@ export const createCheckoutSession = functions.https.onCall(async (data, context
     await db.collection(COLLECTIONS.CHECKOUT_SESSIONS).add({
       stripeSessionId: session.id,
       email,
+      tenantId: finalTenantId || null,
+      planId: planId || null,
       status: "pending",
       createdAt: Timestamp.now(),
     });

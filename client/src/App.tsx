@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth-firebase";
 import { I18nProvider } from "@/lib/i18n";
+import AccountingReconciliation from "@/pages/accounting-reconciliation";
 import ActivateLicense from "@/pages/activate-license";
 import AdminLicenses from "@/pages/admin-licenses";
 import AiSettings from "@/pages/ai-settings";
@@ -18,6 +19,7 @@ import ContractCosts from "@/pages/contract-costs";
 import ContractDetails from "@/pages/contract-details";
 import ContractIngestion from "@/pages/contract-ingestion";
 import Contracts from "@/pages/contracts";
+import CustomerArea from "@/pages/customer-area";
 import Customers from "@/pages/customers";
 import Dashboard from "@/pages/dashboard";
 import DeleteManagement from "@/pages/delete-management";
@@ -26,7 +28,7 @@ import ExecutiveDashboard from "@/pages/executive-dashboard";
 import FinancingComponents from "@/pages/financing-components";
 import IFRS15Engine from "@/pages/ifrs15";
 import IFRS15AccountingControl from "@/pages/ifrs15-accounting-control";
-import Landing from "@/pages/landing";
+import Landing from "@/pages/landing-new";
 import Licenses from "@/pages/licenses";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
@@ -36,8 +38,7 @@ import RevenueWaterfall from "@/pages/revenue-waterfall";
 import Settings from "@/pages/settings";
 import Showcase from "@/pages/showcase";
 import Subscribe from "@/pages/subscribe";
-import AccountingReconciliation from "@/pages/accounting-reconciliation";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Redirect, Route, Switch, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
@@ -53,6 +54,22 @@ function LoadingSpinner() {
 function MainRouter() {
   const [location] = useLocation();
   const { isLoading, isAuthenticated, needsPasswordChange, needsLicenseActivation, user } = useAuth();
+  
+  // Check subscription status for authenticated users
+  const { data: tenant, isLoading: tenantLoading } = useQuery({
+    queryKey: ["tenant-subscription", user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return null;
+      const { tenantService } = await import("@/lib/firestore-service");
+      return tenantService.get(user.tenantId);
+    },
+    enabled: !!user?.tenantId && isAuthenticated && !needsPasswordChange && !needsLicenseActivation,
+  });
+
+  const subscriptionStatus = (tenant as any)?.subscriptionStatus;
+  // Only block if subscriptionStatus is explicitly set and not "active"
+  // If undefined/null, allow access (for backward compatibility with existing tenants)
+  const needsPayment = subscriptionStatus !== undefined && subscriptionStatus !== null && subscriptionStatus !== "active";
 
   // Public routes that don't require auth check (static pages)
   const publicRoutes = ["/landing", "/showcase", "/subscribe"];
@@ -61,6 +78,13 @@ function MainRouter() {
     if (location === "/landing") return <Landing />;
     if (location === "/showcase") return <Showcase />;
     if (location === "/subscribe") return <Subscribe />;
+  }
+
+  // Customer area - requires authentication but no payment
+  if (location === "/customer-area") {
+    if (isLoading) return <LoadingSpinner />;
+    if (!isAuthenticated) return <Redirect to="/login" />;
+    return <CustomerArea />;
   }
 
   // Login page - redirect if already authenticated
@@ -101,7 +125,19 @@ function MainRouter() {
     return <ActivateLicense />;
   }
 
-  // Fully authenticated - show main app with sidebar
+  // Check if payment is required (subscription status is not active)
+  if (isAuthenticated && user?.tenantId && !tenantLoading && needsPayment) {
+    // Allow access to customer-area, but redirect other routes
+    if (location !== "/customer-area" && location !== "/change-password") {
+      return <Redirect to="/customer-area" />;
+    }
+    // If already on customer-area, show it
+    if (location === "/customer-area") {
+      return <CustomerArea />;
+    }
+  }
+
+  // Fully authenticated and paid - show main app with sidebar
   return (
     <AppLayout>
       <Switch>
