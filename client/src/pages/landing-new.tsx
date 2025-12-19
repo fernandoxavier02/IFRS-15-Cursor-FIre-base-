@@ -1,3 +1,4 @@
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,8 +17,10 @@ import {
     CurrencyDollar,
     FileText,
     FileX,
+    Gauge,
     Globe,
     Lightning,
+    Quotes,
     Rocket,
     ShieldCheck,
     SpinnerGap,
@@ -28,7 +31,8 @@ import {
 } from "@phosphor-icons/react";
 import { useMutation } from "@tanstack/react-query";
 import { httpsCallable } from "firebase/functions";
-import { useState } from "react";
+import { motion, useInView } from "framer-motion";
+import { useRef, useState } from "react";
 import { useLocation } from "wouter";
 
 // IFRS 15 Challenges/Problems section
@@ -182,6 +186,225 @@ interface RegistrationFormData {
   phone: string;
 }
 
+// Stats Component
+const stats = [
+  { value: "99.9%", label: "Uptime garantido", icon: Gauge },
+  { value: "500+", label: "Empresas ativas", icon: Buildings },
+  { value: "R$2B+", label: "Receita gerenciada", icon: CurrencyDollar },
+  { value: "< 5min", label: "Tempo de setup", icon: ClockCounterClockwise },
+];
+
+function StatsSection() {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  return (
+    <section className="py-16 bg-gradient-to-br from-emerald-500/5 to-purple-500/5">
+      <div className="container mx-auto px-6">
+        <div ref={ref} className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-6xl mx-auto">
+          {stats.map((stat, index) => {
+            const Icon = stat.icon;
+            return (
+              <motion.div
+                key={index}
+                className="text-center"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.5 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+              >
+                <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 mx-auto mb-4 shadow-lg">
+                  <Icon weight="fill" className="h-8 w-8 text-white" />
+                </div>
+                <motion.div
+                  className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent mb-2"
+                  initial={{ opacity: 0 }}
+                  animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+                  transition={{ duration: 0.8, delay: index * 0.1 + 0.3 }}
+                >
+                  {stat.value}
+                </motion.div>
+                <p className="text-sm text-muted-foreground font-medium">{stat.label}</p>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Testimonials Component
+const testimonials = [
+  {
+    quote: "O sistema revolucionou nossa forma de reconhecer receita. Reduzimos o tempo de fechamento contábil em 70%.",
+    author: "Maria Silva",
+    role: "CFO",
+    company: "TechCorp Brasil",
+    avatar: "MS",
+    rating: 5,
+  },
+  {
+    quote: "Finalmente uma solução que entende as complexidades do IFRS 15. A trilha de auditoria é impecável.",
+    author: "João Santos",
+    role: "Controller",
+    company: "Indústrias ABC",
+    avatar: "JS",
+    rating: 5,
+  },
+  {
+    quote: "A automação dos 5 passos do IFRS 15 nos deu confiança total na conformidade contábil. Recomendo!",
+    author: "Ana Oliveira",
+    role: "Diretora Financeira",
+    company: "Global Services",
+    avatar: "AO",
+    rating: 5,
+  },
+];
+
+function TestimonialsSection() {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  return (
+    <section className="py-24 bg-background">
+      <div className="container mx-auto px-6">
+        <motion.div
+          ref={ref}
+          className="text-center mb-16"
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+          transition={{ duration: 0.6 }}
+        >
+          <Badge variant="outline" className="mb-4 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+            <Quotes weight="fill" className="h-3 w-3 mr-2" />
+            Depoimentos
+          </Badge>
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">
+            O que Nossos Clientes Dizem
+          </h2>
+          <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+            Empresas de todos os tamanhos confiam no IFRS 15 Revenue Manager para automatizar seu compliance contábil.
+          </p>
+        </motion.div>
+
+        <div className="grid gap-6 md:grid-cols-3 max-w-6xl mx-auto">
+          {testimonials.map((testimonial, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 30 }}
+              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+              transition={{ duration: 0.5, delay: index * 0.15 }}
+            >
+              <Card className="card-premium border-0 h-full hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                <CardContent className="p-6">
+                  <div className="flex gap-1 mb-4">
+                    {[...Array(testimonial.rating)].map((_, i) => (
+                      <Star key={i} weight="fill" className="h-4 w-4 text-amber-500" />
+                    ))}
+                  </div>
+                  <Quotes weight="fill" className="h-8 w-8 text-emerald-500/20 mb-4" />
+                  <p className="text-sm text-muted-foreground mb-6 leading-relaxed italic">
+                    "{testimonial.quote}"
+                  </p>
+                  <div className="flex items-center gap-3 pt-4 border-t">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-bold">
+                      {testimonial.avatar}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">{testimonial.author}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {testimonial.role} • {testimonial.company}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// FAQ Component
+const faqs = [
+  {
+    question: "Como funciona o registro no sistema?",
+    answer: "O registro é simples e rápido. Você preenche os dados da sua empresa e recebe um email com suas credenciais de acesso. Após fazer login, você terá acesso à sua área do cliente onde pode visualizar todas as funcionalidades e, quando estiver pronto, escolher e pagar pelo plano desejado.",
+  },
+  {
+    question: "Posso testar antes de pagar?",
+    answer: "Sim! Após o registro, você terá acesso à área do cliente onde pode visualizar todas as funcionalidades disponíveis. O pagamento é opcional e pode ser feito quando você estiver pronto para começar a usar o sistema completo.",
+  },
+  {
+    question: "Quanto tempo leva para configurar?",
+    answer: "A configuração inicial leva menos de 5 minutos. Nosso sistema foi projetado para ser intuitivo e fácil de usar, permitindo que você comece a trabalhar imediatamente após o registro e pagamento.",
+  },
+  {
+    question: "Posso cancelar minha assinatura?",
+    answer: "Sim, você pode cancelar sua assinatura a qualquer momento através da sua área do cliente. Não há taxas de cancelamento e você continuará tendo acesso até o fim do período já pago.",
+  },
+  {
+    question: "O sistema suporta múltiplos usuários?",
+    answer: "Sim, dependendo do plano escolhido. O plano Professional permite até 3 usuários, enquanto o Enterprise permite usuários ilimitados. Todos os usuários da mesma empresa compartilham os dados e colaboram em projetos.",
+  },
+  {
+    question: "Há suporte técnico disponível?",
+    answer: "Sim! Oferecemos suporte por email para todos os planos e suporte prioritário para planos Professional e Enterprise. Nossa equipe está pronta para ajudar você a tirar o máximo proveito do sistema.",
+  },
+];
+
+function FAQSection() {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  return (
+    <section className="py-24 bg-muted/30">
+      <div className="container mx-auto px-6">
+        <motion.div
+          ref={ref}
+          className="text-center mb-16"
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+          transition={{ duration: 0.6 }}
+        >
+          <Badge variant="outline" className="mb-4 bg-blue-500/10 text-blue-600 border-blue-500/20">
+            <FileText weight="fill" className="h-3 w-3 mr-2" />
+            Perguntas Frequentes
+          </Badge>
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">
+            Dúvidas? Temos Respostas
+          </h2>
+          <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+            Encontre respostas para as perguntas mais comuns sobre o IFRS 15 Revenue Manager.
+          </p>
+        </motion.div>
+
+        <motion.div
+          className="max-w-3xl mx-auto"
+          initial={{ opacity: 0, y: 30 }}
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
+          <Accordion type="single" collapsible className="w-full space-y-4">
+            {faqs.map((faq, index) => (
+              <AccordionItem key={index} value={`item-${index}`} className="border rounded-lg px-6 bg-background">
+                <AccordionTrigger className="text-left hover:no-underline font-semibold">
+                  {faq.question}
+                </AccordionTrigger>
+                <AccordionContent className="text-muted-foreground leading-relaxed">
+                  {faq.answer}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
 export default function LandingNew() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -293,32 +516,76 @@ export default function LandingNew() {
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-20 pb-32">
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-purple-500/10" />
-        <div className="absolute top-20 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 right-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
+        <motion.div 
+          className="absolute top-20 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl"
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.5, 0.3],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+        <motion.div 
+          className="absolute bottom-20 right-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl"
+          animate={{
+            scale: [1, 1.3, 1],
+            opacity: [0.3, 0.6, 0.3],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 1,
+          }}
+        />
         
         <div className="container mx-auto px-6 py-24 relative">
           <div className="max-w-5xl mx-auto text-center">
-            <Badge variant="outline" className="mb-6 px-4 py-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
-              <Star weight="fill" className="h-3 w-3 mr-2" />
-              Solução Completa para Compliance IFRS 15
-            </Badge>
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              <Badge variant="outline" className="mb-6 px-4 py-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+                <Star weight="fill" className="h-3 w-3 mr-2" />
+                Solução Completa para Compliance IFRS 15
+              </Badge>
+            </motion.div>
             
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-tight">
+            <motion.h1 
+              className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-tight"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
               Resolva os Desafios do
               <span className="block bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-400 bg-clip-text text-transparent">
                 IFRS 15 em Minutos
               </span>
-            </h1>
+            </motion.h1>
             
-            <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto leading-relaxed">
+            <motion.p 
+              className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto leading-relaxed"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+            >
               Automatize o reconhecimento de receita, simplifique a gestão de contratos e garanta compliance total com o padrão internacional mais rigoroso de contabilidade.
-            </p>
+            </motion.p>
             
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+            <motion.div 
+              className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
+            >
               <Button
                 size="lg"
                 onClick={() => document.getElementById("register")?.scrollIntoView({ behavior: "smooth" })}
-                className="h-14 px-8 text-lg bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/20 font-semibold"
+                className="h-14 px-8 text-lg bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/20 font-semibold transition-all hover:scale-105"
               >
                 Registre-se Agora
                 <ArrowRight weight="bold" className="ml-2 h-5 w-5" />
@@ -326,14 +593,19 @@ export default function LandingNew() {
               <Button
                 size="lg"
                 variant="outline"
-                className="h-14 px-8 text-lg font-semibold border-2"
+                className="h-14 px-8 text-lg font-semibold border-2 transition-all hover:scale-105"
                 onClick={() => setLocation("/login")}
               >
                 Já tem conta? Entrar
               </Button>
-            </div>
+            </motion.div>
 
-            <div className="flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground">
+            <motion.div 
+              className="flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.8 }}
+            >
               <div className="flex items-center gap-2">
                 <CheckCircle weight="fill" className="h-5 w-5 text-emerald-500" />
                 <span className="font-medium">Setup em 5 minutos</span>
@@ -346,15 +618,24 @@ export default function LandingNew() {
                 <CheckCircle weight="fill" className="h-5 w-5 text-emerald-500" />
                 <span className="font-medium">Suporte especializado</span>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>
 
+      {/* Stats Section */}
+      <StatsSection />
+
       {/* Problems Section */}
       <section id="problems" className="py-24 bg-muted/50 scroll-mt-16">
         <div className="container mx-auto px-6">
-          <div className="text-center mb-16">
+          <motion.div 
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
             <Badge variant="outline" className="mb-4 bg-red-500/10 text-red-600 border-red-500/20">
               <Warning weight="fill" className="h-3 w-3 mr-2" />
               Desafios Comuns
@@ -365,21 +646,29 @@ export default function LandingNew() {
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
               A implementação do IFRS 15 apresenta desafios complexos que consomem tempo, recursos e aumentam o risco de não conformidade. Identifique-se com algum desses problemas?
             </p>
-          </div>
+          </motion.div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto">
             {problems.map((problem, index) => {
               const Icon = problem.icon;
               return (
-                <Card key={index} className="card-premium border-0 group hover:shadow-xl transition-all">
-                  <CardContent className="p-6">
-                    <div className={`flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br ${problem.gradient} shadow-lg mb-4 transition-transform duration-300 group-hover:scale-110`}>
-                      <Icon weight="fill" className="h-7 w-7 text-white" />
-                    </div>
-                    <h3 className="text-lg font-semibold mb-2">{problem.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{problem.description}</p>
-                  </CardContent>
-                </Card>
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                >
+                  <Card className="card-premium border-0 group hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    <CardContent className="p-6">
+                      <div className={`flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br ${problem.gradient} shadow-lg mb-4 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}>
+                        <Icon weight="fill" className="h-7 w-7 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold mb-2">{problem.title}</h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{problem.description}</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               );
             })}
           </div>
@@ -387,9 +676,15 @@ export default function LandingNew() {
       </section>
 
       {/* Solutions Section */}
-      <section className="py-24">
+      <section className="py-24 scroll-mt-16">
         <div className="container mx-auto px-6">
-          <div className="text-center mb-16">
+          <motion.div 
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
             <Badge variant="outline" className="mb-4 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
               <CheckCircle weight="fill" className="h-3 w-3 mr-2" />
               Nossa Solução
@@ -400,21 +695,29 @@ export default function LandingNew() {
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
               Uma plataforma completa que automatiza todos os aspectos do IFRS 15, eliminando erros manuais e garantindo compliance total.
             </p>
-          </div>
+          </motion.div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto">
             {solutions.map((solution, index) => {
               const Icon = solution.icon;
               return (
-                <Card key={index} className="card-premium border-0 group hover:shadow-xl transition-all">
-                  <CardContent className="p-6">
-                    <div className={`flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br ${solution.gradient} shadow-lg mb-4 transition-transform duration-300 group-hover:scale-110`}>
-                      <Icon weight="fill" className="h-7 w-7 text-white" />
-                    </div>
-                    <h3 className="text-lg font-semibold mb-2">{solution.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{solution.description}</p>
-                  </CardContent>
-                </Card>
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                >
+                  <Card className="card-premium border-0 group hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    <CardContent className="p-6">
+                      <div className={`flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br ${solution.gradient} shadow-lg mb-4 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}>
+                        <Icon weight="fill" className="h-7 w-7 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold mb-2">{solution.title}</h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{solution.description}</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               );
             })}
           </div>
@@ -424,7 +727,13 @@ export default function LandingNew() {
       {/* Registration Section */}
       <section id="register" className="py-24 bg-gradient-to-b from-muted/50 to-background scroll-mt-16">
         <div className="container mx-auto px-6">
-          <div className="text-center mb-12">
+          <motion.div 
+            className="text-center mb-12"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
             <Badge variant="outline" className="mb-4">Primeiro Passo</Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Registre Sua Empresa
@@ -432,9 +741,15 @@ export default function LandingNew() {
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Preencha as informações abaixo para criar sua conta. Você precisará estar registrado antes de assinar um plano.
             </p>
-          </div>
+          </motion.div>
 
-          <div className="max-w-2xl mx-auto">
+          <motion.div 
+            className="max-w-2xl mx-auto"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
             <Card className="card-premium border-0">
               <CardHeader>
                 <CardTitle>Informações da Empresa</CardTitle>
@@ -560,14 +875,20 @@ export default function LandingNew() {
                 </Button>
               </CardFooter>
             </Card>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Pricing Section */}
       <section id="pricing" className="py-24 scroll-mt-16">
         <div className="container mx-auto px-6">
-          <div className="text-center mb-16">
+          <motion.div 
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
             <Badge variant="outline" className="mb-4">Planos</Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Escolha o Plano Ideal
@@ -585,15 +906,21 @@ export default function LandingNew() {
                 </CardContent>
               </Card>
             </div>
-          </div>
+          </motion.div>
 
-            <div className="grid gap-8 md:grid-cols-3 max-w-6xl mx-auto">
-              {plans.map((plan) => {
+          <div className="grid gap-8 md:grid-cols-3 max-w-6xl mx-auto">
+              {plans.map((plan, index) => {
                 const Icon = plan.icon;
                 return (
-                  <Card
+                  <motion.div
                     key={plan.id}
-                    className={`relative card-premium border-0 ${
+                    initial={{ opacity: 0, y: 40 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: index * 0.15 }}
+                  >
+                  <Card
+                    className={`relative card-premium border-0 transition-all duration-300 hover:scale-105 ${
                       plan.popular ? "ring-2 ring-emerald-500 shadow-xl shadow-emerald-500/10" : ""
                     }`}
                   >
@@ -635,16 +962,29 @@ export default function LandingNew() {
                       </p>
                     </CardFooter>
                   </Card>
+                  </motion.div>
                 );
               })}
             </div>
-          </div>
-        </section>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <TestimonialsSection />
+
+      {/* FAQ Section */}
+      <FAQSection />
 
       {/* CTA Section */}
       <section className="py-24 bg-gradient-to-br from-emerald-500/10 via-transparent to-purple-500/10">
         <div className="container mx-auto px-6">
-          <div className="max-w-4xl mx-auto">
+          <motion.div 
+            className="max-w-4xl mx-auto"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
             <Card className="card-premium border-0 overflow-hidden">
               <div className="relative p-12 text-center">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-purple-500/10" />
@@ -658,7 +998,7 @@ export default function LandingNew() {
                   <Button
                     size="lg"
                     onClick={() => document.getElementById("register")?.scrollIntoView({ behavior: "smooth" })}
-                    className="h-12 px-8 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/20"
+                    className="h-12 px-8 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/20 transition-all hover:scale-105"
                   >
                     Começar Agora
                     <ArrowRight weight="bold" className="ml-2 h-5 w-5" />
@@ -666,7 +1006,7 @@ export default function LandingNew() {
                 </div>
               </div>
             </Card>
-          </div>
+          </motion.div>
         </div>
       </section>
 

@@ -9,13 +9,13 @@ admin.initializeApp();
 
 // ==================== AUTH TRIGGERS ====================
 export {
-    activateUserLicense, createUserWithTenant, onUserCreated,
-    onUserDeleted, registerCompany, setUserClaims
+    activateUserLicense, addTenantUser, createUserWithTenant, deleteUserFromAuth,
+    getTenantUsers, onUserCreated, onUserDeleted, registerCompany, setUserClaims
 } from "./auth/triggers";
 
 // ==================== STRIPE ====================
 export {
-    cancelSubscription, createCheckoutSession,
+    addSeatsToSubscription, cancelSubscription, createCheckoutSession,
     createPortalSession, getStripePublishableKey, getSubscriptionPlans, resumeSubscription
 } from "./stripe/checkout";
 export { stripeWebhook } from "./stripe/webhooks";

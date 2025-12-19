@@ -254,10 +254,22 @@ export default function CustomerArea() {
             {/* User & Company Information Card */}
             <Card className="mb-8 border-0 shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users weight="fill" className="h-5 w-5 text-emerald-500" />
-                  Informações da Conta
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Users weight="fill" className="h-5 w-5 text-emerald-500" />
+                    Informações da Conta
+                  </CardTitle>
+                  {isActive && (user?.role === "admin" || user?.email === "fernandocostaxavier@gmail.com") && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setLocation("/customer-area/users")}
+                      className="gap-2"
+                    >
+                      <Users weight="fill" className="h-4 w-4" />
+                      Gerenciar Usuários
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-6 md:grid-cols-2">

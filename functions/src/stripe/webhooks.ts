@@ -176,13 +176,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // ACTIVATE TENANT - Update status to active
   const updateData: any = {
     status: "active",
-    subscriptionStatus: "active",
+        subscriptionStatus: "active",
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscriptionId,
     planType,
     maxContracts: limits.maxContracts,
     maxLicenses: limits.maxLicenses,
-    cancelAtPeriodEnd: false,
+        cancelAtPeriodEnd: false,
   };
 
   if (subscriptionDetails) {
@@ -212,7 +212,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     // Update user document
     await userDoc.ref.update({
       isActive: true,
-    });
+      });
 
     // Update root user collection
     await db.collection(COLLECTIONS.USERS).doc(userDoc.id).update({

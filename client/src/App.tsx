@@ -20,6 +20,7 @@ import ContractDetails from "@/pages/contract-details";
 import ContractIngestion from "@/pages/contract-ingestion";
 import Contracts from "@/pages/contracts";
 import CustomerArea from "@/pages/customer-area";
+import CustomerUsers from "@/pages/customer-users";
 import Customers from "@/pages/customers";
 import Dashboard from "@/pages/dashboard";
 import DeleteManagement from "@/pages/delete-management";
@@ -90,6 +91,17 @@ function MainRouter() {
     if (isLoading) return <LoadingSpinner />;
     if (!isAuthenticated) return <Redirect to="/login" />;
     return <CustomerArea />;
+  }
+
+  // Customer users management - requires authentication, active subscription, and admin role
+  if (location === "/customer-area/users") {
+    if (isLoading) return <LoadingSpinner />;
+    if (!isAuthenticated) return <Redirect to="/login" />;
+    // Check if user is admin
+    if (user?.role !== "admin" && user?.email !== "fernandocostaxavier@gmail.com") {
+      return <Redirect to="/customer-area" />;
+    }
+    return <CustomerUsers />;
   }
 
   // Login page - redirect if already authenticated

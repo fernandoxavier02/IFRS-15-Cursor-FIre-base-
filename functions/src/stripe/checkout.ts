@@ -244,3 +244,92 @@ export const resumeSubscription = functions.https.onCall(async (data, context) =
     throw new functions.https.HttpsError("internal", error.message || "Failed to resume subscription");
   }
 });
+
+// Add seats to existing subscription
+export const addSeatsToSubscription = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Must be authenticated");
+  }
+
+  const tenantId = context.auth.token.tenantId;
+  const role = context.auth.token.role;
+
+  if (role !== "admin" && !context.auth.token.systemAdmin) {
+    throw new functions.https.HttpsError("permission-denied", "Must be admin");
+  }
+
+  const { quantity = 1 } = data; // Number of additional seats to add
+
+  if (quantity < 1) {
+    throw new functions.https.HttpsError("invalid-argument", "Quantity must be at least 1");
+  }
+
+  try {
+    // Get tenant
+    const tenantDoc = await db.collection(COLLECTIONS.TENANTS).doc(tenantId).get();
+    if (!tenantDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Tenant not found");
+    }
+
+    const tenant = tenantDoc.data();
+    
+    if (tenant?.subscriptionStatus !== "active") {
+      throw new functions.https.HttpsError("failed-precondition", "Subscription must be active to add seats");
+    }
+
+    if (!tenant?.stripeSubscriptionId) {
+      throw new functions.https.HttpsError("failed-precondition", "No Stripe subscription found");
+    }
+
+    // Get subscription from Stripe
+    const subscription = await stripe.subscriptions.retrieve(tenant.stripeSubscriptionId);
+    
+    if (!subscription.items.data.length) {
+      throw new functions.https.HttpsError("failed-precondition", "Subscription has no items");
+    }
+
+    // Update subscription quantity (add seats)
+    const subscriptionItem = subscription.items.data[0];
+    
+    // Validate subscription item and quantity
+    if (!subscriptionItem || typeof subscriptionItem.quantity !== 'number') {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Subscription item quantity is invalid"
+      );
+    }
+    
+    const currentQuantity = subscriptionItem.quantity ?? 1; // Default to 1 if null/undefined
+    const newQuantity = currentQuantity + quantity;
+
+    await stripe.subscriptions.update(tenant.stripeSubscriptionId, {
+      items: [{
+        id: subscriptionItem.id,
+        quantity: newQuantity,
+      }],
+      proration_behavior: "always_invoice", // Charge immediately for prorated amount
+    });
+
+    // Update tenant maxLicenses
+    // Handle null/undefined: default to 0, preserve -1 for unlimited
+    const currentMaxLicenses = tenant?.maxLicenses ?? 0;
+    const newMaxLicenses = currentMaxLicenses === -1 ? -1 : currentMaxLicenses + quantity;
+
+    await tenantDoc.ref.update({
+      maxLicenses: newMaxLicenses,
+    });
+
+    return {
+      success: true,
+      newQuantity,
+      newMaxLicenses,
+      message: `Successfully added ${quantity} seat(s) to subscription`,
+    };
+  } catch (error: any) {
+    console.error("Error adding seats:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError("internal", error.message || "Failed to add seats");
+  }
+});

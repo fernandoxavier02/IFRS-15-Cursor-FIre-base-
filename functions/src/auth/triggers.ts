@@ -6,20 +6,45 @@ import { COLLECTIONS, tenantCollection } from "../utils/collections";
 export const onUserCreated = functions.auth.user().onCreate(async (user) => {
   console.log("New user created:", user.uid, user.email);
 
-  // Create user document in Firestore
-  // Note: This is a basic profile, tenant assignment happens during registration
+  // Check if user document already exists (may have been created by registerCompany)
+  // This prevents race condition where registerCompany creates user with full data
+  // and this trigger overwrites it with minimal data
   try {
-    await db.collection(COLLECTIONS.USERS).doc(user.uid).set({
-      id: user.uid,
-      email: user.email || "",
-      fullName: user.displayName || "",
-      createdAt: Timestamp.now(),
-      isActive: false,
-      mustChangePassword: true,
-      role: "readonly",
-    });
+    const userDocRef = db.collection(COLLECTIONS.USERS).doc(user.uid);
+    const userDoc = await userDocRef.get();
 
-    console.log("User document created for:", user.uid);
+    if (userDoc.exists) {
+      // User document already exists with complete data (from registerCompany)
+      // Only update missing fields if any, using merge
+      const existingData = userDoc.data();
+      const updateData: any = {};
+
+      // Only set defaults if field doesn't exist
+      if (!existingData?.email && user.email) updateData.email = user.email;
+      if (!existingData?.fullName && user.displayName) updateData.fullName = user.displayName;
+      if (!existingData?.createdAt) updateData.createdAt = Timestamp.now();
+
+      if (Object.keys(updateData).length > 0) {
+        await userDocRef.update(updateData);
+        console.log("User document updated with missing fields:", user.uid);
+      } else {
+        console.log("User document already exists with complete data, skipping:", user.uid);
+      }
+    } else {
+      // User document doesn't exist, create basic profile
+      // This handles users created outside of registerCompany flow
+      await userDocRef.set({
+        id: user.uid,
+        email: user.email || "",
+        fullName: user.displayName || "",
+        createdAt: Timestamp.now(),
+        isActive: false,
+        mustChangePassword: true,
+        role: "readonly",
+      });
+
+      console.log("User document created for:", user.uid);
+    }
   } catch (error) {
     console.error("Error creating user document:", error);
   }
@@ -179,7 +204,7 @@ export const createUserWithTenant = functions.https.onCall(async (data, context)
     // Fallback: use email domain as tenantId
     finalTenantId = sanitizedTenantId;
   }
-  
+
   // Tenant name: use provided name, or generate from email domain
   const domainName = emailDomain.split(".")[0];
   const finalTenantName = tenantName || (domainName.charAt(0).toUpperCase() + domainName.slice(1));
@@ -252,11 +277,11 @@ export const createUserWithTenant = functions.https.onCall(async (data, context)
     } catch (error: any) {
       if (error.code === "auth/user-not-found") {
         userRecord = await auth.createUser({
-          email,
+      email,
           password: finalPassword,
-          displayName: fullName,
+      displayName: fullName,
           emailVerified: false,
-        });
+    });
         console.log(`[createUserWithTenant] User created in Auth: ${email}`);
       } else {
         throw error;
@@ -717,5 +742,316 @@ Por favor, altere sua senha após o primeiro login. Esta é uma senha temporári
       throw error;
     }
     throw new functions.https.HttpsError("internal", error.message || "Failed to register company");
+  }
+});
+
+// Temporary function to delete user from Auth (admin only)
+// This can be used to clean up test registrations
+export const deleteUserFromAuth = functions.https.onCall(async (data, context) => {
+  // Only allow system admin to call this
+  if (!context.auth || !context.auth.token.systemAdmin) {
+    throw new functions.https.HttpsError("permission-denied", "Must be system admin");
+  }
+
+  const { userId, email } = data;
+  
+  if (!userId && !email) {
+    throw new functions.https.HttpsError("invalid-argument", "Must provide userId or email");
+  }
+
+  try {
+    let userRecord;
+    if (userId) {
+      userRecord = await auth.getUser(userId);
+    } else if (email) {
+      userRecord = await auth.getUserByEmail(email);
+    } else {
+      throw new functions.https.HttpsError("invalid-argument", "Must provide userId or email");
+    }
+
+    // Delete user from Auth (this will trigger onUserDeleted which cleans up Firestore)
+    await auth.deleteUser(userRecord.uid);
+    
+    console.log(`[deleteUserFromAuth] User deleted: ${userRecord.uid} (${userRecord.email})`);
+    
+    return { success: true, uid: userRecord.uid, email: userRecord.email };
+  } catch (error: any) {
+    console.error("[deleteUserFromAuth] Error:", error);
+    if (error.code === "auth/user-not-found") {
+      throw new functions.https.HttpsError("not-found", "User not found");
+    }
+    throw new functions.https.HttpsError("internal", error.message || "Failed to delete user");
+  }
+});
+
+// Get tenant users (for company admin)
+export const getTenantUsers = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Must be authenticated");
+  }
+
+  const tenantId = context.auth.token.tenantId;
+  const role = context.auth.token.role;
+
+  // Only admin users can view tenant users
+  if (role !== "admin" && !context.auth.token.systemAdmin) {
+    throw new functions.https.HttpsError("permission-denied", "Must be admin");
+  }
+
+  if (!tenantId) {
+    throw new functions.https.HttpsError("failed-precondition", "No tenant associated");
+  }
+
+  try {
+    // Get tenant to check if active
+    const tenantDoc = await db.collection(COLLECTIONS.TENANTS).doc(tenantId).get();
+    if (!tenantDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Tenant not found");
+    }
+
+    const tenant = tenantDoc.data();
+    
+    // Get users from tenant subcollection
+    const usersSnapshot = await db
+      .collection(tenantCollection(tenantId, COLLECTIONS.USERS))
+      .get();
+
+    const users = usersSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    // Get current active users count
+    const activeUsersCount = users.filter((u: any) => u.isActive === true).length;
+
+    return {
+      users,
+      tenant: {
+        id: tenantId,
+        name: tenant?.name,
+        maxLicenses: tenant?.maxLicenses || 0,
+        currentLicenses: activeUsersCount,
+        availableLicenses: (tenant?.maxLicenses || 0) === -1 ? -1 : Math.max(0, (tenant?.maxLicenses || 0) - activeUsersCount),
+        subscriptionStatus: tenant?.subscriptionStatus,
+        status: tenant?.status,
+      },
+    };
+  } catch (error: any) {
+    console.error("[getTenantUsers] Error:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError("internal", error.message || "Failed to get users");
+  }
+});
+
+// Add new user to tenant (admin only, requires active subscription)
+export const addTenantUser = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Must be authenticated");
+  }
+
+  const tenantId = context.auth.token.tenantId;
+  const role = context.auth.token.role;
+
+  // Only admin users can add users
+  if (role !== "admin" && !context.auth.token.systemAdmin) {
+    throw new functions.https.HttpsError("permission-denied", "Must be admin");
+  }
+
+  if (!tenantId) {
+    throw new functions.https.HttpsError("failed-precondition", "No tenant associated");
+  }
+
+  const { email, fullName } = data;
+
+  if (!email || !fullName) {
+    throw new functions.https.HttpsError("invalid-argument", "Email and fullName are required");
+  }
+
+  try {
+    // Get tenant
+    const tenantDoc = await db.collection(COLLECTIONS.TENANTS).doc(tenantId).get();
+    if (!tenantDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Tenant not found");
+    }
+
+    const tenant = tenantDoc.data();
+
+    // Check if subscription is active
+    if (tenant?.subscriptionStatus !== "active" && tenant?.status !== "active") {
+      throw new functions.https.HttpsError("failed-precondition", "Company subscription must be active to add users");
+    }
+
+    // Check available licenses/seats
+    const usersSnapshot = await db
+      .collection(tenantCollection(tenantId, COLLECTIONS.USERS))
+      .get();
+
+    const activeUsersCount = usersSnapshot.docs.filter(
+      doc => doc.data().isActive === true
+    ).length;
+
+    const maxLicenses = tenant?.maxLicenses || 0;
+    
+    // -1 means unlimited (enterprise plan)
+    if (maxLicenses !== -1 && activeUsersCount >= maxLicenses) {
+      throw new functions.https.HttpsError(
+        "resource-exhausted",
+        `Maximum number of users (${maxLicenses}) reached. Please upgrade your plan to add more users.`
+      );
+    }
+
+    // Generate password function
+    const generatePassword = () => {
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
+      let pwd = "";
+      for (let i = 0; i < 16; i++) {
+        pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return pwd;
+    };
+
+    // Check if user already exists
+    let userRecord;
+    let tempPassword: string | undefined;
+    try {
+      userRecord = await auth.getUserByEmail(email);
+      
+      // Check if user already belongs to this tenant
+      const existingUserDoc = await db
+        .collection(tenantCollection(tenantId, COLLECTIONS.USERS))
+        .doc(userRecord.uid)
+        .get();
+
+      if (existingUserDoc.exists) {
+        throw new functions.https.HttpsError("already-exists", "User already exists in this company");
+      }
+
+      // User exists but in different tenant - not allowed
+      throw new functions.https.HttpsError("already-exists", "User with this email already exists in another company");
+    } catch (error: any) {
+      if (error.code === "auth/user-not-found") {
+        // User doesn't exist - create new user
+        tempPassword = generatePassword();
+
+        userRecord = await auth.createUser({
+          email,
+          password: tempPassword,
+          displayName: fullName,
+          emailVerified: false,
+        });
+        console.log(`[addTenantUser] New user created: ${email}`);
+      } else if (error instanceof functions.https.HttpsError) {
+        throw error;
+      } else {
+        throw new functions.https.HttpsError("internal", `Failed to check/create user: ${error.message}`);
+      }
+    }
+
+    // If user already existed, we can't send password email
+    if (!tempPassword) {
+      throw new functions.https.HttpsError("failed-precondition", "Cannot add existing user - they already have an account");
+    }
+
+    // Set custom claims
+    await auth.setCustomUserClaims(userRecord.uid, {
+      tenantId,
+      role: "readonly", // New users start as readonly, admin can change later
+      systemAdmin: false,
+    });
+
+    const now = Timestamp.now();
+    const userData = {
+      id: userRecord.uid,
+      email,
+      fullName,
+      username: email.split("@")[0],
+      tenantId,
+      role: "readonly",
+      isActive: true, // Activate immediately since subscription is active
+      mustChangePassword: true,
+      createdAt: now,
+    };
+
+    // Create user document in root collection
+    await db.collection(COLLECTIONS.USERS).doc(userRecord.uid).set(userData);
+
+    // Create user document in tenant subcollection
+    await db
+      .collection(tenantCollection(tenantId, COLLECTIONS.USERS))
+      .doc(userRecord.uid)
+      .set(userData);
+
+    // Send email with credentials
+    const appUrl = process.env.APP_URL || "https://ifrs15-revenue-manager.web.app";
+    try {
+      await db.collection(COLLECTIONS.MAIL).add({
+        to: email,
+        message: {
+          subject: "Você foi adicionado ao IFRS 15 Revenue Manager",
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px; border-radius: 10px 10px 0 0; text-align: center;">
+                <h1 style="color: white; margin: 0;">IFRS 15 Revenue Manager</h1>
+              </div>
+              
+              <div style="background: white; padding: 40px; border: 1px solid #e5e7eb;">
+                <h2 style="color: #111827; margin-top: 0;">Olá, ${fullName}!</h2>
+                <p>Você foi adicionado à empresa <strong>${tenant?.name}</strong> no IFRS 15 Revenue Manager.</p>
+                
+                <div style="background: #f9fafb; border-left: 4px solid #10b981; padding: 20px; margin: 30px 0; border-radius: 4px;">
+                  <h3 style="margin-top: 0; color: #059669;">Suas Credenciais de Acesso:</h3>
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 8px 0; font-weight: bold; width: 120px;">Email:</td>
+                      <td style="padding: 8px 0;"><code style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px;">${email}</code></td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; font-weight: bold;">Senha:</td>
+                      <td style="padding: 8px 0;"><code style="background: #fef3c7; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #92400e;">${tempPassword}</code></td>
+                    </tr>
+                  </table>
+                </div>
+
+                <div style="text-align: center; margin: 40px 0;">
+                  <a href="${appUrl}/login" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                    Acessar Sistema
+                  </a>
+                </div>
+
+                <p style="color: #6b7280; font-size: 14px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                  <strong>Segurança:</strong> Por favor, altere sua senha após o primeiro login.
+                </p>
+              </div>
+            </body>
+            </html>
+          `,
+        },
+      });
+      console.log(`[addTenantUser] Email sent to: ${email}`);
+    } catch (emailError: any) {
+      console.error("[addTenantUser] Error sending email:", emailError);
+      // Don't fail user creation if email fails
+    }
+
+    return {
+      success: true,
+      userId: userRecord.uid,
+      user: userData,
+      message: "User added successfully. Credentials sent via email.",
+    };
+  } catch (error: any) {
+    console.error("[addTenantUser] Error:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError("internal", error.message || "Failed to add user");
   }
 });
