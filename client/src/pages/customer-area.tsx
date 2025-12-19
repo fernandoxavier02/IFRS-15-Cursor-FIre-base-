@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-firebase";
 import { functions } from "@/lib/firebase";
@@ -14,14 +15,14 @@ import {
     Clock,
     FileText,
     Globe,
+    Lightning,
     Lock,
     Rocket,
     ShieldCheck,
-    Sparkles,
+    Sparkle,
     Target,
-    TrendingUp,
-    Users,
-    Zap
+    TrendUp,
+    Users
 } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { httpsCallable } from "firebase/functions";
@@ -69,7 +70,7 @@ const features = [
 
 const benefits = [
   {
-    icon: TrendingUp,
+    icon: TrendUp,
     title: "Economize Tempo",
     description: "Reduza em até 80% o tempo gasto com cálculos manuais de IFRS 15",
     stat: "80%",
@@ -81,7 +82,7 @@ const benefits = [
     stat: "99.9%",
   },
   {
-    icon: Zap,
+    icon: Lightning,
     title: "Aumente Produtividade",
     description: "Foque no que realmente importa enquanto o sistema trabalha para você",
     stat: "5x",
@@ -164,37 +165,10 @@ export default function CustomerArea() {
     }
   }, []);
 
-  // If active, redirect to app
-  useEffect(() => {
-    if (isActive) {
-      toast({
-        title: "Acesso Liberado!",
-        description: "Redirecionando para o aplicativo...",
-      });
-      setTimeout(() => {
-        setLocation("/");
-      }, 2000);
-    }
-  }, [isActive, setLocation, toast]);
-
   if (tenantLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (isActive) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="max-w-md">
-          <CardContent className="p-12 text-center">
-            <CheckCircle className="h-16 w-16 text-emerald-500 mx-auto mb-4" weight="fill" />
-            <h2 className="text-2xl font-bold mb-2">Acesso Liberado!</h2>
-            <p className="text-muted-foreground">Redirecionando para o aplicativo...</p>
-          </CardContent>
-        </Card>
       </div>
     );
   }
@@ -213,10 +187,17 @@ export default function CustomerArea() {
             </span>
           </div>
           <div className="flex items-center gap-4">
-            <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
-              <Clock weight="fill" className="h-3 w-3 mr-1" />
-              Aguardando Ativação
-            </Badge>
+            {isActive ? (
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                <CheckCircle weight="fill" className="h-3 w-3 mr-1" />
+                Conta Ativa
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
+                <Clock weight="fill" className="h-3 w-3 mr-1" />
+                Aguardando Ativação
+              </Badge>
+            )}
           </div>
         </div>
       </header>
@@ -224,28 +205,114 @@ export default function CustomerArea() {
       {/* Hero Section */}
       <section className="py-16 border-b bg-gradient-to-br from-emerald-500/5 via-transparent to-purple-500/5">
         <div className="container mx-auto px-6">
-          <div className="max-w-4xl mx-auto text-center">
-            <Badge variant="outline" className="mb-6 px-4 py-2 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
-              <Rocket weight="fill" className="h-3 w-3 mr-2" />
-              Bem-vindo, {user?.fullName}!
-            </Badge>
-            
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              Sua Empresa está Registrada
-            </h1>
-            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Estamos quase lá! Complete o pagamento da assinatura para desbloquear o acesso completo ao <strong>IFRS 15 Revenue Manager</strong>.
-            </p>
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-12">
+              <Badge variant="outline" className="mb-6 px-4 py-2 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                <Rocket weight="fill" className="h-3 w-3 mr-2" />
+                Bem-vindo, {user?.fullName}!
+              </Badge>
+              
+              <h1 className="text-4xl md:text-5xl font-bold mb-4">
+                {isActive ? "Sua Conta Está Ativa!" : "Sua Empresa está Registrada"}
+              </h1>
+              <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+                {isActive 
+                  ? "Acesse todas as funcionalidades do IFRS 15 Revenue Manager e gerencie sua receita com confiança."
+                  : "Estamos quase lá! Complete o pagamento da assinatura para desbloquear o acesso completo ao IFRS 15 Revenue Manager."
+                }
+              </p>
 
-            <Card className="border-amber-500/20 bg-amber-500/5">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <Lock weight="fill" className="h-6 w-6 text-amber-500 flex-shrink-0 mt-1" />
-                  <div className="text-left">
-                    <h3 className="font-semibold mb-2">Acesso Limitado</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Atualmente, você pode visualizar as funcionalidades disponíveis, mas o acesso completo ao aplicativo será liberado após a confirmação do pagamento.
-                    </p>
+              {isActive ? (
+                <div className="flex justify-center">
+                  <Button
+                    size="lg"
+                    onClick={() => setLocation("/")}
+                    className="h-14 px-8 text-lg bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/20 font-semibold"
+                  >
+                    <ChartLineUp weight="fill" className="mr-2 h-5 w-5" />
+                    Acesse o Sistema
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </div>
+              ) : (
+                <Card className="border-amber-500/20 bg-amber-500/5 max-w-2xl mx-auto">
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-4">
+                      <Lock weight="fill" className="h-6 w-6 text-amber-500 flex-shrink-0 mt-1" />
+                      <div className="text-left">
+                        <h3 className="font-semibold mb-2">Acesso Limitado</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Atualmente, você pode visualizar as funcionalidades disponíveis, mas o acesso completo ao aplicativo será liberado após a confirmação do pagamento.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* User & Company Information Card */}
+            <Card className="mb-8 border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users weight="fill" className="h-5 w-5 text-emerald-500" />
+                  Informações da Conta
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* User Information */}
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dados Pessoais</Label>
+                      <div className="mt-2 space-y-3">
+                        <div>
+                          <p className="text-sm font-medium">Nome Completo</p>
+                          <p className="text-base">{user?.fullName || "N/A"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">Email</p>
+                          <p className="text-base">{user?.email || "N/A"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">Função</p>
+                          <Badge variant="outline" className="mt-1">
+                            {user?.role === "admin" ? "Administrador" : user?.role || "Usuário"}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Company Information */}
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dados da Empresa</Label>
+                      <div className="mt-2 space-y-3">
+                        <div>
+                          <p className="text-sm font-medium">Nome da Empresa</p>
+                          <p className="text-base">{(tenant as any)?.name || "N/A"}</p>
+                        </div>
+                        {(tenant as any)?.taxId && (
+                          <div>
+                            <p className="text-sm font-medium">CNPJ/Tax ID</p>
+                            <p className="text-base">{(tenant as any)?.taxId}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm font-medium">Plano</p>
+                          <Badge variant="outline" className="mt-1">
+                            {((tenant as any)?.planType || "starter").charAt(0).toUpperCase() + ((tenant as any)?.planType || "starter").slice(1)}
+                          </Badge>
+                        </div>
+                        {(tenant as any)?.address && (
+                          <div>
+                            <p className="text-sm font-medium">Endereço</p>
+                            <p className="text-sm">{(tenant as any)?.address}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -326,7 +393,8 @@ export default function CustomerArea() {
         </div>
       </section>
 
-      {/* CTA Section - Payment */}
+      {/* CTA Section - Payment (only show if not active) */}
+      {!isActive && (
       <section className="py-16">
         <div className="container mx-auto px-6">
           <div className="max-w-4xl mx-auto">
@@ -335,7 +403,7 @@ export default function CustomerArea() {
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-purple-500/10" />
                 <div className="relative text-center">
                   <div className="flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 mx-auto mb-6 shadow-lg">
-                    <Sparkles weight="fill" className="h-10 w-10 text-white" />
+                    <Sparkle weight="fill" className="h-10 w-10 text-white" />
                   </div>
                   
                   <h2 className="text-3xl md:text-4xl font-bold mb-4">
@@ -402,6 +470,7 @@ export default function CustomerArea() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Footer */}
       <footer className="py-8 border-t">

@@ -80,6 +80,11 @@ function MainRouter() {
     if (location === "/subscribe") return <Subscribe />;
   }
 
+  // Root path - show landing page if not authenticated
+  if (location === "/" && !isAuthenticated) {
+    return <Landing />;
+  }
+
   // Customer area - requires authentication but no payment
   if (location === "/customer-area") {
     if (isLoading) return <LoadingSpinner />;
@@ -90,7 +95,15 @@ function MainRouter() {
   // Login page - redirect if already authenticated
   if (location === "/login") {
     if (isLoading) return <LoadingSpinner />;
-    if (isAuthenticated) return <Redirect to="/" />;
+    if (isAuthenticated) {
+      // Check subscription status before redirecting
+      if (needsPasswordChange) return <Redirect to="/change-password" />;
+      if (needsLicenseActivation) return <Redirect to="/activate-license" />;
+      if (user?.tenantId && !tenantLoading && needsPayment) {
+        return <Redirect to="/customer-area" />;
+      }
+      return <Redirect to="/customer-area" />;
+    }
     return <Login />;
   }
 
@@ -99,14 +112,9 @@ function MainRouter() {
     return <LoadingSpinner />;
   }
 
-  // Root path - show showcase if not authenticated
-  if (location === "/" && !isAuthenticated) {
-    return <Showcase />;
-  }
-
-  // Not authenticated - redirect to login
+  // Not authenticated - redirect to login (only if trying to access protected routes)
   if (!isAuthenticated) {
-    return <Redirect to="/login" />;
+    return <Redirect to="/" />;
   }
 
   // Authenticated but needs password change

@@ -607,10 +607,12 @@ export const registerCompany = functions.https.onCall(async (data, context) => {
       
       // Get subscription plans from Firestore
       const plansSnapshot = await db.collection(COLLECTIONS.SUBSCRIPTION_PLANS).get();
-      const plans = plansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const plans = plansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       const plan = plans.find((p: any) => p.id === planId);
       
-      if (plan?.priceId) {
+      const priceId = plan?.priceId || plan?.stripePriceIdMonthly || plan?.stripePriceIdYearly;
+      
+      if (priceId) {
         // Create checkout session directly
         const session = await stripe.checkout.sessions.create({
           mode: "subscription",
@@ -618,7 +620,7 @@ export const registerCompany = functions.https.onCall(async (data, context) => {
           customer_email: email,
           line_items: [
             {
-              price: plan.priceId,
+              price: priceId,
               quantity: 1,
             },
           ],

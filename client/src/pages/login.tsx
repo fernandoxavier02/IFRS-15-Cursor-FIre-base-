@@ -40,9 +40,10 @@ export default function Login() {
     if (result.success) {
       toast({
         title: "Login successful",
-        description: "Welcome back!",
+        description: "Bem-vindo de volta!",
       });
-      setLocation("/");
+      // Redirect to customer area - App.tsx will handle further routing based on subscription status
+      setLocation("/customer-area");
     } else {
       toast({
         title: t("common.error"),

@@ -1,7 +1,7 @@
 import * as functions from "firebase-functions";
 import Stripe from "stripe";
 import { db, Timestamp } from "../utils/admin";
-import { COLLECTIONS } from "../utils/collections";
+import { COLLECTIONS, tenantCollection } from "../utils/collections";
 
 // Initialize Stripe with secret key from environment
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {

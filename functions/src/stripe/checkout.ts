@@ -29,12 +29,15 @@ export const createCheckoutSession = functions.https.onCall(async (data, context
     // If planId provided, find priceId from subscription plans
     if (!finalPriceId && planId) {
       const plansSnapshot = await db.collection(COLLECTIONS.SUBSCRIPTION_PLANS).get();
-      const plans = plansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const plans = plansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       const plan = plans.find((p: any) => p.id === planId);
-      if (!plan || !plan.priceId) {
-        throw new functions.https.HttpsError("not-found", `Plan ${planId} not found or has no priceId`);
+      if (!plan) {
+        throw new functions.https.HttpsError("not-found", `Plan ${planId} not found`);
       }
-      finalPriceId = plan.priceId;
+      finalPriceId = plan.priceId || plan.stripePriceIdMonthly || plan.stripePriceIdYearly;
+      if (!finalPriceId) {
+        throw new functions.https.HttpsError("not-found", `Plan ${planId} has no priceId configured`);
+      }
     }
 
     // Check if customer exists

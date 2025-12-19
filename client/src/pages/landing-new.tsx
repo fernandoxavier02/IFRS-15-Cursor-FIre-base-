@@ -18,7 +18,6 @@ import {
     FileX,
     Globe,
     Lightning,
-    Play,
     Rocket,
     ShieldCheck,
     SpinnerGap,
@@ -283,15 +282,19 @@ export default function LandingNew() {
               IFRS 15 Revenue Manager
             </span>
           </div>
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => setLocation("/login")}>
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setLocation("/login")}
+              className="font-semibold"
+            >
               Entrar
             </Button>
             <Button
               onClick={() => document.getElementById("register")?.scrollIntoView({ behavior: "smooth" })}
-              className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
+              className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 font-semibold shadow-lg shadow-emerald-500/20"
             >
-              Começar Agora
+              Registre-se
             </Button>
           </div>
         </div>
@@ -325,19 +328,18 @@ export default function LandingNew() {
               <Button
                 size="lg"
                 onClick={() => document.getElementById("register")?.scrollIntoView({ behavior: "smooth" })}
-                className="h-14 px-8 text-lg bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/20"
+                className="h-14 px-8 text-lg bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/20 font-semibold"
               >
-                Começar Gratuitamente
+                Registre-se Agora
                 <ArrowRight weight="bold" className="ml-2 h-5 w-5" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                className="h-14 px-8 text-lg"
-                onClick={() => document.getElementById("problems")?.scrollIntoView({ behavior: "smooth" })}
+                className="h-14 px-8 text-lg font-semibold border-2"
+                onClick={() => setLocation("/login")}
               >
-                <Play weight="fill" className="mr-2 h-5 w-5" />
-                Ver Como Resolvemos
+                Já tem conta? Entrar
               </Button>
             </div>
 
