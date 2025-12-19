@@ -185,7 +185,6 @@ interface RegistrationFormData {
 export default function LandingNew() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [registrationData, setRegistrationData] = useState<RegistrationFormData>({
     companyName: "",
     email: "",
@@ -197,7 +196,7 @@ export default function LandingNew() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (data: RegistrationFormData & { planId: string }) => {
+    mutationFn: async (data: RegistrationFormData) => {
       const registerCompany = httpsCallable(functions, "registerCompany");
       const result = await registerCompany({
         companyName: data.companyName,
@@ -207,30 +206,21 @@ export default function LandingNew() {
         address: data.address,
         country: data.country,
         phone: data.phone,
-        planId: data.planId,
+        // No planId - user will choose plan in customer area
       });
       return result.data as any;
     },
     onSuccess: (data) => {
       toast({
         title: "Registro realizado com sucesso!",
-        description: data.credentials 
-          ? "Verifique seu email para receber suas credenciais de acesso. Você será redirecionado para o pagamento."
-          : "Registro concluído. Você receberá um email com suas credenciais em instantes.",
+        description: "Verifique seu email para receber suas credenciais de acesso. Você será redirecionado para fazer login.",
         variant: "default",
       });
       
-      // If checkout URL is available, redirect to payment
-      if (data.checkoutUrl) {
-        setTimeout(() => {
-          window.location.href = data.checkoutUrl;
-        }, 2000);
-      } else {
-        // Otherwise, redirect to login after showing credentials
-        setTimeout(() => {
-          setLocation("/login");
-        }, 3000);
-      }
+      // Always redirect to login - user can choose plan later in customer area
+      setTimeout(() => {
+        setLocation("/login");
+      }, 2500);
     },
     onError: (error: Error) => {
       toast({
@@ -241,7 +231,7 @@ export default function LandingNew() {
     },
   });
 
-  const handleRegister = (planId: string) => {
+  const handleRegister = () => {
     // Validate required fields
     if (!registrationData.companyName || !registrationData.email || !registrationData.fullName) {
       toast({
@@ -265,8 +255,8 @@ export default function LandingNew() {
       return;
     }
 
-    setSelectedPlan(planId);
-    registerMutation.mutate({ ...registrationData, planId });
+    // Register without plan - user will choose plan later in customer area
+    registerMutation.mutate({ ...registrationData });
   };
 
   return (
@@ -549,15 +539,24 @@ export default function LandingNew() {
               <CardFooter className="flex flex-col gap-4">
                 <p className="text-xs text-muted-foreground text-center">
                   Ao registrar, você concorda com nossos Termos de Serviço e Política de Privacidade.
-                  As credenciais de acesso serão enviadas para o email informado após a confirmação do pagamento.
+                  As credenciais de acesso serão enviadas para o email informado.
                 </p>
                 <Button
-                  className="w-full h-12 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
-                  onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
+                  className="w-full h-12 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 font-semibold"
+                  onClick={handleRegister}
                   disabled={registerMutation.isPending}
                 >
-                  Continuar para Escolher Plano
-                  <ArrowRight weight="bold" className="ml-2 h-4 w-4" />
+                  {registerMutation.isPending ? (
+                    <>
+                      <SpinnerGap weight="bold" className="h-4 w-4 mr-2 animate-spin" />
+                      Processando...
+                    </>
+                  ) : (
+                    <>
+                      Criar Minha Conta
+                      <ArrowRight weight="bold" className="ml-2 h-4 w-4" />
+                    </>
+                  )}
                 </Button>
               </CardFooter>
             </Card>
@@ -577,11 +576,11 @@ export default function LandingNew() {
               Selecione o plano que melhor atende às necessidades da sua empresa.
             </p>
             <div className="max-w-md mx-auto">
-              <Card className="card-premium border-emerald-500/20 bg-emerald-500/5">
+              <Card className="card-premium border-blue-500/20 bg-blue-500/5">
                 <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground flex items-center gap-2 justify-center">
-                    <Warning weight="fill" className="h-4 w-4 text-amber-500" />
-                    <span><strong>Obrigatório:</strong> Preencha o formulário de registro acima antes de escolher um plano.</span>
+                  <p className="text-sm text-muted-foreground flex items-center gap-2 justify-center text-center">
+                    <CheckCircle weight="fill" className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                    <span>Após o registro, você terá acesso à sua área do cliente, onde poderá escolher e pagar pelo plano desejado.</span>
                   </p>
                 </CardContent>
               </Card>
@@ -631,28 +630,9 @@ export default function LandingNew() {
                       </ul>
                     </CardContent>
                     <CardFooter className="pt-4">
-                      <Button
-                        className={`w-full h-12 font-semibold ${
-                          plan.popular
-                            ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/20"
-                            : ""
-                        }`}
-                        variant={plan.popular ? "default" : "outline"}
-                        onClick={() => handleRegister(plan.id)}
-                        disabled={registerMutation.isPending && selectedPlan === plan.id}
-                      >
-                        {registerMutation.isPending && selectedPlan === plan.id ? (
-                          <>
-                            <SpinnerGap weight="bold" className="h-4 w-4 mr-2 animate-spin" />
-                            Processando...
-                          </>
-                        ) : (
-                          <>
-                            Escolher Este Plano
-                            <ArrowRight weight="bold" className="ml-2 h-4 w-4" />
-                          </>
-                        )}
-                      </Button>
+                      <p className="text-sm text-center text-muted-foreground w-full">
+                        Você poderá escolher este plano após o registro, na sua área do cliente.
+                      </p>
                     </CardFooter>
                   </Card>
                 );

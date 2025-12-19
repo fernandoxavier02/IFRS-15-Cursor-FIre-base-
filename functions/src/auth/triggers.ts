@@ -470,7 +470,7 @@ export const registerCompany = functions.https.onCall(async (data, context) => {
     address,
     country = "Brasil",
     phone,
-    planId = "professional",
+    planId, // Optional - user will choose plan in customer area
   } = data;
 
   // Validate required fields
@@ -501,21 +501,22 @@ export const registerCompany = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError("already-exists", "A company with this email domain already exists. Please use a different email or contact support.");
     }
 
-    // Determine plan limits
+    // Determine plan limits (use default starter plan if no planId provided)
     const planLimits: Record<string, { maxContracts: number; maxUsers: number; price: number }> = {
       starter: { maxContracts: 10, maxUsers: 1, price: 299 },
       professional: { maxContracts: 30, maxUsers: 3, price: 699 },
       enterprise: { maxContracts: -1, maxUsers: -1, price: 999 },
     };
-    const limits = planLimits[planId] || planLimits.professional;
+    const defaultPlanId = planId || "starter"; // Default to starter if no plan selected
+    const limits = planLimits[defaultPlanId] || planLimits.starter;
 
     // 1. Create tenant with full company information
     await tenantRef.set({
       id: sanitizedTenantId,
       name: companyName,
       slug: sanitizedTenantId,
-      plan: planId,
-      planType: planId,
+      plan: defaultPlanId,
+      planType: defaultPlanId,
       maxContracts: limits.maxContracts,
       maxLicenses: limits.maxUsers,
       status: "pending", // Will be activated after payment
@@ -597,58 +598,8 @@ export const registerCompany = functions.https.onCall(async (data, context) => {
       .doc(userRecord.uid)
       .set(userData);
 
-    // 7. Get Stripe checkout URL if planId is provided
-    let checkoutUrl: string | null = null;
-    try {
-      const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-        apiVersion: "2023-10-16",
-      });
-      
-      // Get subscription plans from Firestore
-      const plansSnapshot = await db.collection(COLLECTIONS.SUBSCRIPTION_PLANS).get();
-      const plans = plansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      const plan = plans.find((p: any) => p.id === planId);
-      
-      const priceId = plan?.priceId || plan?.stripePriceIdMonthly || plan?.stripePriceIdYearly;
-      
-      if (priceId) {
-        // Create checkout session directly
-        const session = await stripe.checkout.sessions.create({
-          mode: "subscription",
-          payment_method_types: ["card"],
-          customer_email: email,
-          line_items: [
-            {
-              price: priceId,
-              quantity: 1,
-            },
-          ],
-          success_url: `${process.env.APP_URL || "https://ifrs15-revenue-manager.web.app"}/subscribe?success=true&tenantId=${sanitizedTenantId}`,
-          cancel_url: `${process.env.APP_URL || "https://ifrs15-revenue-manager.web.app"}/subscribe?canceled=true`,
-          metadata: {
-            email,
-            tenantId: sanitizedTenantId,
-            companyName,
-            planId,
-          },
-        });
-        
-        checkoutUrl = session.url || null;
-        
-        // Store checkout session in database
-        await db.collection(COLLECTIONS.CHECKOUT_SESSIONS).add({
-          stripeSessionId: session.id,
-          email,
-          tenantId: sanitizedTenantId,
-          status: "pending",
-          createdAt: Timestamp.now(),
-        });
-      }
-    } catch (stripeError: any) {
-      console.error("[registerCompany] Error creating checkout session:", stripeError);
-      // Don't fail registration if Stripe fails - they can set up payment later
-    }
+    // 7. NO CHECKOUT AUTOMATIC - User will choose and pay for plan in customer area
+    // Registration is separate from payment - user can register now and pay later
 
     // 8. Send email with credentials using Trigger Email extension
     const appUrl = process.env.APP_URL || "https://ifrs15-revenue-manager.web.app";
@@ -688,15 +639,16 @@ export const registerCompany = functions.https.onCall(async (data, context) => {
                   </table>
                 </div>
 
-                <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 30px 0; border-radius: 4px;">
-                  <h3 style="margin-top: 0; color: #2563eb;">⚠️ Importante:</h3>
-                  <p style="margin: 0;">Sua conta está <strong>aguardando ativação</strong>. Para acessar o aplicativo completo, você precisará:</p>
-                  <ol style="margin: 10px 0 0 20px; padding-left: 0;">
-                    <li>Acessar sua <strong>Área do Cliente</strong> usando as credenciais acima</li>
-                    <li>Completar o pagamento da assinatura</li>
-                    <li>Após confirmação, seu acesso será liberado automaticamente</li>
-                  </ol>
-                </div>
+              <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 30px 0; border-radius: 4px;">
+                <h3 style="margin-top: 0; color: #2563eb;">✨ Próximos Passos:</h3>
+                <p style="margin: 0;">Agora você pode:</p>
+                <ol style="margin: 10px 0 0 20px; padding-left: 0;">
+                  <li>Acessar sua <strong>Área do Cliente</strong> usando as credenciais acima</li>
+                  <li>Visualizar todas as funcionalidades disponíveis</li>
+                  <li>Quando estiver pronto, escolher e pagar pelo plano desejado</li>
+                  <li>Após o pagamento, seu acesso completo será liberado automaticamente</li>
+                </ol>
+              </div>
 
                 <div style="text-align: center; margin: 40px 0;">
                   <a href="${appUrl}/login" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);">
@@ -729,10 +681,11 @@ SUAS CREDENCIAIS DE ACESSO:
 Email: ${email}
 Senha: ${tempPassword}
 
-IMPORTANTE: Sua conta está aguardando ativação. Para acessar o aplicativo completo:
+PRÓXIMOS PASSOS:
 1. Acesse sua Área do Cliente usando as credenciais acima
-2. Complete o pagamento da assinatura
-3. Após confirmação, seu acesso será liberado automaticamente
+2. Visualize todas as funcionalidades disponíveis
+3. Quando estiver pronto, escolha e pague pelo plano desejado
+4. Após o pagamento, seu acesso completo será liberado automaticamente
 
 Acesse: ${appUrl}/login
 
@@ -752,14 +705,11 @@ Por favor, altere sua senha após o primeiro login. Esta é uma senha temporári
       success: true,
       userId: userRecord.uid,
       tenantId: sanitizedTenantId,
-      checkoutUrl,
       credentials: {
         email,
         password: tempPassword, // Return password in response as backup if email fails
       },
-      message: checkoutUrl 
-        ? "Company registered successfully. Check your email for credentials. Redirecting to checkout..." 
-        : "Company registered successfully. Check your email for credentials. You can complete payment from your customer area.",
+      message: "Company registered successfully. Check your email for credentials. You can login and choose a plan in your customer area.",
     };
   } catch (error: any) {
     console.error("[registerCompany] Error:", error);
